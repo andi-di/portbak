@@ -75,7 +75,7 @@ try:
         with (case / "app.log").open("w") as log:
             process = subprocess.Popen((["wine", str(app)] if wine else [str(app)]), env=env, stdout=log, stderr=log)
             try:
-                manifest = target / ("backup-" + job_id) / "manifest.json"
+                manifest = target / ("manifest-" + job_id + ".json")
                 deadline = time.monotonic() + 20
                 while not manifest.exists() and time.monotonic() < deadline:
                     assert process.poll() is None, (case / "app.log").read_text()

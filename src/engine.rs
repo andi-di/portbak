@@ -154,20 +154,27 @@ fn run_inner(
     if source.starts_with(&target) || target.starts_with(&source) {
         bail!("Source and destination folders must not overlap")
     }
-    let root = target.join(format!("backup-{}", job.id));
-    if root.exists() && is_link(&fs::symlink_metadata(&root)?) {
-        bail!("Job destination must not be a link")
+    anyhow::ensure!(target.is_dir(), "Destination is not a folder");
+    let root = target;
+    let lock_path = root.join(".lock");
+    let manifest_path = root.join(format!("manifest-{}.json", job.id));
+    for path in [&lock_path, &manifest_path] {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) => {
+                anyhow::ensure!(!is_link(&metadata), "Backup metadata must not be a link")
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
     }
-    fs::create_dir_all(&root)?;
     let lock = OpenOptions::new()
         .create(true)
         .truncate(false)
         .read(true)
         .write(true)
-        .open(root.join(".lock"))?;
+        .open(&lock_path)?;
     lock.try_lock_exclusive()
-        .context("This job is already running")?;
-    let manifest_path = root.join("manifest.json");
+        .context("This destination is already in use")?;
     let mut manifest: Manifest = if manifest_path.exists() {
         load(&manifest_path)?
     } else {
@@ -374,6 +381,84 @@ mod tests {
         run(j, &std::sync::mpsc::channel().0).unwrap()
     }
     #[test]
+    fn backups_use_selected_destination_directly() {
+        let (_t, j) = setup();
+        run_test(&j);
+        let manifest: Manifest = load(&j.target.join(format!("manifest-{}.json", j.id))).unwrap();
+        assert!(j.target.join(&manifest.records[0].name).join("a").is_file());
+        assert!(!j.target.join(format!("backup-{}", j.id)).exists());
+    }
+
+    #[test]
+    fn shared_destination_keeps_job_history_separate() {
+        let (_t, first) = setup();
+        let mut second = first.clone();
+        second.id = uuid::Uuid::new_v4();
+        second.rolling = true;
+        second.max_count = Some(1);
+        run_test(&first);
+        run_test(&second);
+        fs::write(second.source.join("a"), "changed").unwrap();
+        run_test(&second);
+        let first_manifest: Manifest =
+            load(&first.target.join(format!("manifest-{}.json", first.id))).unwrap();
+        let second_manifest: Manifest =
+            load(&second.target.join(format!("manifest-{}.json", second.id))).unwrap();
+        assert_eq!(first_manifest.records.len(), 1);
+        assert_eq!(second_manifest.records.len(), 1);
+        assert!(first.target.join(&first_manifest.records[0].name).exists());
+        assert!(second
+            .target
+            .join(&second_manifest.records[0].name)
+            .exists());
+        assert_ne!(
+            first_manifest.records[0].name,
+            second_manifest.records[0].name
+        );
+    }
+
+    #[test]
+    fn destination_lock_prevents_concurrent_checks() {
+        let (_t, job) = setup();
+        let lock = File::create(job.target.join(".lock")).unwrap();
+        lock.try_lock_exclusive().unwrap();
+        assert!(run(&job, &std::sync::mpsc::channel().0).is_err());
+        assert!(!job
+            .target
+            .join(format!("manifest-{}.json", job.id))
+            .exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn metadata_links_are_rejected() {
+        for name in [".lock", "manifest"] {
+            let (_t, job) = setup();
+            let metadata = if name == "manifest" {
+                format!("manifest-{}.json", job.id)
+            } else {
+                name.into()
+            };
+            std::os::unix::fs::symlink(job.source.join("a"), job.target.join(metadata)).unwrap();
+            assert!(run(&job, &std::sync::mpsc::channel().0).is_err());
+            assert_eq!(fs::read_to_string(job.source.join("a")).unwrap(), "hello");
+        }
+    }
+
+    #[test]
+    fn legacy_backups_are_preserved() {
+        let (_t, j) = setup();
+        let legacy = j.target.join(format!("backup-{}", j.id));
+        fs::create_dir(&legacy).unwrap();
+        fs::write(legacy.join("old-backup"), "keep").unwrap();
+        run_test(&j);
+        assert_eq!(
+            fs::read_to_string(legacy.join("old-backup")).unwrap(),
+            "keep"
+        );
+    }
+
+    #[test]
     fn changes_and_empty_directories() {
         let (_t, j) = setup();
         assert!(run_test(&j).created);
@@ -399,8 +484,8 @@ mod tests {
         let (_t, mut j) = setup();
         j.zip = true;
         run_test(&j);
-        let root = j.target.join(format!("backup-{}", j.id));
-        let m: Manifest = load(&root.join("manifest.json")).unwrap();
+        let root = j.target.clone();
+        let m: Manifest = load(&root.join(format!("manifest-{}.json", j.id))).unwrap();
         let mut z =
             zip::ZipArchive::new(File::open(root.join(&m.records[0].name)).unwrap()).unwrap();
         let mut s = String::new();
@@ -414,12 +499,12 @@ mod tests {
         j.max_count = Some(1);
         j.max_bytes = Some(1);
         run_test(&j);
-        let root = j.target.join(format!("backup-{}", j.id));
+        let root = j.target.clone();
         fs::write(root.join("foreign"), "safe").unwrap();
         fs::write(j.source.join("a"), "changed").unwrap();
         let o = run_test(&j);
         assert!(o.message.contains("exceeds"));
-        let m: Manifest = load(&root.join("manifest.json")).unwrap();
+        let m: Manifest = load(&root.join(format!("manifest-{}.json", j.id))).unwrap();
         assert_eq!(m.records.len(), 1);
         assert!(root.join(&m.records[0].name).exists());
         assert!(root.join("foreign").exists());
@@ -460,8 +545,8 @@ mod tests {
             j.max_count = Some(1);
             run_test(&j);
             fs::write(j.source.join("a"), "version2").unwrap();
-            let root = j.target.join(format!("backup-{}", j.id));
-            let path = root.join("manifest.json");
+            let root = j.target.clone();
+            let path = root.join(format!("manifest-{}.json", j.id));
             let original = fs::read(&path).unwrap();
             let result = run_inner(&j, &std::sync::mpsc::channel().0, || {
                 fs::write(j.source.join("a"), "version3")?;
@@ -485,8 +570,8 @@ mod tests {
             "Simulated write failure"
         ))
         .is_err());
-        let root = j.target.join(format!("backup-{}", j.id));
-        assert!(!root.join("manifest.json").exists());
+        let root = j.target.clone();
+        assert!(!root.join(format!("manifest-{}.json", j.id)).exists());
         assert_eq!(fs::read_dir(root).unwrap().count(), 1);
     }
     #[test]
@@ -497,20 +582,15 @@ mod tests {
         run_test(&j);
         fs::write(j.source.join("a"), "second").unwrap();
         run_test(&j);
-        let m: Manifest = load(
-            &j.target
-                .join(format!("backup-{}", j.id))
-                .join("manifest.json"),
-        )
-        .unwrap();
+        let m: Manifest = load(&j.target.join(format!("manifest-{}.json", j.id))).unwrap();
         assert_eq!(m.records.len(), 2);
     }
     #[test]
     fn missing_latest_is_recreated() {
         let (_t, j) = setup();
         run_test(&j);
-        let root = j.target.join(format!("backup-{}", j.id));
-        let m: Manifest = load(&root.join("manifest.json")).unwrap();
+        let root = j.target.clone();
+        let m: Manifest = load(&root.join(format!("manifest-{}.json", j.id))).unwrap();
         fs::remove_dir_all(root.join(&m.records[0].name)).unwrap();
         assert!(run_test(&j).created);
     }
@@ -528,8 +608,8 @@ mod tests {
             fs::create_dir_all(j.source.join("nested/empty")).unwrap();
             fs::write(j.source.join("nested/file"), "content").unwrap();
             run_test(&j);
-            let root = j.target.join(format!("backup-{}", j.id));
-            let m: Manifest = load(&root.join("manifest.json")).unwrap();
+            let root = j.target.clone();
+            let m: Manifest = load(&root.join(format!("manifest-{}.json", j.id))).unwrap();
             if zip {
                 let mut z =
                     zip::ZipArchive::new(File::open(root.join(&m.records[0].name)).unwrap())

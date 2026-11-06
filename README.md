@@ -20,7 +20,7 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 
 ## Storage format and recovery
 
-Each job gets a separate `backup-<UUID>` directory in its destination. It contains a versioned `manifest.json` and backups such as `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix.
+Backups are stored directly in the selected destination, alongside a per-job `manifest-<UUID>.json` and a destination `.lock` file. Backups are named `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix. Existing `backup-<UUID>` folders from older versions are left untouched; new checks start a separate history directly in the destination. Old backups remain available for manual restoration and are not included in the new retention history.
 
 Each backup contains the full source contents. To restore a version, copy its files into a folder of your choice or extract the ZIP archive. Check existing data before overwriting it. Removing a job in the app does not delete its backups.
 

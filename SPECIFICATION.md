@@ -111,8 +111,9 @@ Before a check:
 - Require nonempty source and destination selections and confirm both folders are available.
 - Resolve actual filesystem locations. Reject identical folders and any case where one is inside the other, including overlap through a path alias.
 - Never modify source contents.
-- Keep each job's backups in its own managed destination subfolder, such as `backup-<job-id>`.
-- Reject a managed job subfolder that is itself a link or directory redirection.
+- Store backup folders or ZIP files directly in the selected destination, without an extra job subfolder. Use a separate `manifest-<job-id>.json` for each job and lock the destination while checking, publishing, and pruning.
+- Reject links or directory redirections for manifest and lock files.
+- Leave legacy `backup-<job-id>` folders untouched. New checks start a separate history directly in the destination; legacy backups remain available for manual restoration and are excluded from new retention cleanup.
 
 Include all ordinary files and directories recursively, including hidden files and empty directories. There are no include/exclude filters in this version.
 
