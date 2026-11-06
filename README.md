@@ -60,7 +60,7 @@ cargo fmt --check
 cargo build --release --locked
 ```
 
-The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow). The harbor-worker icon uses only the cap and face at 16/24 pixels; larger sizes include the file he carries.
+The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow). The sailor icon uses only the cap and face at 16/24 pixels; larger sizes include the folder he carries and an anchor tattoo.
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 

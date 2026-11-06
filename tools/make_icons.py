@@ -60,16 +60,21 @@ def render(target):
     # Tiny icons devote their entire silhouette to the cap and face.
     compact = target < 32
     if not compact:
-        rounded((108, 324, 404, 460), 66, NAVY)
+        rounded((112, 320, 400, 460), 58, NAVY)
+        rounded((145, 329, 367, 456), 32, CREAM)
+        for y in (348, 376, 404, 432):
+            draw.rectangle(rect(k, 150, y, 362, y + 12), fill=NAVY)
+        draw.polygon(scaled(k, [(180, 325), (256, 369), (332, 325),
+                                  (307, 321), (256, 347), (205, 321)]), fill=NAVY)
     oval((137, 208, 189, 286), SKIN, NAVY)
     oval((323, 208, 375, 286), SKIN, NAVY)
     rounded((164, 155, 348, 376 if compact else 354), 86, SKIN, NAVY)
 
-    # An oversized work cap, with a broad visor and a simple rope band.
-    rounded((124, 80, 388, 211), 60, NAVY)
-    rounded((144, 153, 368, 177), 10, "#54738B")
-    rounded((133, 184, 379, 223), 18, NAVY)
-    draw.line(scaled(k, [(168, 197), (344, 197)]), fill=CREAM, width=8 * k)
+    # White sailor cap and trailing ribbon distinguish him from a dock worker.
+    draw.polygon(scaled(k, [(345, 176), (390, 225), (388, 167)]), fill=NAVY)
+    rounded((124, 86, 388, 203), 48, CREAM, NAVY)
+    rounded((140, 168, 372, 220), 14, NAVY)
+    draw.line(scaled(k, [(158, 180), (354, 180)]), fill="#54738B", width=6 * k)
     oval((199, 236, 215, 254), NAVY)
     oval((297, 236, 313, 254), NAVY)
     # The split moustache and oversized nose carry the character at small sizes.
@@ -78,17 +83,24 @@ def render(target):
     oval((231, 247, 281, 289), "#F49B70")
     if not compact:
         draw.arc(rect(k, 229, 299, 283, 327), 10, 170, fill=CREAM, width=8 * k)
-        # A folded sheet reads as a file, rather than a shipping box.
-        draw.polygon(scaled(k, [(209, 351), (285, 351), (319, 385),
-                                  (319, 451), (209, 451)]), fill=CREAM)
-        draw.line(scaled(k, [(209, 451), (209, 351), (285, 351),
-                             (319, 385), (319, 451), (209, 451)]),
+        # Wide tabbed folder stays recognizable when the icon is reduced.
+        draw.polygon(scaled(k, [(174, 382), (174, 358), (239, 358),
+                                  (257, 378), (337, 378), (337, 451), (174, 451)]),
+                     fill="#E8A63F")
+        draw.line(scaled(k, [(174, 451), (174, 358), (239, 358),
+                             (257, 378), (337, 378), (337, 451)]),
                   fill=NAVY, width=8 * k, joint="curve")
-        draw.line(scaled(k, [(285, 351), (285, 385), (319, 385)]),
-                  fill=NAVY, width=8 * k, joint="curve")
-        draw.line(scaled(k, [(233, 411), (292, 411)]), fill="#54738B", width=8 * k)
-        oval((174, 380, 223, 428), SKIN, NAVY, 6)
-        oval((305, 380, 354, 428), SKIN, NAVY, 6)
+        rounded((172, 385, 342, 453), 10, "#FFD16B", NAVY)
+        draw.line(scaled(k, [(193, 400), (321, 400)]), fill=CREAM, width=6 * k)
+        rounded((115, 365, 173, 449), 27, SKIN, NAVY, 6)
+        rounded((339, 365, 397, 449), 27, SKIN, NAVY, 6)
+        # Keep the anchor bold enough to read on the exposed forearm at 64px.
+        oval((357, 378, 373, 394), None, NAVY, 5)
+        draw.line(scaled(k, [(365, 392), (365, 428)]), fill=NAVY, width=6 * k)
+        draw.line(scaled(k, [(352, 403), (378, 403)]), fill=NAVY, width=5 * k)
+        draw.arc(rect(k, 349, 397, 381, 430), 0, 180, fill=NAVY, width=6 * k)
+        draw.polygon(scaled(k, [(347, 414), (357, 416), (349, 424)]), fill=NAVY)
+        draw.polygon(scaled(k, [(383, 414), (373, 416), (381, 424)]), fill=NAVY)
 
     return img.resize((target, target), Image.LANCZOS)
 
