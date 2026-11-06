@@ -185,6 +185,8 @@ pub struct Record {
     pub hash: String,
     pub bytes: u64,
     pub created: DateTime<Utc>,
+    #[serde(default)]
+    pub protected: bool,
 }
 #[derive(Default, Serialize, Deserialize)]
 pub struct Manifest {

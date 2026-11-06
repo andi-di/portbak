@@ -197,12 +197,16 @@ Rolling retention is configured per job and disabled by default. Maximum count a
 After a newly successful backup:
 
 - Count only successful backups owned by this job and recorded in its manifest.
-- Evaluate both active limits. If either is exceeded, delete the oldest managed successful backup and repeat until all active limits are satisfied or only one backup remains.
+- Evaluate both active limits, counting protected versions as well. If either is exceeded, delete the oldest unprotected managed successful backup other than the newest version, repeating until the limits are satisfied or no eligible version remains.
 - Use successful creation order to determine the oldest backup.
 - For folder backups, total size means the sum of regular file lengths. For ZIP backups, use archive file length. Do not use source size, allocated disk blocks, settings, or unrelated files.
 - Always keep the newest successful backup. If it alone exceeds the size limit, retain it and show a notice.
-- Never delete unrelated files, another job's backups, temporary output, unrecorded output, or the latest successful backup.
+- Never delete protected versions, unrelated files, another job's backups, temporary output, unrecorded output, or the latest successful backup.
 - Never follow links when deleting managed backup entries. Refuse unsafe deletion and report a cleanup warning.
+
+Each saved version has a persistent protection flag, false by default (including records that predate the flag). Changing this flag must preserve all other metadata and must not trigger immediate cleanup. Use destination locking and atomic manifest replacement for protection changes.
+
+When rolling retention is enabled and at least one version is protected, warn if the count limit minus the protected count is at most three places, or if at most 20% of the size limit remains after subtracting protected backup sizes. Show concrete remaining values, clamp negative values to zero, and separately report exceeded limits. These are retention budgets, not free disk space; warnings do not block new backups. Protected versions and the newest backup can cause limits to remain exceeded.
 
 Do not delete old backups in advance to make room for a new one. If there is not enough space to create the new backup first, report failure and retain previous backups.
 

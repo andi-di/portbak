@@ -1,3 +1,4 @@
+pub mod history;
 pub mod restore;
 
 use crate::model::{Job, Manifest, Record};
@@ -320,23 +321,31 @@ fn run_inner(
         hash,
         bytes: size,
         created: Utc::now(),
+        protected: false,
     });
     save(&manifest_path, &manifest)?;
     let warning = prune(&root, &manifest_path, &mut manifest, job)
         .err()
         .map(|e| format!(" · Cleanup failed: {e}"))
         .unwrap_or_default();
+    let protection_warning = history::warnings(job, &manifest.records).join(" · ");
+    let protection_warning = if protection_warning.is_empty() {
+        String::new()
+    } else {
+        format!(" · {protection_warning}")
+    };
     let over = job.rolling && job.max_bytes.map(|n| size > n).unwrap_or(false);
     Ok(Outcome {
         message: format!(
-            "Backup complete · {} files/folders · {skipped} skipped{}{}",
+            "Backup complete · {} files/folders · {skipped} skipped{}{}{}",
             entries.len(),
             if over {
                 " · Latest backup exceeds size limit"
             } else {
                 ""
             },
-            warning
+            warning,
+            protection_warning
         ),
         created: true,
     })
@@ -352,12 +361,20 @@ fn prune(root: &Path, path: &Path, m: &mut Manifest, j: &Job) -> Result<()> {
             .unwrap_or(false);
         let over_size = j
             .max_bytes
-            .map(|n| m.records.iter().map(|r| r.bytes).sum::<u64>() > n)
+            .map(|n| m.records.iter().map(|r| u128::from(r.bytes)).sum::<u128>() > u128::from(n))
             .unwrap_or(false);
         if !over_count && !over_size {
             break;
         }
-        let p = root.join(&m.records[0].name);
+        let Some(index) = m
+            .records
+            .iter()
+            .take(m.records.len() - 1)
+            .position(|record| !record.protected)
+        else {
+            break;
+        };
+        let p = root.join(&m.records[index].name);
         if p.exists() {
             let meta = fs::symlink_metadata(&p)?;
             if is_link(&meta) {
@@ -369,7 +386,7 @@ fn prune(root: &Path, path: &Path, m: &mut Manifest, j: &Job) -> Result<()> {
                 fs::remove_file(&p)?;
             }
         }
-        m.records.remove(0);
+        m.records.remove(index);
         save(path, m)?;
     }
     Ok(())

@@ -26,14 +26,14 @@ enum Event {
     Done(Uuid, Result<engine::Outcome, String>),
     History(
         Uuid,
-        Result<(Vec<engine::restore::Backup>, PathBuf), String>,
+        Result<(Vec<engine::history::Backup>, PathBuf), String>,
     ),
 }
 
 struct RestoreDialog {
     request: Uuid,
     job: Job,
-    backups: Option<Result<Vec<engine::restore::Backup>, String>>,
+    backups: Option<Result<Vec<engine::history::Backup>, String>>,
     selected: Option<String>,
     source_display: Option<PathBuf>,
 }
@@ -170,7 +170,7 @@ impl App {
         let ctx = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| -> anyhow::Result<_> {
-                let backups = engine::restore::list(&job)?;
+                let backups = engine::history::list(&job)?;
                 let source = std::fs::canonicalize(&job.source)?;
                 Ok((backups, source))
             })()
@@ -934,7 +934,7 @@ mod tests {
             ..Job::default()
         };
         engine::run(&job, &mpsc::channel().0).unwrap();
-        let name = engine::restore::list(&job).unwrap()[0].record.name.clone();
+        let name = engine::history::list(&job).unwrap()[0].record.name.clone();
         let config = Config {
             jobs: vec![job],
             ..Config::default()
@@ -952,7 +952,7 @@ mod tests {
         app.restore_dialog = Some(RestoreDialog {
             request: Uuid::new_v4(),
             source_display: Some(job.source.clone()),
-            backups: Some(Ok(engine::restore::list(&job).unwrap())),
+            backups: Some(Ok(engine::history::list(&job).unwrap())),
             job,
             selected: Some(name.to_owned()),
         });

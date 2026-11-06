@@ -1,36 +1,8 @@
 use super::*;
 use std::{collections::HashSet, ffi::OsString};
 
-#[derive(Clone)]
-pub struct Backup {
-    pub record: Record,
-    pub available: bool,
-    pub zip: bool,
-}
-
-pub fn list(job: &Job) -> Result<Vec<Backup>> {
-    let target = fs::canonicalize(&job.target).context("Destination folder is unavailable")?;
-    let _lock = lock_destination(&target)?;
-    let manifest = read_manifest(&target, job.id)?;
-    let mut backups = Vec::new();
-    for record in manifest.records.into_iter().rev() {
-        let path = target.join(&record.name);
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => Some(metadata),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
-        };
-        let zip = record.name.ends_with(".zip");
-        let available =
-            metadata.is_some_and(|m| !is_link(&m) && if zip { m.is_file() } else { m.is_dir() });
-        backups.push(Backup {
-            record,
-            available,
-            zip,
-        });
-    }
-    Ok(backups)
-}
+#[cfg(test)]
+use super::history::list;
 
 pub fn run(job: &Job, name: &str, progress: &Sender<String>) -> Result<Outcome> {
     restore_inner(job, name, progress, || Ok(()))
