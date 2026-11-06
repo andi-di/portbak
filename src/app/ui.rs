@@ -12,16 +12,18 @@ const CARD_SHADOW: f32 = 4.0;
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if ctx.input(|input| input.viewport().close_requested()) {
+            if !self.persist() {
+                eprintln!("Could not save settings on exit: {}", self.error);
+            }
+            return;
+        }
         self.ensure_skin(ctx);
         self.tick(ctx);
         if let Some(id) = self.selected {
             self.ensure_summary(id, ctx);
         }
         ctx.set_theme(theme_preference(self.config.theme));
-        if ctx.input(|input| input.viewport().close_requested()) && !self.permit_close {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.closing = true;
-        }
         let before = self.config.clone();
         self.show_header(ctx);
         self.show_footer(ctx);
@@ -34,9 +36,6 @@ impl eframe::App for App {
         self.show_history(ctx);
         if self.config != before {
             self.dirty = true;
-        }
-        if self.closing {
-            self.show_quit_dialog(ctx);
         }
         if Skin::of(ctx).effects.scanlines {
             pixel::paint_scanlines(ctx, palette_of(ctx));
@@ -267,47 +266,6 @@ impl App {
             (false, _, true) => "Schedule enabled",
             (false, _, false) => "Schedule disabled",
         }
-    }
-
-    fn show_quit_dialog(&mut self, ctx: &egui::Context) {
-        let palette = palette_of(ctx);
-        let window = egui::Window::new("Quit the app?")
-            .collapsible(false)
-            .resizable(false)
-            .default_width(460.0)
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]);
-        pixel::dialog(
-            ctx,
-            window,
-            "Quit the app?",
-            sprites::POWER,
-            palette.hot,
-            |ui| {
-                ui.label("Quitting stops scheduling. The app keeps running when minimized.");
-                if self.active.is_some() {
-                    alert(
-                        ui,
-                        palette.gold,
-                        "An operation is running. Please wait for it to finish before quitting.",
-                    );
-                }
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    let keep = PixelButton::new("Keep running")
-                        .sprite(sprites::PLAY)
-                        .tone(Tone::Accent);
-                    if ui.add(keep).clicked() {
-                        self.closing = false;
-                    }
-                    let quit = PixelButton::new("Quit")
-                        .sprite(sprites::POWER)
-                        .tone(Tone::Danger);
-                    if ui.add_enabled(self.active.is_none(), quit).clicked() {
-                        self.quit(ctx);
-                    }
-                });
-            },
-        );
     }
 }
 

@@ -134,8 +134,6 @@ pub struct App {
     progress: String,
     dirty: bool,
     last_save: Instant,
-    closing: bool,
-    permit_close: bool,
     /// Held for the app's lifetime so a second instance cannot share the configuration.
     _lock: File,
 }
@@ -160,8 +158,6 @@ impl App {
             progress: String::new(),
             dirty: false,
             last_save: Instant::now(),
-            closing: false,
-            permit_close: false,
             _lock: lock,
         }
     }
@@ -227,13 +223,6 @@ impl App {
 
     fn remove_pending(&mut self, id: Uuid) {
         self.queue.retain(|queued| *queued != id);
-    }
-
-    fn quit(&mut self, ctx: &egui::Context) {
-        if self.persist() {
-            self.permit_close = true;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-        }
     }
 
     /// Runs `task` on a background thread and delivers its event to the UI thread.
