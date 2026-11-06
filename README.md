@@ -41,6 +41,14 @@ The size limit counts the sizes of stored backup files, or the archive size for 
 - A power failure or forced process termination may leave `.partial-*` entries or published backups that have not yet been recorded in the manifest. These are intentionally not deleted automatically. Settings and manifests are replaced atomically; complete protection against power loss at the storage level is not guaranteed.
 - The app works offline. Linux requires a graphical session with OpenGL and standard system libraries, including libc, X11/Wayland, and xkbcommon. The Linux build is not a fully static universal executable; build against a suitably old base system for older distributions. Linux folder selection uses XDG Desktop Portal and its desktop backend.
 
+## Contributing and branch rules
+
+Start each change on a dedicated branch from current `origin/main`, using names such as `feat/<topic>`, `fix/<topic>`, or `chore/<topic>`. Commit related changes separately with conventional commit messages, push the branch, and open a pull request to `main`. Do not commit or push directly to `main`. Agents can open PRs but must not merge them; the owner `andi-di` performs merges.
+
+The intended GitHub protections are versioned in [.github/rulesets](.github/rulesets). `main-pr-and-ci` requires a PR and successful GitHub Actions checks `build (ubuntu-22.04)` and `build (windows-latest)` against an up-to-date branch, and blocks force pushes and branch deletion without exceptions. `main-owner-merges` restricts updates to the repository admin role, with bypass only for pull requests. For this personal repository, that role belongs to owner `andi-di`; its exception does not bypass the separate CI ruleset. No second review is required for owner-authored PRs.
+
+These JSON files document the configuration; committing them does not activate GitHub settings. An authenticated repository administrator must apply them through GitHub Settings → Rules → Rulesets (Import a ruleset), or the GitHub REST API. Existing rulesets must be updated by ID rather than duplicated. Verify both are active and target `refs/heads/main`. Do not add broad bypass permissions or grant apps permission to bypass them. GitHub authorizes accounts, so the agent merge prohibition also applies when an agent uses the owner's credentials.
+
 ## Development and builds
 
 Install stable Rust, then run:
@@ -56,7 +64,9 @@ The output is `target/release/portbak` on Linux or `target/release/portbak.exe` 
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 
-The GitHub Actions workflow runs formatting checks, tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs once the project is pushed to a GitHub repository.
+The GitHub Actions workflow runs formatting checks, all tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs for pull requests, pushes to `main`, and manual dispatches. Feature-branch pushes are checked through their PR, avoiding duplicate push/PR runs. New commits cancel obsolete runs for the same PR or branch. Both platform jobs finish independently so one failure does not hide the other result.
+
+Rust dependencies and build artifacts are cached per platform, compiler, dependency set, and build environment. Warm runs avoid rebuilding unchanged dependencies; the first run still needs to populate its cache. All tests and both release builds remain enabled. The test suite exercises restore/rollback, retention, integrity and scheduling; observed CI test execution is a few seconds, with compilation accounting for most of the `cargo test` step.
 
 Tests cover folder/ZIP restore, full source replacement, rollback and recovery, unsafe archives, content changes and renames, empty directories, ZIP readability, links, overlapping paths, failure cleanup, sources changing during backup, rolling retention, missing backups, atomic saves, and scheduling including daylight saving transitions.
 
