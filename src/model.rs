@@ -3,12 +3,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Schedule {
     Daily,
     Weekdays,
     Interval,
 }
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum IntervalUnit {
     Seconds,
@@ -16,6 +17,7 @@ pub enum IntervalUnit {
     Minutes,
     Hours,
 }
+
 impl IntervalUnit {
     pub fn label(self) -> &'static str {
         match self {
@@ -41,7 +43,8 @@ impl IntervalUnit {
         }
     }
 }
-#[derive(Clone, Serialize, Deserialize)]
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Job {
     pub id: Uuid,
@@ -63,6 +66,7 @@ pub struct Job {
     pub last_success: Option<DateTime<Utc>>,
     pub status: String,
 }
+
 impl Default for Job {
     fn default() -> Self {
         Self {
@@ -87,7 +91,13 @@ impl Default for Job {
         }
     }
 }
+
 impl Job {
+    /// Weekday schedules need at least one selected day to ever run.
+    pub fn has_runnable_schedule(&self) -> bool {
+        self.schedule != Schedule::Weekdays || self.weekdays.contains(&true)
+    }
+
     pub fn reschedule(&mut self, now: DateTime<Utc>) {
         self.next_run = self.enabled.then(|| self.next_after(now));
     }
@@ -124,9 +134,11 @@ impl Job {
         }
         due
     }
+
     pub fn next_after(&self, now: DateTime<Utc>) -> DateTime<Utc> {
         self.next_after_in(now, &Local)
     }
+
     fn next_after_in<T: TimeZone>(&self, now: DateTime<Utc>, zone: &T) -> DateTime<Utc> {
         if self.schedule == Schedule::Interval {
             return now
@@ -163,22 +175,45 @@ impl Job {
         now + Duration::days(1)
     }
 }
-#[derive(Serialize, Deserialize)]
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl Theme {
+    pub const ALL: [Self; 3] = [Self::System, Self::Light, Self::Dark];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::System => "System",
+            Self::Light => "Light",
+            Self::Dark => "Dark",
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub version: u32,
-    pub theme: String,
+    pub theme: Theme,
     pub jobs: Vec<Job>,
 }
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             version: 1,
-            theme: "System".into(),
+            theme: Theme::System,
             jobs: vec![],
         }
     }
 }
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Record {
     pub name: String,
@@ -188,6 +223,7 @@ pub struct Record {
     #[serde(default)]
     pub protected: bool,
 }
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct Manifest {
     pub version: u32,
@@ -198,11 +234,12 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn default_job_is_disabled_interval() {
         let job = Job::default();
         assert!(!job.enabled);
-        assert!(job.schedule == Schedule::Interval);
+        assert_eq!(job.schedule, Schedule::Interval);
         assert_eq!(job.interval_value, 60);
         assert!(job.next_run.is_none());
     }
@@ -270,6 +307,7 @@ mod tests {
         let n = Utc::now();
         assert_eq!(j.next_after(n), n + Duration::minutes(5));
     }
+
     #[test]
     fn interval_units_schedule_and_roundtrip() {
         let now = Utc::now();
@@ -327,6 +365,7 @@ mod tests {
         let n = Utc::now();
         assert!(j.next_after(n) > n);
     }
+
     #[test]
     fn weekday_selection() {
         let j = Job {
@@ -337,6 +376,7 @@ mod tests {
         let t = j.next_after(Utc::now());
         assert_eq!(t.with_timezone(&Local).weekday(), chrono::Weekday::Mon);
     }
+
     #[test]
     fn overdue_is_coalesced_and_disabled_does_not_run() {
         let now = Utc::now();
@@ -352,6 +392,7 @@ mod tests {
         j.next_run = Some(now - Duration::days(1));
         assert!(!j.take_due(now));
     }
+
     #[test]
     fn new_schedule_is_planned_without_immediate_run() {
         let mut j = Job {
@@ -362,6 +403,34 @@ mod tests {
         assert!(!j.take_due(now));
         assert!(j.next_run.unwrap() > now);
     }
+
+    #[test]
+    fn theme_keeps_its_saved_names() {
+        let config = Config {
+            theme: Theme::Dark,
+            ..Config::default()
+        };
+        let value = serde_json::to_value(&config).unwrap();
+        assert_eq!(value["theme"], "Dark");
+        let saved: Config = serde_json::from_value(value).unwrap();
+        assert_eq!(saved.theme, Theme::Dark);
+    }
+
+    #[test]
+    fn weekday_schedule_needs_a_selected_day() {
+        let mut job = Job {
+            schedule: Schedule::Weekdays,
+            weekdays: [false; 7],
+            ..Job::default()
+        };
+        assert!(!job.has_runnable_schedule());
+        job.weekdays[6] = true;
+        assert!(job.has_runnable_schedule());
+        job.weekdays = [false; 7];
+        job.schedule = Schedule::Daily;
+        assert!(job.has_runnable_schedule());
+    }
+
     #[test]
     fn dst_missing_hour_is_advanced_and_repeated_hour_runs_once() {
         let zone = chrono_tz::Europe::Berlin;
