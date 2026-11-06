@@ -1,6 +1,6 @@
 use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use super::sprites::{self, Sprite};
-use super::style::{label_font, Palette, Skin};
+use super::style::{label_font, Palette};
 use super::widgets::{
     alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
     DATE_MINUTE, DATE_TIME,
@@ -57,9 +57,7 @@ impl App {
         let mut add = false;
         let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-            if Skin::of(ui.ctx()).effects.grid {
-                pixel::paint_grid(ui.painter(), ui.clip_rect(), Palette::of(ui));
-            }
+            pixel::paint_scenery(ui);
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 let job = jobs.iter_mut().find(|job| Some(job.id) == selected);

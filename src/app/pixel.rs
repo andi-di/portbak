@@ -1,7 +1,8 @@
 //! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
 
+use super::ornaments;
 use super::sprites::{self, Sprite};
-use super::style::{self, display_font, label_font, Palette};
+use super::style::{self, display_font, label_font, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
     WidgetInfo, WidgetType,
@@ -326,6 +327,13 @@ pub fn section<R>(
 }
 
 pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
+    match Skin::of(ui.ctx()).effects.title_bar {
+        TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
+        TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
+    }
+}
+
+fn striped_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
     let height = 30.0;
@@ -377,13 +385,15 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
     }
 }
 
-/// Text in the blocky display face with a hard drop shadow.
+/// Text in the display face with a hard drop shadow; `size` is scaled by the skin.
 pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
+    let typography = &Skin::of(ui.ctx()).typography;
+    let size = size * typography.display_scale;
     let galley = ui
         .painter()
         .layout_no_wrap(text.to_owned(), display_font(size), color);
-    let drop = (size / 8.0).round().max(1.0);
+    let drop = (size * typography.display_drop).round().max(1.0);
     let (rect, response) =
         ui.allocate_exact_size(galley.size() + Vec2::splat(drop), Sense::hover());
     let painter = ui.painter();
@@ -506,8 +516,32 @@ pub fn stripes(painter: &egui::Painter, rect: Rect, palette: &Palette) {
     }
 }
 
+/// The skin's decorations behind a central panel's content; call before adding the content.
+pub fn paint_scenery(ui: &egui::Ui) {
+    let effects = &Skin::of(ui.ctx()).effects;
+    let palette = Palette::of(ui);
+    if effects.grid {
+        paint_grid(ui.painter(), ui.clip_rect(), palette);
+    }
+    if effects.embers {
+        ornaments::paint_embers(ui, ui.clip_rect(), palette);
+    }
+}
+
+/// The skin's screen-wide overlays; call after everything else has been laid out.
+pub fn paint_overlays(ctx: &egui::Context) {
+    let effects = &Skin::of(ctx).effects;
+    let palette = Palette::of_ctx(ctx);
+    if effects.vignette {
+        ornaments::paint_vignette(ctx, palette);
+    }
+    if effects.scanlines {
+        paint_scanlines(ctx, palette);
+    }
+}
+
 /// A faint graph-paper grid behind the content.
-pub fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
+fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
     const STEP: f32 = 24.0;
     let stroke = Stroke::new(1.0_f32, palette.grid);
     let mut x = rect.left() - rect.left() % STEP;
@@ -523,7 +557,7 @@ pub fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
 }
 
 /// CRT scanlines over everything; painted only, so input passes straight through.
-pub fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
+fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     const PITCH: f32 = 3.0;
     let layer = egui::LayerId::new(egui::Order::Debug, egui::Id::new("scanlines"));
     let screen = ctx.screen_rect();

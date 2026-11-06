@@ -1,5 +1,6 @@
 mod editor;
 mod history_view;
+mod ornaments;
 mod pixel;
 mod settings_view;
 mod skins;

@@ -42,6 +42,8 @@ pub struct Palette {
     pub metal: Color32,
     pub paper: Color32,
     pub scanline: Color32,
+    /// Color the window edges sink into when the vignette effect is on.
+    pub vignette: Color32,
 }
 
 /// Font files placed in front of egui's defaults, which stay as glyph fallbacks.
@@ -58,6 +60,10 @@ pub struct Typography {
     pub small: f32,
     /// Section titles, readouts and other small display-face text.
     pub label: f32,
+    /// Multiplier for fixed display-face sizes, since faces differ in size at the same em.
+    pub display_scale: f32,
+    /// Drop shadow offset of display labels as a fraction of their size.
+    pub display_drop: f32,
 }
 
 pub struct Metrics {
@@ -73,6 +79,18 @@ pub struct Effects {
     pub scanlines: bool,
     pub grid: bool,
     pub stripes: bool,
+    /// Sparks drifting up behind the content; keeps the window repainting while visible.
+    pub embers: bool,
+    pub vignette: bool,
+    pub title_bar: TitleBar,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TitleBar {
+    /// A solid colored band with stripes and three window lights.
+    Striped,
+    /// A dark band with a tinted icon, a fading colored rule and diamond ornaments.
+    Engraved,
 }
 
 impl Skin {

@@ -15,9 +15,7 @@ impl App {
         let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
         let mut close = false;
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-            if Skin::of(ui.ctx()).effects.grid {
-                pixel::paint_grid(ui.painter(), ui.clip_rect(), Palette::of(ui));
-            }
+            pixel::paint_scenery(ui);
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);

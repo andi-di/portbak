@@ -1,3 +1,4 @@
+use super::ornaments;
 use super::pixel::{self, PixelButton, Tone};
 use super::skins;
 use super::sprites;
@@ -37,9 +38,7 @@ impl eframe::App for App {
         if self.config != before {
             self.dirty = true;
         }
-        if Skin::of(ctx).effects.scanlines {
-            pixel::paint_scanlines(ctx, palette_of(ctx));
-        }
+        pixel::paint_overlays(ctx);
     }
 }
 
@@ -78,11 +77,17 @@ impl App {
                     });
                 });
                 ui.add_space(12.0);
-                if !Skin::of(ui.ctx()).effects.stripes {
-                    return;
-                }
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
+                if !Skin::of(ui.ctx()).effects.stripes {
+                    let rule = egui::Rect::from_min_max(
+                        egui::pos2(clip.left(), top),
+                        egui::pos2(clip.right(), top + 2.0),
+                    );
+                    ui.allocate_rect(rule, egui::Sense::hover());
+                    ornaments::fading_rule(ui.painter(), rule, palette.accent);
+                    return;
+                }
                 let band = egui::Rect::from_min_max(
                     egui::pos2(clip.left(), top),
                     egui::pos2(clip.right(), top + 16.0),
