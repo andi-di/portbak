@@ -21,7 +21,7 @@ jobs:
       - run: cargo build --release --locked
       - uses: actions/upload-artifact@v7
         with:
-          name: portable-backup-${{ runner.os }}-x86_64
+          name: portbak-${{ runner.os }}-x86_64
           path: |
-            target/release/portable-backup
-            target/release/portable-backup.exe
+            target/release/portbak
+            target/release/portbak.exe

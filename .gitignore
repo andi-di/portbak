@@ -1,4 +1,4 @@
 /target
-/portable-backup.json
-/portable-backup.lock
+/portbak.json
+/portbak.lock
 /dist/

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-`portable-backup` — portable desktop backup app for Linux x86-64 and Windows 10/11 x86-64.
+`portbak` — portable desktop backup app for Linux x86-64 and Windows 10/11 x86-64.
 The stack, dependencies, commands, and build/platform facts live in `Cargo.toml` and `README.md`; the
 observable behavior contract is `SPECIFICATION.md`; open tasks live in `TODOS.md`. Don't restate any of
 them here.

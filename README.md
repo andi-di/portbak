@@ -1,4 +1,4 @@
-# Portable Backup
+# portbak
 
 Lightweight backup app for Linux and Windows, written in Rust with egui. No browser runtime, server, or installer required.
 
@@ -8,7 +8,7 @@ See [SPECIFICATION.md](SPECIFICATION.md) for standalone, implementation-independ
 
 ## Getting started
 
-Copy the executable for your platform into a **writable folder** and launch it. On Linux, run `chmod +x portable-backup` if necessary. The app creates `portable-backup.json` (settings and status) and `portable-backup.lock` (instance lock) alongside the executable. To move your configuration, copy the JSON file too and update source and destination paths. Administrator privileges are not required.
+Copy the executable for your platform into a **writable folder** and launch it. On Linux, run `chmod +x portbak` if necessary. The app creates `portbak.json` (settings and status) and `portbak.lock` (instance lock) alongside the executable. To move your configuration, copy the JSON file too and update source and destination paths. Administrator privileges are not required.
 
 1. Select **New job** and choose a name and existing source and destination folders.
 2. Optionally enable **Compress as ZIP**. The default is a full folder copy.
@@ -20,7 +20,7 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 
 ## Storage format and recovery
 
-Backups are stored directly in the selected destination, alongside a per-job `manifest-<UUID>.json` and a destination `.lock` file. Backups are named `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix. Existing `backup-<UUID>` folders from older versions are left untouched; new checks start a separate history directly in the destination. Old backups remain available for manual restoration and are not included in the new retention history.
+Backups are stored directly in the selected destination, alongside a per-job `manifest-<UUID>.json` and a destination `.lock` file. Backups are named `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix.
 
 Each backup contains the full source contents. To restore a version, copy its files into a folder of your choice or extract the ZIP archive. Check existing data before overwriting it. Removing a job in the app does not delete its backups.
 
@@ -48,7 +48,7 @@ cargo fmt --check
 cargo build --release --locked
 ```
 
-The output is `target/release/portable-backup` on Linux or `target/release/portable-backup.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build.
+The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build.
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 
@@ -64,19 +64,19 @@ Use `cargo-zigbuild` with Zig for broader Linux compatibility:
 cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.28 --locked
 ```
 
-The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux-gnu/release/portable-backup`. Check the actual glibc symbol versions with `readelf --version-info` and launch the release executable. Graphics drivers and desktop libraries must still be available on the target system.
+The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux-gnu/release/portbak`. Check the actual glibc symbol versions with `readelf --version-info` and launch the release executable. Graphics drivers and desktop libraries must still be available on the target system.
 
 ### Linux UI smoke test
 
 ```sh
-python3 tools/ui_smoke.py target/release/portable-backup
+python3 tools/ui_smoke.py target/release/portbak
 ```
 
-Requires an X11/XWayland session, libX11, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution and persisted completion in both themes, measures memory usage, and captures screenshots of the app window only. It terminates its test processes afterward. Artifacts remain in `/tmp/portable-backup-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
+Requires an X11/XWayland session, libX11, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution at a five-second interval and persisted completion in both themes, measures memory usage, and captures only the app window at its default and minimum sizes. It terminates its test processes afterward. Artifacts remain in `/tmp/portbak-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
 
 ### Included executables
 
-Local distribution files are `dist/linux-x86_64/portable-backup` and `dist/windows-x86_64/portable-backup.exe`. Each platform needs only its executable; the configuration is created alongside it on first launch. The Linux distribution build targets glibc 2.28 or newer. The Windows executable targets Windows 10/11 x86-64 and statically links its unwind runtime. Both require working system graphics drivers.
+Local distribution files are `dist/linux-x86_64/portbak` and `dist/windows-x86_64/portbak.exe`. Each platform needs only its executable; the configuration is created alongside it on first launch. The Linux distribution build targets glibc 2.28 or newer. The Windows executable targets Windows 10/11 x86-64 and statically links its unwind runtime. Both require working system graphics drivers.
 
 The local Windows cross-build uses LLVM-MinGW and the Rust target `x86_64-pc-windows-gnullvm`. After installing these toolchains, run:
 

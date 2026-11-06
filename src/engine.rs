@@ -446,19 +446,6 @@ mod tests {
     }
 
     #[test]
-    fn legacy_backups_are_preserved() {
-        let (_t, j) = setup();
-        let legacy = j.target.join(format!("backup-{}", j.id));
-        fs::create_dir(&legacy).unwrap();
-        fs::write(legacy.join("old-backup"), "keep").unwrap();
-        run_test(&j);
-        assert_eq!(
-            fs::read_to_string(legacy.join("old-backup")).unwrap(),
-            "keep"
-        );
-    }
-
-    #[test]
     fn changes_and_empty_directories() {
         let (_t, j) = setup();
         assert!(run_test(&j).created);

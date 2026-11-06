@@ -1,4 +1,4 @@
-# Portable Backup — Product Specification
+# portbak — Product Specification
 
 Version: 1.0  
 Language: English  
@@ -113,7 +113,6 @@ Before a check:
 - Never modify source contents.
 - Store backup folders or ZIP files directly in the selected destination, without an extra job subfolder. Use a separate `manifest-<job-id>.json` for each job and lock the destination while checking, publishing, and pruning.
 - Reject links or directory redirections for manifest and lock files.
-- Leave legacy `backup-<job-id>` folders untouched. New checks start a separate history directly in the destination; legacy backups remain available for manual restoration and are excluded from new retention cleanup.
 
 Include all ordinary files and directories recursively, including hidden files and empty directories. There are no include/exclude filters in this version.
 

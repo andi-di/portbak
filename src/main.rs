@@ -202,6 +202,21 @@ fn centered_row<R>(
     )
 }
 
+fn centered_combo<R>(
+    ui: &mut egui::Ui,
+    contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let height = ui
+        .text_style_height(&egui::TextStyle::Button)
+        .max(ui.spacing().icon_width)
+        + ui.spacing().button_padding.y * 2.0;
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.spacing().combo_width, height),
+        egui::Layout::top_down(egui::Align::Min),
+        contents,
+    )
+}
+
 fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
     ui.label(label);
 
@@ -245,16 +260,18 @@ impl eframe::App for App {
             ui.add_space(12.0);
 
             centered_row(ui, |ui| {
-                ui.heading("Portable Backup");
+                ui.heading("portbak");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    egui::ComboBox::from_id_salt("theme")
-                        .selected_text(&self.config.theme)
-                        .show_ui(ui, |ui| {
-                            for t in ["System", "Light", "Dark"] {
-                                ui.selectable_value(&mut self.config.theme, t.into(), t);
-                            }
-                        });
+                    centered_combo(ui, |ui| {
+                        egui::ComboBox::from_id_salt("theme")
+                            .selected_text(&self.config.theme)
+                            .show_ui(ui, |ui| {
+                                for t in ["System", "Light", "Dark"] {
+                                    ui.selectable_value(&mut self.config.theme, t.into(), t);
+                                }
+                            })
+                    });
                 });
             });
 
@@ -396,13 +413,13 @@ ui.selectable_value(&mut j.schedule,Schedule::Weekdays,"Weekdays");
 centered_row(ui, |ui|{
 ui.label("Every");
 ui.add(egui::DragValue::new(&mut j.interval_value).range(1..=j.interval_unit.maximum()));
-egui::ComboBox::from_id_salt("interval_unit")
+centered_combo(ui, |ui| egui::ComboBox::from_id_salt("interval_unit")
     .selected_text(j.interval_unit.label())
     .show_ui(ui, |ui| {
         for unit in [IntervalUnit::Seconds, IntervalUnit::Minutes, IntervalUnit::Hours] {
             ui.selectable_value(&mut j.interval_unit, unit, unit.label());
         }
-    });
+    }));
 j.interval_value = j.interval_value.clamp(1, j.interval_unit.maximum());
 }
 );
@@ -582,7 +599,7 @@ fn startup() -> anyhow::Result<()> {
     let path = std::env::current_exe()?
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Application directory is missing"))?
-        .join("portable-backup.json");
+        .join("portbak.json");
 
     let lock = OpenOptions::new()
         .create(true)
@@ -591,9 +608,8 @@ fn startup() -> anyhow::Result<()> {
         .write(true)
         .open(path.with_extension("lock"))?;
 
-    lock.try_lock_exclusive().map_err(|_| {
-        anyhow::anyhow!("Portable Backup is already running with this configuration.")
-    })?;
+    lock.try_lock_exclusive()
+        .map_err(|_| anyhow::anyhow!("portbak is already running with this configuration."))?;
 
     let config: Config = if path.exists() {
         engine::load(&path)?
@@ -613,7 +629,7 @@ fn startup() -> anyhow::Result<()> {
     };
 
     eframe::run_native(
-        "Portable Backup",
+        "portbak",
         options,
         Box::new(move |cc| {
             cc.egui_ctx.all_styles_mut(|style| {
@@ -642,12 +658,12 @@ fn startup() -> anyhow::Result<()> {
 
 fn main() {
     if let Err(e) = startup() {
-        let msg = format!("Portable Backup could not start:\n{e:#}");
+        let msg = format!("portbak could not start:\n{e:#}");
 
         eprintln!("{msg}");
 
         rfd::MessageDialog::new()
-            .set_title("Portable Backup")
+            .set_title("portbak")
             .set_description(&msg)
             .set_level(rfd::MessageLevel::Error)
             .show();
@@ -675,6 +691,47 @@ mod tests {
         app.remove_pending(active);
         assert_eq!(app.active, Some(active));
         assert_eq!(app.queue, VecDeque::from([other]));
+    }
+
+    #[test]
+    fn mixed_row_controls_share_vertical_center() {
+        let context = egui::Context::default();
+        let _ = context.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.spacing_mut().button_padding = egui::vec2(10.0, 5.0);
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Heading, egui::FontId::proportional(22.0));
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
+                centered_row(ui, |ui| {
+                    let label = ui.label("Every");
+                    let value = ui.add(egui::DragValue::new(&mut 60));
+                    let unit = centered_combo(ui, |ui| {
+                        egui::ComboBox::from_id_salt("unit_test")
+                            .selected_text("Minutes")
+                            .show_ui(ui, |_| {})
+                    })
+                    .inner;
+                    assert!(
+                        (label.rect.center().y - value.rect.center().y).abs() < 0.5,
+                        "label {:?}, value {:?}",
+                        label.rect,
+                        value.rect
+                    );
+                    assert!(
+                        (label.rect.center().y - unit.response.rect.center().y).abs() < 0.5,
+                        "label {:?}, unit {:?}",
+                        label.rect,
+                        unit.response.rect
+                    );
+                });
+            });
+        });
     }
 
     #[test]
