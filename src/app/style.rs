@@ -28,7 +28,7 @@ pub struct Skin {
 pub enum Finish {
     /// Pixel sprites, beveled buttons, square boxes and lamps.
     Pixel,
-    /// Vector glyphs, thorned forged plates, spiked sockets and diamond lamps.
+    /// Vector glyphs, forged plates, spiked sockets and diamond lamps.
     Engraved,
 }
 

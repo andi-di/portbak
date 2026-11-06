@@ -30,8 +30,7 @@ pub static DARK_FANTASY: Skin = Skin {
     },
     metrics: Metrics {
         border: 1.0,
-        // Room for the thorns above and below each plate.
-        lift: 12.0,
+        lift: 2.0,
         shadow: 6,
         shadow_blur: 20,
     },

@@ -1,11 +1,9 @@
-//! Forged-iron widget faces for engraved skins: chamfered plates and sockets grown with thorns.
+//! Forged-iron widget faces for engraved skins: chamfered plates and thorned check box sockets.
 
 use super::pixel::mix;
 use super::style::Palette;
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, Shape, Stroke, Vec2};
 
-/// Room a plate needs on each side for its side thorns.
-pub const THORN_REACH: f32 = 8.0;
 const CURVE_STEPS: u32 = 6;
 
 /// How a plate should look in its current interaction state.
@@ -18,15 +16,9 @@ pub struct PlateLook {
     pub focused: bool,
 }
 
-/// A chamfered plate with a gilded inner line, thorns at its ends and edges, and a soft shadow
-/// or ember glow. `face` excludes the thorns; `spike` is how far edge thorns reach up and down.
-pub fn thorned_plate(painter: &egui::Painter, face: Rect, spike: f32, look: &PlateLook) {
+/// A chamfered, gradient-lit plate with a gilded inner line, a soft shadow and an ember glow.
+pub fn plate(painter: &egui::Painter, face: Rect, look: &PlateLook) {
     let palette = Palette::of_ctx(painter.ctx());
-    let iron = if look.enabled {
-        mix(look.fill, palette.metal, 0.35)
-    } else {
-        palette.shade
-    };
     painter.add(soft_shadow(face, palette));
     if look.glow > 0.0 {
         let glow = egui::Shadow {
@@ -36,9 +28,6 @@ pub fn thorned_plate(painter: &egui::Painter, face: Rect, spike: f32, look: &Pla
             color: mix(look.fill, palette.hot, 0.6).gamma_multiply(0.75 * look.glow),
         };
         painter.add(glow.as_shape(face, 4.0));
-    }
-    for (base_a, base_b, tip) in plate_thorns(face, spike) {
-        thorn(painter, base_a, base_b, tip, iron);
     }
     let chamfer = (face.height() * 0.28).min(9.0);
     let (top, bottom) = match (look.enabled, look.pressed) {
@@ -107,44 +96,6 @@ fn soft_shadow(face: Rect, palette: &Palette) -> Shape {
         color: palette.outline.gamma_multiply(0.6),
     };
     shadow.as_shape(face, 4.0).into()
-}
-
-/// Side thorns hooking upward from each end, plus pairs leaning outward from the top and bottom.
-fn plate_thorns(face: Rect, spike: f32) -> Vec<(Pos2, Pos2, Pos2)> {
-    let (left, right) = (face.left() + 2.0, face.right() - 2.0);
-    let middle = face.center().y;
-    let half = face.height() * 0.24;
-    let mut thorns = vec![
-        (
-            egui::pos2(left, middle + half),
-            egui::pos2(left, middle - half),
-            egui::pos2(face.left() - THORN_REACH, middle - half * 0.7),
-        ),
-        (
-            egui::pos2(right, middle - half),
-            egui::pos2(right, middle + half),
-            egui::pos2(face.right() + THORN_REACH, middle - half * 0.7),
-        ),
-    ];
-    if spike < 2.0 {
-        return thorns;
-    }
-    let lean = spike * 1.1;
-    for (fraction, y, reach) in [
-        (0.12, face.top() + 2.0, -spike * 1.15),
-        (0.3, face.bottom() - 2.0, spike),
-    ] {
-        for side in [-1.0_f32, 1.0] {
-            let x = face.center().x + side * face.width() * (0.5 - fraction);
-            let base = 5.0;
-            thorns.push((
-                egui::pos2(x - base, y),
-                egui::pos2(x + base, y),
-                egui::pos2(x + side * lean, y + reach),
-            ));
-        }
-    }
-    thorns
 }
 
 /// A thorn with concave flanks, from the base edge `a`–`b` out to `tip`.
@@ -234,20 +185,6 @@ fn gradient_polygon(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn plates_grow_two_side_thorns_and_edge_thorns_only_with_room() {
-        let face = Rect::from_min_size(Pos2::ZERO, egui::vec2(120.0, 32.0));
-        assert_eq!(plate_thorns(face, 0.0).len(), 2);
-        let thorns = plate_thorns(face, 4.0);
-        assert_eq!(thorns.len(), 6);
-        for (_, _, tip) in thorns {
-            assert!(
-                !face.contains(tip),
-                "thorn tip {tip:?} stays inside the plate"
-            );
-        }
-    }
 
     #[test]
     fn octagon_cuts_every_corner() {

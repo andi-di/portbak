@@ -94,9 +94,9 @@ impl Widget for PixelButton {
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
         let padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
         let engraved = Skin::of(ui.ctx()).finish == Finish::Engraved;
-        // Engraved plates spend the lift on room for thorns above, below and beside the face.
+        // Engraved plates press straight down, so they only need room below.
         let margin = if engraved {
-            Vec2::new(forge::THORN_REACH * 2.0, m.lift)
+            Vec2::new(0.0, m.lift)
         } else {
             Vec2::splat(m.lift)
         };
@@ -124,7 +124,7 @@ impl Widget for PixelButton {
         let painter = ui.painter();
         let face = if engraved {
             let press = Vec2::new(0.0, if sunk { 1.0 } else { 0.0 });
-            let face = Rect::from_min_size(rect.min + margin / 2.0 + press, face_size);
+            let face = Rect::from_min_size(rect.min + press, face_size);
             let look = forge::PlateLook {
                 fill,
                 enabled,
@@ -132,7 +132,7 @@ impl Widget for PixelButton {
                 glow,
                 focused: response.has_focus(),
             };
-            forge::thorned_plate(painter, face, m.lift / 2.0, &look);
+            forge::plate(painter, face, &look);
             face
         } else {
             let offset = if sunk {
