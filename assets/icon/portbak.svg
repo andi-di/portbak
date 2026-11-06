@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- portbak app icon: folder + verify check inside a backup-cycle arc on a teal tile -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#115E59"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#tile)"/>
+
+  <path d="M115 219 A150 150 0 0 1 397 219" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round"/>
+  <path d="M409 251 L370 220 L419 202 Z" fill="#FFFFFF"/>
+
+  <path d="M140 258 a24 24 0 0 1 24 -24 h76 l22 26 h86 a24 24 0 0 1 24 24 v106 a24 24 0 0 1 -24 24 H164 a24 24 0 0 1 -24 -24 Z" fill="#FFFFFF"/>
+
+  <path d="M214 334 l26 26 l58 -60" fill="none" stroke="#28C85A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
