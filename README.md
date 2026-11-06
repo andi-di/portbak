@@ -13,7 +13,7 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 1. Select **New job** and choose a name and existing source and destination folders.
 2. Optionally enable **Compress as ZIP**. The default is a full folder copy.
 3. Select **Check now** to create the first backup. Subsequent backups are created only when file contents change, files are added or removed, paths are renamed, or empty directories change.
-4. Optionally enable automatic backups: daily, on selected weekdays, or at an interval in minutes (60 minutes = one hour).
+4. Jobs start with automatic backups disabled. Enable **Enable automatic backups** to arm the schedule: interval (the default, every 60 minutes), daily, or selected weekdays. Active jobs show a countdown updated every second in the job list and details. Disable automatic backups at any time to remove pending work; a running backup finishes safely. **Check now** remains available when automatic backups are disabled. Re-enabling starts a fresh schedule.
 5. Optionally enable **rolling retention** with a maximum count and/or total size. Both limits can be combined. Retention is disabled by default.
 
 **The app must be running for scheduled backups.** You can minimize it. Closing the window asks for confirmation and stops scheduling. Missed checks are caught up once on startup or resume. Schedules use the local time zone: a time skipped by daylight saving is moved to the first valid minute, and a repeated time runs only once.

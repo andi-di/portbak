@@ -47,7 +47,7 @@ The interface must remain responsive during hashing, copying, compression, verif
 - Enable or disable automatic scheduling for an individual job.
 - **Remove job**: remove the job configuration without deleting any existing backups.
 - Save changes automatically and preserve them across restarts.
-- Prevent editing or removing a running or queued job until its pending work finishes.
+- Prevent editing or removing a running or queued job until its pending work finishes, except that automatic scheduling can be toggled at any time. Disabling removes queued work for that job but lets a running backup finish. Manual checks remain available when scheduling is disabled.
 
 ### Window lifecycle
 
@@ -63,7 +63,7 @@ Each job is independent and has a persistent unique identifier. Jobs may share s
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
 | Destination folder | Existing folder selected through a folder picker or editable path; initially empty |
 | Automatic scheduling | Disabled by default |
-| Schedule mode | Daily by default; alternatives: selected weekdays or interval |
+| Schedule mode | Interval by default; display choices in order: Interval, Daily, Weekdays |
 | Local time | 18:00 by default; hours 0–23, minutes 0–59 |
 | Selected weekdays | All seven selected by default; used only in weekday mode |
 | Interval | 60 minutes by default; positive whole minutes, with a supported range of at least 1–525,600 minutes |
@@ -80,13 +80,15 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 ### Modes
 
-1. **Daily:** check once per day at the configured local time.
-2. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
-3. **Interval:** check every configured number of minutes. Express hours through minutes; for example, 120 minutes means two hours.
+1. **Interval:** check every configured number of minutes. Express hours through minutes; for example, 120 minutes means two hours.
+2. **Daily:** check once per day at the configured local time.
+3. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
 
 ### Execution rules
 
 - Scheduling works only while the application is running, including when minimized. Do not register system tasks, install services, or wake an off computer.
+- Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
+- Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
 - On first enabling a schedule, plan the next future occurrence; do not immediately run a backup solely because scheduling was enabled.
 - Recalculate the next future occurrence when the user changes schedule settings.
 - Persist scheduled due times across normal restarts.

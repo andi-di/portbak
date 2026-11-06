@@ -85,6 +85,10 @@ impl App {
         }
     }
 
+    fn remove_pending(&mut self, id: Uuid) {
+        self.queue.retain(|queued| *queued != id);
+    }
+
     fn tick(&mut self, ctx: &egui::Context) {
         while let Ok(e) = self.rx.try_recv() {
             match e {
@@ -309,6 +313,9 @@ impl eframe::App for App {
                                 ui.small("Queued");
                             }
 
+                            if let Some(remaining) = j.countdown(Utc::now()) {
+                                ui.small(format!("Next check in: {remaining}"));
+                            }
                             ui.small(&j.status);
                         });
                     }
@@ -318,6 +325,7 @@ impl eframe::App for App {
         let mut run = None;
 
         let mut remove = None;
+        let mut disabled = None;
 
         egui::CentralPanel::default().show(ctx,|ui|{
 
@@ -330,6 +338,17 @@ ui.heading(&j.name);
 ui.add_space(10.0);
 
                     let busy=self.active==Some(j.id)||self.queue.contains(&j.id);
+
+                    let mut enabled = j.enabled;
+                    let can_enable = j.schedule != Schedule::Weekdays || j.weekdays.iter().any(|day| *day);
+                    if ui.add_enabled(can_enable || enabled, egui::Checkbox::new(&mut enabled, "Enable automatic backups")).changed() {
+                        j.enabled = enabled;
+                        j.reschedule(Utc::now());
+                        if !enabled { disabled = Some(j.id); }
+                    }
+                    if !j.enabled && self.active == Some(j.id) {
+                        ui.label("Automatic backups disabled; current backup will finish.");
+                    }
 
                     ui.add_enabled_ui(!busy,|ui|{
 
@@ -349,12 +368,10 @@ ui.heading("Scheduling");
 
                         let old=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_minutes)).unwrap();
 
-                        ui.checkbox(&mut j.enabled,"Enable automatic backups");
-
                         ui.horizontal(|ui|{
+ui.selectable_value(&mut j.schedule,Schedule::Interval,"Interval");
 ui.selectable_value(&mut j.schedule,Schedule::Daily,"Daily");
 ui.selectable_value(&mut j.schedule,Schedule::Weekdays,"Weekdays");
-ui.selectable_value(&mut j.schedule,Schedule::Interval,"Interval");
 }
 );
 
@@ -392,7 +409,7 @@ j.enabled=false;
                         }
 
                         if old!=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_minutes)).unwrap(){
-j.next_run=Some(j.next_after(Utc::now()));
+j.reschedule(Utc::now());
 }
 
                         ui.label(format!("Next check: {}",if j.enabled{
@@ -400,6 +417,10 @@ j.next_run.map(|t|t.with_timezone(&chrono::Local).format("%d.%m.%Y %H:%M").to_st
 else{
 "disabled".into()}
 ));
+
+                        if let Some(remaining) = j.countdown(Utc::now()) {
+                            ui.label(format!("Next check in: {remaining}"));
+                        }
 
                         ui.separator();
 ui.heading("Retention");
@@ -477,6 +498,10 @@ ui.label("Create a backup job and select source and destination folders.");
 
         }
 );
+
+        if let Some(id) = disabled {
+            self.remove_pending(id);
+        }
 
         if let Some(id) = run {
             self.enqueue(id)
@@ -602,5 +627,44 @@ fn main() {
             .set_description(&msg)
             .set_level(rfd::MessageLevel::Error)
             .show();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disabling_removes_pending_work_and_preserves_active_work() {
+        let mut app = App::new(
+            Config::default(),
+            PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        let active = Uuid::new_v4();
+        let queued = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        app.active = Some(active);
+        app.enqueue(queued);
+        app.enqueue(other);
+        app.remove_pending(queued);
+        app.remove_pending(active);
+        assert_eq!(app.active, Some(active));
+        assert_eq!(app.queue, VecDeque::from([other]));
+    }
+
+    #[test]
+    fn manual_checks_can_queue_disabled_jobs() {
+        let job = Job::default();
+        let id = job.id;
+        let config = Config {
+            jobs: vec![job],
+            ..Config::default()
+        };
+        let mut app = App::new(config, PathBuf::new(), tempfile::tempfile().unwrap());
+        app.enqueue(id);
+        app.enqueue(id);
+        assert_eq!(app.queue, VecDeque::from([id]));
+        assert!(!app.config.jobs[0].enabled);
     }
 }

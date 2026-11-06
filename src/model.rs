@@ -39,7 +39,7 @@ impl Default for Job {
             target: PathBuf::new(),
             enabled: false,
             zip: false,
-            schedule: Schedule::Daily,
+            schedule: Schedule::Interval,
             hour: 18,
             minute: 0,
             weekdays: [true; 7],
@@ -54,6 +54,32 @@ impl Default for Job {
     }
 }
 impl Job {
+    pub fn reschedule(&mut self, now: DateTime<Utc>) {
+        self.next_run = self.enabled.then(|| self.next_after(now));
+    }
+
+    pub fn countdown(&self, now: DateTime<Utc>) -> Option<String> {
+        if !self.enabled {
+            return None;
+        }
+        self.next_run.map(|next| {
+            let millis = (next - now).num_milliseconds().max(0);
+            let seconds = (millis + 999) / 1000;
+            let days = seconds / 86400;
+            let time = format!(
+                "{:02}:{:02}:{:02}",
+                seconds / 3600 % 24,
+                seconds / 60 % 60,
+                seconds % 60
+            );
+            if days > 0 {
+                format!("{days}d {time}")
+            } else {
+                time
+            }
+        })
+    }
+
     pub fn take_due(&mut self, now: DateTime<Utc>) -> bool {
         if !self.enabled {
             return false;
@@ -133,6 +159,68 @@ pub struct Manifest {
 mod tests {
     use super::*;
     #[test]
+    fn default_job_is_disabled_interval() {
+        let job = Job::default();
+        assert!(!job.enabled);
+        assert!(job.schedule == Schedule::Interval);
+        assert_eq!(job.interval_minutes, 60);
+        assert!(job.next_run.is_none());
+    }
+
+    #[test]
+    fn activation_starts_a_fresh_interval() {
+        let now = Utc::now();
+        let mut job = Job {
+            enabled: true,
+            ..Job::default()
+        };
+        job.reschedule(now);
+        assert_eq!(job.next_run, Some(now + Duration::minutes(60)));
+        job.enabled = false;
+        job.reschedule(now);
+        assert!(job.next_run.is_none());
+        assert!(!job.take_due(now + Duration::days(1)));
+        job.enabled = true;
+        job.reschedule(now + Duration::days(1));
+        assert_eq!(
+            job.next_run,
+            Some(now + Duration::days(1) + Duration::minutes(60))
+        );
+    }
+
+    #[test]
+    fn countdown_uses_due_time_without_mutating_it() {
+        let now = Utc::now();
+        let mut job = Job {
+            enabled: true,
+            next_run: Some(now + Duration::days(1) + Duration::seconds(1)),
+            ..Job::default()
+        };
+        assert_eq!(job.countdown(now).as_deref(), Some("1d 00:00:01"));
+        assert_eq!(
+            job.countdown(now + Duration::milliseconds(500)).as_deref(),
+            Some("1d 00:00:01")
+        );
+        assert_eq!(
+            job.countdown(now + Duration::seconds(2)).as_deref(),
+            Some("23:59:59")
+        );
+        assert_eq!(
+            job.countdown(now + Duration::days(2)).as_deref(),
+            Some("00:00:00")
+        );
+        assert_eq!(
+            job.next_run,
+            Some(now + Duration::days(1) + Duration::seconds(1))
+        );
+        job.enabled = false;
+        assert!(job.countdown(now).is_none());
+        job.enabled = true;
+        job.next_run = None;
+        assert!(job.countdown(now).is_none());
+    }
+
+    #[test]
     fn interval_is_future() {
         let j = Job {
             schedule: Schedule::Interval,
@@ -144,7 +232,10 @@ mod tests {
     }
     #[test]
     fn calendar_is_future() {
-        let j = Job::default();
+        let j = Job {
+            schedule: Schedule::Daily,
+            ..Job::default()
+        };
         let n = Utc::now();
         assert!(j.next_after(n) > n);
     }
@@ -187,6 +278,7 @@ mod tests {
     fn dst_missing_hour_is_advanced_and_repeated_hour_runs_once() {
         let zone = chrono_tz::Europe::Berlin;
         let j = Job {
+            schedule: Schedule::Daily,
             hour: 2,
             minute: 30,
             ..Job::default()
