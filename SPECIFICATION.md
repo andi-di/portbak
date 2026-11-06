@@ -66,7 +66,7 @@ Each job is independent and has a persistent unique identifier. Jobs may share s
 | Schedule mode | Interval by default; display choices in order: Interval, Daily, Weekdays |
 | Local time | 18:00 by default; hours 0–23, minutes 0–59 |
 | Selected weekdays | All seven selected by default; used only in weekday mode |
-| Interval | 60 minutes by default; positive whole minutes, with a supported range of at least 1–525,600 minutes |
+| Interval | 60 Minutes by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
 | Compress as ZIP | Checkbox; disabled by default |
 | Rolling retention | Disabled by default |
 | Maximum count | Independently enabled; initial value when enabled: 10; positive whole number, supporting at least 1–100,000 |
@@ -80,7 +80,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 ### Modes
 
-1. **Interval:** check every configured number of minutes. Express hours through minutes; for example, 120 minutes means two hours.
+1. **Interval:** check every configured number of seconds, minutes, or hours. Changing the unit preserves the numeric value, clamped to the new unit’s supported range. Store the value and selected unit independently.
 2. **Daily:** check once per day at the configured local time.
 3. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
 

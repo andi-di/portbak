@@ -9,6 +9,38 @@ pub enum Schedule {
     Weekdays,
     Interval,
 }
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum IntervalUnit {
+    Seconds,
+    #[default]
+    Minutes,
+    Hours,
+}
+impl IntervalUnit {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Seconds => "Seconds",
+            Self::Minutes => "Minutes",
+            Self::Hours => "Hours",
+        }
+    }
+
+    pub fn maximum(self) -> u32 {
+        match self {
+            Self::Seconds => 31_536_000,
+            Self::Minutes => 525_600,
+            Self::Hours => 8_760,
+        }
+    }
+
+    fn seconds(self) -> i64 {
+        match self {
+            Self::Seconds => 1,
+            Self::Minutes => 60,
+            Self::Hours => 3_600,
+        }
+    }
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Job {
@@ -22,7 +54,8 @@ pub struct Job {
     pub hour: u32,
     pub minute: u32,
     pub weekdays: [bool; 7],
-    pub interval_minutes: u32,
+    pub interval_value: u32,
+    pub interval_unit: IntervalUnit,
     pub rolling: bool,
     pub max_count: Option<usize>,
     pub max_bytes: Option<u64>,
@@ -43,7 +76,8 @@ impl Default for Job {
             hour: 18,
             minute: 0,
             weekdays: [true; 7],
-            interval_minutes: 60,
+            interval_value: 60,
+            interval_unit: IntervalUnit::Minutes,
             rolling: false,
             max_count: None,
             max_bytes: None,
@@ -95,7 +129,11 @@ impl Job {
     }
     fn next_after_in<T: TimeZone>(&self, now: DateTime<Utc>, zone: &T) -> DateTime<Utc> {
         if self.schedule == Schedule::Interval {
-            return now + Duration::minutes(self.interval_minutes.max(1).into());
+            return now
+                + Duration::seconds(
+                    i64::from(self.interval_value.clamp(1, self.interval_unit.maximum()))
+                        * self.interval_unit.seconds(),
+                );
         }
         let date = now.with_timezone(zone).date_naive();
         for day in 0..9 {
@@ -163,7 +201,7 @@ mod tests {
         let job = Job::default();
         assert!(!job.enabled);
         assert!(job.schedule == Schedule::Interval);
-        assert_eq!(job.interval_minutes, 60);
+        assert_eq!(job.interval_value, 60);
         assert!(job.next_run.is_none());
     }
 
@@ -224,12 +262,60 @@ mod tests {
     fn interval_is_future() {
         let j = Job {
             schedule: Schedule::Interval,
-            interval_minutes: 5,
+            interval_value: 5,
             ..Job::default()
         };
         let n = Utc::now();
         assert_eq!(j.next_after(n), n + Duration::minutes(5));
     }
+    #[test]
+    fn interval_units_schedule_and_roundtrip() {
+        let now = Utc::now();
+        for (unit, seconds) in [
+            (IntervalUnit::Seconds, 5),
+            (IntervalUnit::Minutes, 300),
+            (IntervalUnit::Hours, 18_000),
+        ] {
+            let job = Job {
+                interval_value: 5,
+                interval_unit: unit,
+                enabled: true,
+                ..Job::default()
+            };
+            let data = serde_json::to_vec(&job).unwrap();
+            let mut saved: Job = serde_json::from_slice(&data).unwrap();
+            assert_eq!(saved.interval_unit, unit);
+            assert_eq!(saved.interval_value, 5);
+            saved.reschedule(now);
+            assert_eq!(saved.next_run, Some(now + Duration::seconds(seconds)));
+            assert!(!saved.take_due(now + Duration::seconds(seconds) - Duration::milliseconds(1)));
+            assert!(saved.take_due(now + Duration::seconds(seconds)));
+        }
+    }
+
+    #[test]
+    fn interval_bounds_and_unit_changes() {
+        let now = Utc::now();
+        let mut job = Job {
+            interval_value: 60,
+            ..Job::default()
+        };
+        job.interval_unit = IntervalUnit::Hours;
+        assert_eq!(job.interval_value, 60);
+        assert_eq!(job.next_after(now), now + Duration::hours(60));
+        for unit in [
+            IntervalUnit::Seconds,
+            IntervalUnit::Minutes,
+            IntervalUnit::Hours,
+        ] {
+            job.interval_unit = unit;
+            job.interval_value = 0;
+            assert_eq!(job.next_after(now), now + Duration::seconds(unit.seconds()));
+            job.interval_value = u32::MAX;
+            assert_eq!(job.next_after(now), now + Duration::days(365));
+        }
+    }
+
     #[test]
     fn calendar_is_future() {
         let j = Job {

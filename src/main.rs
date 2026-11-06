@@ -9,7 +9,7 @@ use eframe::egui;
 
 use fs2::FileExt;
 
-use model::{Config, Job, Schedule};
+use model::{Config, IntervalUnit, Job, Schedule};
 
 use std::{
     collections::VecDeque,
@@ -372,7 +372,7 @@ ui.checkbox(&mut j.zip,"Compress as ZIP");
                         ui.separator();
 ui.heading("Scheduling");
 
-                        let old=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_minutes)).unwrap();
+                        let old=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_value,j.interval_unit)).unwrap();
 
                         ui.horizontal(|ui|{
 ui.selectable_value(&mut j.schedule,Schedule::Interval,"Interval");
@@ -384,8 +384,15 @@ ui.selectable_value(&mut j.schedule,Schedule::Weekdays,"Weekdays");
                         if j.schedule==Schedule::Interval{
 ui.horizontal(|ui|{
 ui.label("Every");
-ui.add(egui::DragValue::new(&mut j.interval_minutes).range(1..=525600));
-ui.label("minutes (60 = 1 hour)");
+ui.add(egui::DragValue::new(&mut j.interval_value).range(1..=j.interval_unit.maximum()));
+egui::ComboBox::from_id_salt("interval_unit")
+    .selected_text(j.interval_unit.label())
+    .show_ui(ui, |ui| {
+        for unit in [IntervalUnit::Seconds, IntervalUnit::Minutes, IntervalUnit::Hours] {
+            ui.selectable_value(&mut j.interval_unit, unit, unit.label());
+        }
+    });
+j.interval_value = j.interval_value.clamp(1, j.interval_unit.maximum());
 }
 );
 }
@@ -414,7 +421,7 @@ j.enabled=false;
 
                         }
 
-                        if old!=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_minutes)).unwrap(){
+                        if old!=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_value,j.interval_unit)).unwrap(){
 j.reschedule(Utc::now());
 }
 
