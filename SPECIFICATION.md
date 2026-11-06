@@ -48,7 +48,7 @@ The interface must remain responsive during hashing, copying, compression, verif
 - **Manage backups…**: beside Restore, open the same history overview when no operation is running or queued, without requiring an available source folder. Pause automatic starts while open. Show each saved version’s protection checkbox and save changes in the background. Disable further edits and closing while saving; report errors without pretending the protection changed. Closing preserves job activation. Missing versions are marked unavailable, but existing protection can be removed.
 - In both history dialogs, subtly highlight the first list entry of each local calendar day, newest first. Keep selection and protection independently recognizable. Wrap job action buttons on narrow windows.
 - Show retention capacity warnings in the management overview and job details; refresh after protection changes, limit changes, and backup completion.
-- On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits, manual starts, and normal quitting while restoring; other jobs resume scheduling afterward.
+- On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits and manual starts while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
 - Save changes automatically and preserve them across restarts.
@@ -56,7 +56,7 @@ The interface must remain responsive during hashing, copying, compression, verif
 
 ### Window lifecycle
 
-Minimizing keeps the application and scheduler running. Closing the window displays a confirmation explaining that quitting stops scheduled backups. Offer **Keep running** and **Quit**. While a backup or restore is running, allow the user to keep the app running but prevent normal quitting until that operation finishes. No system tray or always-running service is required.
+Minimizing keeps the application and scheduler running. Closing the window immediately exits without confirmation, including while a backup or restore is running. Attempt to save settings before exit; a save failure is logged to stderr and does not block closing. Exit stops scheduling and terminates background operations without waiting for completion. Interrupted operations have the same recovery limitations as forced process termination. No system tray or always-running service is required.
 
 ## 4. Job configuration and defaults
 
@@ -264,8 +264,8 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | New schedule enabled | First execution planned for the future |
 | DST missing/repeated local time | First valid minute / first occurrence only |
 | App minimized | Schedule and progress continue |
-| Quit request while idle | Confirmation explains scheduling stops |
-| Quit request while backup runs | Normal quitting blocked until completion |
+| Quit request while idle | Save settings and exit immediately without confirmation |
+| Quit request while backup or restore runs | Exit immediately without waiting for completion |
 | Second instance or destination lock conflict | Clear refusal; no concurrent writes |
 | GUI restore selected folder or ZIP | Entire source contents replaced; extra and hidden entries removed; saved empty directories restored |
 | Restore cancelled | Source and job activation unchanged |
