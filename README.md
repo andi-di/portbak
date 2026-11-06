@@ -64,7 +64,9 @@ The output is `target/release/portbak` on Linux or `target/release/portbak.exe` 
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 
-The GitHub Actions workflow runs formatting checks, tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs once the project is pushed to a GitHub repository.
+The GitHub Actions workflow runs formatting checks, all tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs for pull requests, pushes to `main`, and manual dispatches. Feature-branch pushes are checked through their PR, avoiding duplicate push/PR runs. New commits cancel obsolete runs for the same PR or branch. Both platform jobs finish independently so one failure does not hide the other result.
+
+Rust dependencies and build artifacts are cached per platform, compiler, dependency set, and build environment. Warm runs avoid rebuilding unchanged dependencies; the first run still needs to populate its cache. All tests and both release builds remain enabled. The test suite exercises restore/rollback, retention, integrity and scheduling; observed CI test execution is a few seconds, with compilation accounting for most of the `cargo test` step.
 
 Tests cover folder/ZIP restore, full source replacement, rollback and recovery, unsafe archives, content changes and renames, empty directories, ZIP readability, links, overlapping paths, failure cleanup, sources changing during backup, rolling retention, missing backups, atomic saves, and scheduling including daylight saving transitions.
 
