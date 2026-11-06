@@ -5,7 +5,7 @@
 //! `A` the caller's tint, `Y` gold, `G` good, `R` bad.
 
 use super::glyphs;
-use super::style::{IconStyle, Palette, Skin};
+use super::style::{Finish, Palette, Skin};
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -289,25 +289,37 @@ const GEAR: Bitmap = &[
 ];
 
 pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
-    let grid = match Skin::of(ctx).icons {
-        IconStyle::Pixel => {
+    let grid = match Skin::of(ctx).finish {
+        Finish::Pixel => {
             let bitmap = sprite.bitmap();
             let width = bitmap.first().map_or(0, |row| row.len());
             egui::vec2(width as f32, bitmap.len() as f32)
         }
-        IconStyle::Engraved => glyphs::grid(sprite),
+        Finish::Engraved => glyphs::grid(sprite),
     };
     grid * scale
 }
 
 /// Paints the icon with its top-left corner at `origin`, snapped to whole pixels.
 pub fn paint(painter: &egui::Painter, origin: Pos2, sprite: Sprite, scale: f32, tint: Color32) {
+    paint_awake(painter, origin, sprite, scale, tint, 0.0);
+}
+
+/// Like `paint`, with `wake` from 0 to 1 bringing engraved icons to life, e.g. while hovered.
+pub fn paint_awake(
+    painter: &egui::Painter,
+    origin: Pos2,
+    sprite: Sprite,
+    scale: f32,
+    tint: Color32,
+    wake: f32,
+) {
     let origin = origin.round();
-    match Skin::of(painter.ctx()).icons {
-        IconStyle::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
-        IconStyle::Engraved => {
+    match Skin::of(painter.ctx()).finish {
+        Finish::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
+        Finish::Engraved => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
-            glyphs::paint(painter, rect, sprite, tint);
+            glyphs::paint(painter, rect, sprite, tint, wake);
         }
     }
 }

@@ -22,7 +22,8 @@ pub fn grid(sprite: Sprite) -> Vec2 {
     }
 }
 
-pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) {
+/// Paints `sprite` into `rect`; `wake` from 0 to 1 animates icons that react to hover.
+pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32, wake: f32) {
     let palette = Palette::of_ctx(painter.ctx());
     let pen = Pen::new(painter, rect);
     let dark = mix(tint, palette.outline, 0.62);
@@ -34,7 +35,7 @@ pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32)
         Sprite::Trash => skull(&pen, palette),
         Sprite::Rewind => chevrons(&pen, tint),
         Sprite::Play => sword(&pen, palette, tint),
-        Sprite::Chest => mimic(&pen, palette, tint),
+        Sprite::Chest => mimic(&pen, palette, tint, wake),
         Sprite::Package => urn(&pen, palette, tint, dark),
         Sprite::Sun => sun(&pen, palette),
         Sprite::Moon => moon(&pen, palette),
@@ -92,13 +93,15 @@ impl<'a> Pen<'a> {
         self.painter.add(Shape::line(self.points(points), stroke));
     }
 
+    /// A rectangle with corners rounded in proportion to its short side.
     fn rect(&self, min: Point, max: Point, fill: Color32, edge: Option<Color32>) {
         let rect = Rect::from_two_pos(self.at(min), self.at(max));
-        self.painter.rect_filled(rect, 0.0, fill);
+        let radius = rect.width().min(rect.height()) * 0.22;
+        self.painter.rect_filled(rect, radius, fill);
         if let Some(edge) = edge {
             let stroke = self.stroke(edge, 1.0);
             self.painter
-                .rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Inside);
+                .rect_stroke(rect, radius, stroke, egui::StrokeKind::Inside);
         }
     }
 
@@ -246,54 +249,105 @@ fn sword(pen: &Pen, palette: &Palette, tint: Color32) {
     pen.circle(turn(&[(0.05, 0.5)])[0], 0.06, palette.gold, None);
 }
 
-/// A treasure chest that is not what it seems; manage backups.
-fn mimic(pen: &Pen, palette: &Palette, tint: Color32) {
-    let wood = mix(palette.gold, palette.outline, 0.6);
-    let teeth = palette.paper;
-    pen.shape(
-        &[(0.06, 0.34), (0.12, 0.08), (0.88, 0.08), (0.94, 0.34)],
-        wood,
-        tint,
-    );
-    pen.rect(
-        (0.1, 0.34),
-        (0.9, 0.54),
-        mix(palette.accent, palette.outline, 0.55),
-        None,
-    );
-    for index in 0..5 {
-        let x = 0.18 + index as f32 * 0.16;
-        pen.fill(&[(x - 0.06, 0.33), (x + 0.06, 0.33), (x, 0.47)], teeth);
+/// A treasure chest that wakes into a mimic: the lid lifts, fangs and tongue come out, eyes
+/// open, and once fully awake it chomps. Manage backups.
+fn mimic(pen: &Pen, palette: &Palette, tint: Color32, wake: f32) {
+    let ctx = pen.painter.ctx();
+    let chomp = if wake > 0.0 {
+        ctx.request_repaint_after(FLICKER_FRAME);
+        let time = ctx.input(|input| input.time) as f32;
+        0.75 + 0.25 * (time * 11.0).sin() * wake
+    } else {
+        0.0
+    };
+    let gap = 0.2 * wake * chomp;
+    let rim = 0.52;
+    let lid_bottom = rim - gap;
+    let wood = mix(palette.gold, palette.outline, 0.62);
+    if gap > 0.01 {
+        pen.rect(
+            (0.1, lid_bottom),
+            (0.9, rim + 0.04),
+            mix(palette.accent, palette.outline, 0.6),
+            None,
+        );
     }
-    pen.rect((0.06, 0.52), (0.94, 0.96), wood, Some(tint));
-    for index in 0..4 {
-        let x = 0.26 + index as f32 * 0.16;
-        pen.fill(&[(x - 0.05, 0.53), (x + 0.05, 0.53), (x, 0.42)], teeth);
+    pen.rect((0.06, rim), (0.94, 0.95), wood, Some(tint));
+    let fang = 0.11 * wake;
+    if fang > 0.005 {
+        for index in 0..4 {
+            let x = 0.24 + index as f32 * 0.17;
+            pen.fill(
+                &[
+                    (x - 0.05, rim + 0.01),
+                    (x + 0.05, rim + 0.01),
+                    (x, rim - fang),
+                ],
+                palette.paper,
+            );
+        }
+    }
+    let mut lid = vec![(0.94, lid_bottom), (0.06, lid_bottom)];
+    lid.extend((0..=10).map(|step| {
+        let angle = PI + step as f32 * PI / 10.0;
+        (
+            0.5 + 0.44 * angle.cos(),
+            lid_bottom - 0.14 + 0.22 * angle.sin(),
+        )
+    }));
+    pen.shape(&lid, wood, tint);
+    if fang > 0.005 {
+        for index in 0..5 {
+            let x = 0.16 + index as f32 * 0.17;
+            pen.fill(
+                &[
+                    (x - 0.06, lid_bottom - 0.01),
+                    (x + 0.06, lid_bottom - 0.01),
+                    (x, lid_bottom + fang * 1.2),
+                ],
+                palette.paper,
+            );
+        }
     }
     for (left, right) in [(0.18, 0.26), (0.74, 0.82)] {
-        pen.rect((left, 0.1), (right, 0.33), palette.gold, None);
-        pen.rect((left, 0.54), (right, 0.94), palette.gold, None);
+        pen.rect(
+            (left, lid_bottom - 0.3),
+            (right, lid_bottom),
+            palette.gold,
+            None,
+        );
+        pen.rect((left, rim), (right, 0.95), palette.gold, None);
     }
     pen.rect(
-        (0.32, 0.64),
-        (0.44, 0.8),
+        (0.4, rim + 0.08),
+        (0.6, rim + 0.28),
         palette.gold,
         Some(palette.outline),
     );
-    pen.shape(
-        &[
-            (0.5, 0.5),
-            (0.66, 0.5),
-            (0.7, 0.74),
-            (0.6, 0.86),
-            (0.51, 0.74),
-        ],
-        mix(palette.bad, palette.paper, 0.25),
-        palette.outline,
-    );
-    for x in [0.4, 0.6] {
-        pen.circle((x, 0.2), 0.05, palette.gold, None);
-        pen.circle((x, 0.2), 0.018, palette.outline, None);
+    pen.circle((0.5, rim + 0.16), 0.03, palette.outline, None);
+    if wake > 0.05 {
+        let tip = rim + 0.1 + 0.32 * wake;
+        pen.shape(
+            &[
+                (0.54, rim - 0.02),
+                (0.72, rim - 0.02),
+                (0.74, tip - 0.08),
+                (0.65, tip),
+                (0.56, tip - 0.08),
+            ],
+            mix(palette.bad, palette.paper, 0.25),
+            palette.outline,
+        );
+        for x in [0.36, 0.64] {
+            let center = (x, lid_bottom - 0.17);
+            pen.circle(center, 0.075 * wake, palette.gold, Some(palette.outline));
+            pen.rect(
+                (x - 0.012, center.1 - 0.06 * wake),
+                (x + 0.012, center.1 + 0.06 * wake),
+                palette.outline,
+                None,
+            );
+        }
     }
 }
 
@@ -493,7 +547,9 @@ mod tests {
                 let painter = ctx.layer_painter(egui::LayerId::background());
                 for sprite in Sprite::ALL {
                     let rect = Rect::from_min_size(Pos2::ZERO, grid(sprite) * 2.0);
-                    paint(&painter, rect, sprite, Palette::of_ctx(ctx).accent);
+                    for wake in [0.0, 0.5, 1.0] {
+                        paint(&painter, rect, sprite, Palette::of_ctx(ctx).accent, wake);
+                    }
                 }
             });
         }

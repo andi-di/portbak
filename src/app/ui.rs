@@ -2,7 +2,7 @@ use super::ornaments;
 use super::pixel::{self, PixelButton, Tone};
 use super::skins;
 use super::sprites::{self, Sprite};
-use super::style::{self, IconStyle, Palette, Skin};
+use super::style::{self, Finish, Palette, Skin};
 use super::widgets::alert;
 use super::App;
 use crate::model::{Job, Theme};
@@ -255,7 +255,7 @@ impl App {
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         ui.painter().set(
             background,
-            card_shapes(rect, palette, selected, response.hovered()),
+            card_shapes(ui.ctx(), rect, selected, response.hovered()),
         );
         ui.add_space(CARD_SHADOW + 4.0);
         response.clicked()
@@ -276,7 +276,7 @@ fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
     let mascot = sprites::show(ui, skin.wording.mascot, 4.0, palette.hot);
-    if skin.icons == IconStyle::Pixel && pixel::blink(ui, 0.8) {
+    if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [
             (egui::vec2(-2.0, -6.0), egui::vec2(4.0, 12.0)),
@@ -305,11 +305,13 @@ fn blinking_cursor(ui: &egui::Ui, text: &str, cursor: &str) -> String {
 }
 
 fn card_shapes(
+    ctx: &egui::Context,
     rect: egui::Rect,
-    palette: &Palette,
     selected: bool,
     hovered: bool,
 ) -> Vec<egui::Shape> {
+    let palette = palette_of(ctx);
+    let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);
     let fill = match (selected, hovered) {
         (true, _) => palette.raised,
         (false, true) => pixel::mix(palette.surface, palette.raised, 0.6),
@@ -321,11 +323,7 @@ fn card_shapes(
         palette.outline
     };
     let mut shapes = vec![
-        egui::Shape::rect_filled(
-            rect.translate(egui::Vec2::splat(CARD_SHADOW)),
-            0.0,
-            palette.outline,
-        ),
+        shadow.as_shape(rect, 0.0).into(),
         egui::Shape::rect_filled(rect, 0.0, fill),
         egui::Shape::rect_stroke(
             rect,

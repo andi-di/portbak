@@ -20,15 +20,15 @@ pub struct Skin {
     pub typography: Typography,
     pub metrics: Metrics,
     pub effects: Effects,
-    pub icons: IconStyle,
+    pub finish: Finish,
     pub wording: Wording,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum IconStyle {
-    /// Hard-edged pixel sprites and square lamps.
+pub enum Finish {
+    /// Pixel sprites, beveled buttons, square boxes and lamps.
     Pixel,
-    /// Smooth vector line art with dark bodies and diamond lamps.
+    /// Vector glyphs, thorned forged plates, spiked sockets and diamond lamps.
     Engraved,
 }
 
@@ -95,8 +95,10 @@ pub struct Metrics {
     pub border: f32,
     /// How far raised buttons stand off their shadow.
     pub lift: f32,
-    /// Offset of the hard shadow behind panels and windows.
+    /// Offset of the shadow behind panels and windows.
     pub shadow: i8,
+    /// Blur of that shadow; 0 gives a hard diagonal pixel shadow.
+    pub shadow_blur: u8,
 }
 
 pub struct Effects {
@@ -229,8 +231,8 @@ fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palet
     visuals.window_stroke = Stroke::new(metrics.border + 1.0, palette.outline);
     visuals.window_corner_radius = CornerRadius::ZERO;
     visuals.menu_corner_radius = CornerRadius::ZERO;
-    visuals.window_shadow = hard_shadow(metrics.shadow + 3, palette.outline);
-    visuals.popup_shadow = hard_shadow(metrics.shadow - 1, palette.outline);
+    visuals.window_shadow = drop_shadow(metrics, palette, metrics.shadow + 3);
+    visuals.popup_shadow = drop_shadow(metrics, palette, metrics.shadow - 1);
     visuals.faint_bg_color = palette.raised;
     visuals.extreme_bg_color = palette.sunken;
     visuals.code_bg_color = palette.sunken;
@@ -266,12 +268,21 @@ fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palet
     widgets.open.bg_stroke = Stroke::new(metrics.border, palette.accent);
 }
 
-fn hard_shadow(offset: i8, color: Color32) -> Shadow {
+/// The skin's drop shadow: hard and diagonal without blur, soft and falling straight down with it.
+pub fn drop_shadow(metrics: &Metrics, palette: &Palette, offset: i8) -> Shadow {
+    if metrics.shadow_blur == 0 {
+        return Shadow {
+            offset: [offset, offset],
+            blur: 0,
+            spread: 0,
+            color: palette.outline,
+        };
+    }
     Shadow {
-        offset: [offset, offset],
-        blur: 0,
+        offset: [0, offset],
+        blur: metrics.shadow_blur,
         spread: 0,
-        color,
+        color: palette.outline.gamma_multiply(0.7),
     }
 }
 

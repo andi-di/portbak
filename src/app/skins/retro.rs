@@ -2,7 +2,7 @@
 
 use crate::app::sprites::Sprite;
 use crate::app::style::{
-    Effects, Fonts, IconStyle, Metrics, Palette, Skin, TitleBar, Typography, Wording,
+    Effects, Finish, Fonts, Metrics, Palette, Skin, TitleBar, Typography, Wording,
 };
 use eframe::egui::Color32;
 
@@ -31,6 +31,7 @@ pub static RETRO: Skin = Skin {
         border: 2.0,
         lift: 3.0,
         shadow: 5,
+        shadow_blur: 0,
     },
     effects: Effects {
         scanlines: true,
@@ -40,7 +41,7 @@ pub static RETRO: Skin = Skin {
         vignette: false,
         title_bar: TitleBar::Striped,
     },
-    icons: IconStyle::Pixel,
+    finish: Finish::Pixel,
     wording: Wording {
         mascot: Sprite::Floppy,
         tagline: "PORTABLE BACKUP SYSTEM",

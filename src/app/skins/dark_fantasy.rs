@@ -2,7 +2,7 @@
 
 use crate::app::sprites::Sprite;
 use crate::app::style::{
-    Effects, Fonts, IconStyle, Metrics, Palette, Skin, TitleBar, Typography, Wording,
+    Effects, Finish, Fonts, Metrics, Palette, Skin, TitleBar, Typography, Wording,
 };
 use eframe::egui::Color32;
 
@@ -26,12 +26,14 @@ pub static DARK_FANTASY: Skin = Skin {
         label: 14.0,
         display_scale: 1.4,
         // A hairline engraving; a deep hard shadow would double the thin serifs.
-        display_drop: 0.04,
+        display_drop: 0.03,
     },
     metrics: Metrics {
         border: 1.0,
-        lift: 2.0,
+        // Room for the thorns above and below each plate.
+        lift: 12.0,
         shadow: 6,
+        shadow_blur: 20,
     },
     effects: Effects {
         scanlines: false,
@@ -41,7 +43,7 @@ pub static DARK_FANTASY: Skin = Skin {
         vignette: true,
         title_bar: TitleBar::Engraved,
     },
-    icons: IconStyle::Engraved,
+    finish: Finish::Engraved,
     wording: Wording {
         mascot: Sprite::Power,
         tagline: "KEEPER OF FORGOTTEN FILES",
