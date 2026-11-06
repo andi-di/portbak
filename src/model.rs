@@ -201,6 +201,8 @@ impl Theme {
 pub struct Config {
     pub version: u32,
     pub theme: Theme,
+    /// Id of the chosen skin; unknown ids fall back to the default skin.
+    pub skin: String,
     pub jobs: Vec<Job>,
 }
 
@@ -209,6 +211,7 @@ impl Default for Config {
         Self {
             version: 1,
             theme: Theme::System,
+            skin: "retro".into(),
             jobs: vec![],
         }
     }
@@ -414,6 +417,14 @@ mod tests {
         assert_eq!(value["theme"], "Dark");
         let saved: Config = serde_json::from_value(value).unwrap();
         assert_eq!(saved.theme, Theme::Dark);
+    }
+
+    #[test]
+    fn configs_without_a_skin_load_the_default_skin() {
+        let saved: Config =
+            serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();
+        assert_eq!(saved.skin, "retro");
+        assert_eq!(saved.theme, Theme::Light);
     }
 
     #[test]

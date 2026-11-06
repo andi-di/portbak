@@ -52,10 +52,7 @@ fn startup() -> anyhow::Result<()> {
     eframe::run_native(
         "portbak",
         options,
-        Box::new(move |creation| {
-            creation.egui_ctx.all_styles_mut(apply_style);
-            Ok(Box::new(app::App::new(config, path, lock)))
-        }),
+        Box::new(move |_| Ok(Box::new(app::App::new(config, path, lock)))),
     )
     .map_err(|error| anyhow::anyhow!("{error}"))
 }
@@ -93,20 +90,4 @@ fn load_config(path: &Path) -> anyhow::Result<Config> {
     );
     engine::save(path, &config)?;
     Ok(config)
-}
-
-fn apply_style(style: &mut egui::Style) {
-    style.spacing.item_spacing = egui::vec2(8.0, 5.0);
-    style.spacing.button_padding = egui::vec2(10.0, 5.0);
-    for (text_style, size) in [
-        (egui::TextStyle::Heading, 22.0),
-        (egui::TextStyle::Body, 14.0),
-        (egui::TextStyle::Button, 14.0),
-    ] {
-        style
-            .text_styles
-            .insert(text_style, egui::FontId::proportional(size));
-    }
-    let text_gray = if style.visuals.dark_mode { 220 } else { 35 };
-    style.visuals.override_text_color = Some(egui::Color32::from_gray(text_gray));
 }

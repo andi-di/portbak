@@ -1,6 +1,9 @@
+use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use super::sprites::{self, Sprite};
+use super::style::{label_font, Palette, Skin};
 use super::widgets::{
-    centered_combo, centered_row, job_title, local_time, path_picker, retention_warnings, DANGER,
-    DATE_MINUTE, DATE_TIME, ERROR_TEXT, SUCCESS,
+    alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
+    DATE_MINUTE, DATE_TIME,
 };
 use super::{App, CachedHistory, HistoryMode};
 use crate::model::{IntervalUnit, Job, Schedule};
@@ -13,6 +16,7 @@ const MAX_COUNT_LIMIT: usize = 100_000;
 const BYTES_PER_GIB: f64 = 1_073_741_824.0;
 const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const CONTENT_MAX_WIDTH: f32 = 880.0;
 
 /// Everything that decides when a job runs; a change restarts its schedule.
 type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
@@ -44,16 +48,23 @@ impl App {
             locked: self.scheduling_paused(),
             backup_running: self.active == Some(id) && !self.restoring,
         });
+        let can_add = !self.scheduling_paused();
         let selected = self.selected;
         let summaries = &self.history_cache;
         let jobs = &mut self.config.jobs;
         let mut action = None;
         let mut disabled = false;
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let mut add = false;
+        let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
+        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+            if Skin::of(ui.ctx()).effects.grid {
+                pixel::paint_grid(ui.painter(), ui.clip_rect(), Palette::of(ui));
+            }
             egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
                 let (Some(job), Some(permissions)) = (job, permissions) else {
-                    welcome(ui);
+                    add = welcome(ui, can_add);
                     return;
                 };
                 let was_enabled = job.enabled;
@@ -64,6 +75,9 @@ impl App {
                 disabled = was_enabled && !job.enabled;
             });
         });
+        if add {
+            self.add_job();
+        }
         if let (true, Some(id)) = (disabled, selected) {
             self.remove_pending(id);
         }
@@ -82,10 +96,38 @@ impl App {
     }
 }
 
-fn welcome(ui: &mut egui::Ui) {
-    ui.add_space(60.0);
-    ui.heading("Your folders. Safely backed up.");
-    ui.label("Create a backup job and select source and destination folders.");
+/// The empty state: a bobbing floppy and one big button; returns whether it was pressed.
+fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
+    let palette = Palette::of(ui);
+    ui.vertical_centered(|ui| {
+        ui.add_space(50.0);
+        let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
+        ui.add_space(bob);
+        sprites::show(ui, sprites::FLOPPY, 10.0, palette.hot);
+        ui.add_space(24.0 - bob);
+        pixel::display_label(ui, "INSERT DISK", 24.0, palette.gold);
+        ui.add_space(14.0);
+        ui.heading("Your folders. Safely backed up.");
+        ui.label(
+            egui::RichText::new("Create a backup job and select source and destination folders.")
+                .color(palette.dim),
+        );
+        ui.add_space(22.0);
+        let start = PixelButton::new("New job")
+            .sprite(sprites::PLUS)
+            .tone(Tone::Accent)
+            .min_size(egui::vec2(240.0, 52.0));
+        let clicked = ui.add_enabled(can_add, start).clicked();
+        ui.add_space(14.0);
+        let prompt = if pixel::blink(ui, 0.5) {
+            "PRESS START"
+        } else {
+            " "
+        };
+        pixel::display_label(ui, prompt, 10.0, palette.hot);
+        clicked
+    })
+    .inner
 }
 
 fn job_editor(
@@ -94,49 +136,77 @@ fn job_editor(
     permissions: &Permissions,
     summary: Option<&CachedHistory>,
 ) -> Option<JobAction> {
-    ui.add_space(10.0);
-    job_title(ui, |ui| ui.heading(&job.name), job.enabled);
-    ui.add_space(10.0);
-    activation_button(ui, job, permissions.locked);
+    let palette = Palette::of(ui);
+    job_banner(ui, job, permissions.locked);
     if !job.enabled && permissions.backup_running {
-        ui.label("Automatic backups disabled; current backup will finish.");
+        alert(
+            ui,
+            palette.gold,
+            "Automatic backups disabled; current backup will finish.",
+        );
     }
+    ui.add_space(14.0);
     ui.add_enabled_ui(!permissions.busy, |ui| {
-        folder_settings(ui, job);
-        ui.separator();
-        schedule_settings(ui, job);
-        ui.separator();
-        retention_settings(ui, job, summary);
+        pixel::section(ui, "Folders", sprites::FOLDER, palette.accent, |ui| {
+            folder_settings(ui, job)
+        });
+        pixel::section(ui, "Scheduling", sprites::CLOCK, palette.hot, |ui| {
+            schedule_settings(ui, job)
+        });
+        pixel::section(ui, "Retention", sprites::SHIELD, palette.good, |ui| {
+            retention_settings(ui, job, summary)
+        });
     });
-    ui.separator();
-    let last_backup = job
-        .last_success
-        .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
-    ui.label(format!("Last backup: {last_backup}"));
-    ui.label(&job.status);
-    ui.add_space(8.0);
-    let action = action_buttons(ui, permissions);
-    ui.add_space(10.0);
-    ui.small(
-        "Backups are full copies. Links are skipped. Each check reads all file contents. \
-         Restore with Restore backup… or by copying/extracting.",
-    );
-    action
+    pixel::section(ui, "Status", sprites::MONITOR, palette.gold, |ui| {
+        status_panel(ui, job, permissions)
+    })
+}
+
+/// The job's floppy, name, state lamp and the power switch for automatic backups.
+fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
+    let palette = Palette::of(ui);
+    ui.horizontal(|ui| {
+        let tint = if job.enabled {
+            palette.good
+        } else {
+            palette.metal
+        };
+        sprites::show(ui, sprites::FLOPPY, 5.0, tint);
+        ui.add_space(6.0);
+        let activation_width = 320.0;
+        ui.allocate_ui(
+            egui::vec2(ui.available_width() - activation_width, 60.0),
+            |ui| {
+                ui.vertical(|ui| {
+                    ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
+                    ui.horizontal(|ui| {
+                        let (color, text) = if job.enabled {
+                            (palette.good, "Automatic backups enabled")
+                        } else {
+                            (palette.dim, "Automatic backups disabled")
+                        };
+                        pixel::led(ui, color, job.enabled);
+                        ui.label(egui::RichText::new(text).color(color));
+                    });
+                });
+            },
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            activation_button(ui, job, locked);
+        });
+    });
 }
 
 fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
-    let (label, color) = if job.enabled {
-        ("Disable automatic backups", DANGER)
+    let (label, tone) = if job.enabled {
+        ("Disable automatic backups", Tone::Danger)
     } else {
-        ("Enable automatic backups", SUCCESS)
+        ("Enable automatic backups", Tone::Good)
     };
-    let button = egui::Button::new(
-        egui::RichText::new(label)
-            .strong()
-            .color(egui::Color32::WHITE),
-    )
-    .fill(color)
-    .min_size(egui::vec2(260.0, 40.0));
+    let button = PixelButton::new(label)
+        .sprite(sprites::POWER)
+        .tone(tone)
+        .min_size(egui::vec2(300.0, 52.0));
     let can_toggle = (job.enabled || job.has_runnable_schedule()) && !locked;
     if ui.add_enabled(can_toggle, button).clicked() {
         job.enabled = !job.enabled;
@@ -145,14 +215,21 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
 }
 
 fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
-    ui.label("Job name");
-    ui.text_edit_singleline(&mut job.name);
-    ui.add_space(8.0);
+    caption(ui, "Job name");
+    ui.add(
+        egui::TextEdit::singleline(&mut job.name)
+            .desired_width(ui.available_width().min(420.0))
+            .margin(egui::vec2(8.0, 4.0)),
+    );
+    ui.add_space(6.0);
     path_picker(ui, "Source folder", &mut job.source);
-    ui.add_space(8.0);
+    ui.add_space(6.0);
     path_picker(ui, "Destination folder", &mut job.target);
-    ui.add_space(8.0);
-    ui.checkbox(&mut job.zip, "Compress as ZIP");
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
+        sprites::show(ui, sprites::PACKAGE, 2.0, Palette::of(ui).gold);
+    });
 }
 
 fn schedule_key(job: &Job) -> ScheduleKey {
@@ -168,12 +245,17 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 }
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
-    ui.heading("Scheduling");
+    let palette = Palette::of(ui);
     let before = schedule_key(job);
     centered_row(ui, |ui| {
-        ui.selectable_value(&mut job.schedule, Schedule::Interval, "Interval");
-        ui.selectable_value(&mut job.schedule, Schedule::Daily, "Daily");
-        ui.selectable_value(&mut job.schedule, Schedule::Weekdays, "Weekdays");
+        let modes: [(Schedule, &str, Sprite); 3] = [
+            (Schedule::Interval, "Interval", sprites::REWIND),
+            (Schedule::Daily, "Daily", sprites::SUN),
+            (Schedule::Weekdays, "Weekdays", sprites::CLOCK),
+        ];
+        for (schedule, label, sprite) in modes {
+            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
+        }
     });
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
@@ -194,10 +276,33 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
             |time| local_time(time, DATE_MINUTE),
         )
     };
-    ui.label(format!("Next check: {next}"));
-    if let Some(remaining) = job.countdown(Utc::now()) {
-        ui.label(format!("Next check in: {remaining}"));
-    }
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        readout(ui, "Next check", &next, palette.accent);
+        if let Some(remaining) = job.countdown(Utc::now()) {
+            ui.add_space(24.0);
+            readout(ui, "Next check in", &remaining, palette.good);
+        }
+    });
+}
+
+/// A captioned value in the display face, like a digital readout.
+fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
+    ui.vertical(|ui| {
+        caption(ui, label);
+        let palette = Palette::of(ui);
+        egui::Frame::new()
+            .fill(palette.sunken)
+            .stroke(egui::Stroke::new(2.0_f32, palette.outline))
+            .inner_margin(egui::Margin::symmetric(10, 6))
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(value.to_uppercase())
+                        .font(label_font(ui.ctx()))
+                        .color(color),
+                );
+            });
+    });
 }
 
 fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
@@ -244,53 +349,73 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job) {
 fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
     centered_row(ui, |ui| {
         for (selected, label) in job.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
-            ui.toggle_value(selected, label);
+            let day = PixelButton::new(label)
+                .selected(*selected)
+                .min_size(egui::vec2(58.0, 0.0));
+            if ui.add(day).clicked() {
+                *selected = !*selected;
+            }
         }
     });
     if !job.has_runnable_schedule() {
-        ui.colored_label(ERROR_TEXT, "Select at least one weekday");
+        alert(ui, Palette::of(ui).bad, "Select at least one weekday");
         job.enabled = false;
     }
 }
 
 fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
-    ui.heading("Retention");
-    ui.checkbox(
+    let palette = Palette::of(ui);
+    ui.add(PixelCheckbox::new(
         &mut job.rolling,
         "Enable rolling retention – delete oldest backups automatically",
-    );
+    ));
     ui.add_enabled_ui(job.rolling, |ui| {
-        optional_limit(
-            ui,
-            "Maximum count",
-            &mut job.max_count,
-            DEFAULT_MAX_COUNT,
-            |ui, count| {
-                ui.add(egui::DragValue::new(count).range(1..=MAX_COUNT_LIMIT));
-            },
-        );
-        optional_limit(
-            ui,
-            "Maximum total size",
-            &mut job.max_bytes,
-            DEFAULT_MAX_BYTES,
-            |ui, bytes| {
-                let mut gib = *bytes as f64 / BYTES_PER_GIB;
-                let editor = egui::DragValue::new(&mut gib)
-                    .speed(0.1)
-                    .range(0.001..=100_000.0)
-                    .suffix(" GiB");
-                if ui.add(editor).changed() {
-                    *bytes = (gib * BYTES_PER_GIB) as u64;
-                }
-            },
+        ui.indent("limits", |ui| {
+            optional_limit(
+                ui,
+                "Maximum count",
+                &mut job.max_count,
+                DEFAULT_MAX_COUNT,
+                |ui, count| {
+                    ui.add(egui::DragValue::new(count).range(1..=MAX_COUNT_LIMIT));
+                },
+            );
+            optional_limit(
+                ui,
+                "Maximum total size",
+                &mut job.max_bytes,
+                DEFAULT_MAX_BYTES,
+                |ui, bytes| {
+                    let mut gib = *bytes as f64 / BYTES_PER_GIB;
+                    let editor = egui::DragValue::new(&mut gib)
+                        .speed(0.1)
+                        .range(0.001..=100_000.0)
+                        .suffix(" GiB");
+                    if ui.add(editor).changed() {
+                        *bytes = (gib * BYTES_PER_GIB) as u64;
+                    }
+                },
+            );
+        });
+    });
+    ui.horizontal(|ui| {
+        sprites::show(ui, sprites::SHIELD, 1.0, palette.good);
+        ui.label(
+            egui::RichText::new(
+                "The latest successful backup and protected versions are always kept.",
+            )
+            .small()
+            .color(palette.dim),
         );
     });
-    ui.small("The latest successful backup and protected versions are always kept.");
     match summary.map(|summary| &summary.records) {
         Some(Ok(records)) => retention_warnings(ui, job, records),
         Some(Err(error)) => {
-            ui.small(format!("Backup history unavailable: {error}"));
+            alert(
+                ui,
+                palette.dim,
+                &format!("Backup history unavailable: {error}"),
+            );
         }
         None => {}
     }
@@ -306,7 +431,7 @@ fn optional_limit<T>(
 ) {
     centered_row(ui, |ui| {
         let mut active = limit.is_some();
-        if ui.checkbox(&mut active, label).changed() {
+        if ui.add(PixelCheckbox::new(&mut active, label)).changed() {
             *limit = active.then_some(default);
         }
         if let Some(value) = limit {
@@ -315,19 +440,71 @@ fn optional_limit<T>(
     });
 }
 
+fn status_panel(ui: &mut egui::Ui, job: &Job, permissions: &Permissions) -> Option<JobAction> {
+    let palette = Palette::of(ui);
+    let last_backup = job
+        .last_success
+        .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
+    readout(ui, "Last backup", &last_backup, palette.gold);
+    ui.add_space(2.0);
+    if job.status.starts_with("Error") {
+        alert(ui, palette.bad, &job.status);
+    } else {
+        ui.add(egui::Label::new(&job.status).wrap());
+    }
+    ui.add_space(8.0);
+    let action = action_buttons(ui, permissions);
+    ui.add_space(8.0);
+    ui.label(
+        egui::RichText::new(
+            "Backups are full copies. Links are skipped. Each check reads all file contents. \
+             Restore with Restore backup… or by copying/extracting.",
+        )
+        .small()
+        .color(palette.dim),
+    );
+    action
+}
+
 fn action_buttons(ui: &mut egui::Ui, permissions: &Permissions) -> Option<JobAction> {
     let can_edit = !permissions.busy;
     let can_open_history = can_edit && permissions.idle;
     let buttons = [
-        ("Check now", can_edit, JobAction::Check),
-        ("Restore backup…", can_open_history, JobAction::Restore),
-        ("Manage backups…", can_open_history, JobAction::Manage),
-        ("Remove job", can_edit, JobAction::Remove),
+        (
+            "Check now",
+            sprites::PLAY,
+            Tone::Accent,
+            can_edit,
+            JobAction::Check,
+        ),
+        (
+            "Restore backup…",
+            sprites::REWIND,
+            Tone::Plain,
+            can_open_history,
+            JobAction::Restore,
+        ),
+        (
+            "Manage backups…",
+            sprites::CHEST,
+            Tone::Plain,
+            can_open_history,
+            JobAction::Manage,
+        ),
+        (
+            "Remove job",
+            sprites::TRASH,
+            Tone::Danger,
+            can_edit,
+            JobAction::Remove,
+        ),
     ];
     let mut clicked = None;
     ui.horizontal_wrapped(|ui| {
-        for (label, enabled, action) in buttons {
-            if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+        ui.spacing_mut().item_spacing = egui::vec2(12.0, 12.0);
+        for (label, sprite, tone, enabled, action) in buttons {
+            let button = PixelButton::new(label).sprite(sprite).tone(tone);
+            if ui.add_enabled(enabled, button).clicked() {
                 clicked = Some(action);
             }
         }

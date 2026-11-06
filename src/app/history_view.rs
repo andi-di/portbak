@@ -1,10 +1,14 @@
-use super::widgets::{centered_row, local_time, retention_warnings, DANGER, DATE_TIME, ERROR_TEXT};
+use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use super::sprites;
+use super::style::{label_font, Palette};
+use super::widgets::{alert, caption, format_bytes, local_time, retention_warnings, DATE, TIME};
 use super::{records_of, App, HistoryDialog, HistoryMode};
 use crate::engine::history::Backup;
 use chrono::{Local, TimeZone};
 use eframe::egui;
 
-const LIST_HEIGHT: f32 = 220.0;
+const LIST_HEIGHT: f32 = 300.0;
+const DIALOG_HEIGHT: f32 = 620.0;
 
 /// What the user asked for in this frame; applied once the dialog is no longer borrowed.
 #[derive(Default)]
@@ -19,20 +23,24 @@ impl App {
         let Some(dialog) = &mut self.history_dialog else {
             return;
         };
+        let palette = Palette::of_ctx(ctx);
         let app_error = &self.error;
-        let mut response = DialogResponse::default();
-        let title = match dialog.mode {
-            HistoryMode::Manage => "Manage backups",
-            HistoryMode::Restore => "Restore backup",
+        let (title, sprite, band) = match dialog.mode {
+            HistoryMode::Manage => ("Manage backups", sprites::CHEST, palette.accent),
+            HistoryMode::Restore => ("Restore backup", sprites::REWIND, palette.hot),
         };
-        egui::Window::new(title)
+        let window = egui::Window::new(title)
             .collapsible(false)
             .resizable(true)
-            .default_width(650.0)
-            .max_height(520.0)
-            .vscroll(true)
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .show(ctx, |ui| response = dialog_contents(ui, dialog, app_error));
+            .default_size([680.0, DIALOG_HEIGHT])
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]);
+        let response = pixel::dialog(ctx, window, title, sprite, band, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(DIALOG_HEIGHT)
+                .show(ui, |ui| dialog_contents(ui, dialog, app_error))
+                .inner
+        })
+        .unwrap_or_default();
         if response.close {
             self.history_dialog = None;
         }
@@ -50,26 +58,34 @@ fn dialog_contents(
     dialog: &mut HistoryDialog,
     app_error: &str,
 ) -> DialogResponse {
+    let palette = Palette::of(ui);
     let manage = dialog.mode == HistoryMode::Manage;
     let mut response = DialogResponse::default();
-    ui.heading(&dialog.job.name);
-    ui.label(if manage {
-        "Protect saved versions from automatic deletion. \
-         Protected versions still count toward retention limits."
-    } else {
-        "Choose a saved version. Close programs that write to this folder before restoring."
+    ui.horizontal(|ui| {
+        sprites::show(ui, sprites::FLOPPY, 3.0, palette.hot);
+        ui.add(egui::Label::new(egui::RichText::new(&dialog.job.name).heading()).truncate());
     });
+    ui.label(
+        egui::RichText::new(if manage {
+            "Protect saved versions from automatic deletion. \
+             Protected versions still count toward retention limits."
+        } else {
+            "Choose a saved version. Close programs that write to this folder before restoring."
+        })
+        .color(palette.dim),
+    );
+    ui.add_space(4.0);
     match &dialog.backups {
         None => {
-            ui.spinner();
-            ui.label("Loading backup history …");
+            ui.horizontal(|ui| {
+                pixel::marquee(ui, 180.0, palette.accent);
+                ui.label("Loading backup history …");
+            });
         }
-        Some(Err(error)) => {
-            ui.colored_label(ERROR_TEXT, error);
-        }
+        Some(Err(error)) => alert(ui, palette.bad, error),
         Some(Ok(backups)) => {
             if backups.is_empty() {
-                ui.label("No saved backups for this job.");
+                alert(ui, palette.dim, "No saved backups for this job.");
             }
             response.protection =
                 backup_list(ui, backups, &mut dialog.selected, manage, dialog.saving);
@@ -78,26 +94,27 @@ fn dialog_contents(
             }
         }
     }
-    ui.separator();
+    ui.add_space(4.0);
     if !manage {
         restore_details(ui, dialog, app_error);
     }
     if dialog.saving {
-        ui.label("Saving protection …");
+        ui.horizontal(|ui| {
+            pixel::marquee(ui, 120.0, palette.good);
+            ui.label("Saving protection …");
+        });
     }
     if !dialog.error.is_empty() {
-        ui.colored_label(ERROR_TEXT, &dialog.error);
+        alert(ui, palette.bad, &dialog.error);
     }
-    centered_row(ui, |ui| {
-        let close = egui::Button::new(if manage { "Close" } else { "Cancel" });
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        let close = PixelButton::new(if manage { "Close" } else { "Cancel" });
         response.close = ui.add_enabled(!dialog.saving, close).clicked();
         if !manage {
-            let restore = egui::Button::new(
-                egui::RichText::new("Replace contents and restore")
-                    .strong()
-                    .color(egui::Color32::WHITE),
-            )
-            .fill(DANGER);
+            let restore = PixelButton::new("Replace contents and restore")
+                .sprite(sprites::REWIND)
+                .tone(Tone::Danger);
             response.confirm = ui.add_enabled(dialog.selected.is_some(), restore).clicked();
         }
     });
@@ -105,20 +122,53 @@ fn dialog_contents(
 }
 
 fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
+    let palette = Palette::of(ui);
     let source = dialog.source_display.as_ref().unwrap_or(&dialog.job.source);
-    ui.label(format!("Source folder to replace: {}", source.display()));
+    caption(ui, "Source folder to replace");
+    sunken(ui, |ui| {
+        ui.horizontal(|ui| {
+            sprites::show(ui, sprites::FOLDER, 2.0, palette.gold);
+            ui.add(egui::Label::new(source.display().to_string()).wrap());
+        });
+    });
     if let Some(name) = &dialog.selected {
         ui.label(format!("Selected backup: {name}"));
     }
-    ui.colored_label(
-        ERROR_TEXT,
-        "The ENTIRE current contents of this source folder will be replaced, \
-         including additional files, hidden entries and subfolders.",
+    egui::Frame::new()
+        .fill(pixel::mix(palette.bad, palette.surface, 0.8))
+        .stroke(egui::Stroke::new(2.0_f32, palette.bad))
+        .inner_margin(egui::Margin::same(10))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            alert(
+                ui,
+                palette.bad,
+                "The ENTIRE current contents of this source folder will be replaced, \
+                 including additional files, hidden entries and subfolders.",
+            );
+        });
+    ui.label(
+        egui::RichText::new(
+            "Automatic backups for this job will remain disabled after restoration.",
+        )
+        .color(palette.dim),
     );
-    ui.label("Automatic backups for this job will remain disabled after restoration.");
     if !app_error.is_empty() {
-        ui.colored_label(ERROR_TEXT, app_error);
+        alert(ui, palette.bad, app_error);
     }
+}
+
+fn sunken<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let palette = Palette::of(ui);
+    egui::Frame::new()
+        .fill(palette.sunken)
+        .stroke(egui::Stroke::new(2.0_f32, palette.outline))
+        .inner_margin(egui::Margin::symmetric(10, 6))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            contents(ui)
+        })
+        .inner
 }
 
 /// Marks the first backup of each local calendar day in a newest-first list.
@@ -135,27 +185,6 @@ fn day_starts<T: TimeZone>(backups: &[Backup], zone: &T) -> Vec<bool> {
         .collect()
 }
 
-fn backup_label(backup: &Backup) -> String {
-    let record = &backup.record;
-    let kind = if backup.zip { "ZIP" } else { "Folder" };
-    let unavailable = if backup.available {
-        ""
-    } else {
-        " · unavailable"
-    };
-    let protected = if record.protected {
-        " · Protected"
-    } else {
-        ""
-    };
-    format!(
-        "{} · {kind} · {} bytes{unavailable}{protected}\n{}",
-        local_time(record.created, DATE_TIME),
-        record.bytes,
-        record.name
-    )
-}
-
 /// Returns a protection change requested in manage mode.
 fn backup_list(
     ui: &mut egui::Ui,
@@ -166,67 +195,146 @@ fn backup_list(
 ) -> Option<(String, bool)> {
     let mut changed = None;
     let starts = day_starts(backups, &Local);
-    egui::ScrollArea::vertical()
-        .max_height(LIST_HEIGHT)
-        .show(ui, |ui| {
-            for (backup, first_of_day) in backups.iter().zip(starts) {
-                let mut text = egui::RichText::new(backup_label(backup));
-                if first_of_day {
-                    text = text.strong();
-                }
-                if manage {
-                    if let Some(change) = protection_row(ui, backup, text, first_of_day, saving) {
-                        changed = Some(change);
+    sunken(ui, |ui| {
+        egui::ScrollArea::vertical()
+            .max_height(LIST_HEIGHT)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                for (backup, first_of_day) in backups.iter().zip(starts) {
+                    if first_of_day {
+                        day_header(ui, backup);
                     }
-                } else {
-                    selection_row(ui, backup, text, first_of_day, selected);
+                    if manage {
+                        if let Some(change) = protection_row(ui, backup, saving) {
+                            changed = Some(change);
+                        }
+                    } else {
+                        selection_row(ui, backup, selected);
+                    }
                 }
-            }
-        });
+            });
+    });
     changed
 }
 
-fn protection_row(
-    ui: &mut egui::Ui,
-    backup: &Backup,
-    text: egui::RichText,
-    first_of_day: bool,
-    saving: bool,
-) -> Option<(String, bool)> {
-    let fill = if first_of_day {
-        ui.visuals().faint_bg_color
-    } else {
-        egui::Color32::TRANSPARENT
-    };
-    egui::Frame::new()
-        .fill(fill)
-        .inner_margin(4.0)
-        .show(ui, |ui| {
-            ui.label(text);
-            let mut protected = backup.record.protected;
-            // Unavailable backups can still be unprotected so retention may drop them.
-            let enabled = !saving && (backup.available || protected);
-            let checkbox = egui::Checkbox::new(&mut protected, "Protect from automatic deletion");
-            ui.add_enabled(enabled, checkbox)
-                .changed()
-                .then(|| (backup.record.name.clone(), protected))
-        })
-        .inner
+/// A dated divider that opens each calendar day's group.
+fn day_header(ui: &mut egui::Ui, backup: &Backup) {
+    let palette = Palette::of(ui);
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        sprites::show(ui, sprites::CURSOR, 2.0, palette.gold);
+        let date = local_time(backup.record.created, DATE).to_uppercase();
+        ui.label(
+            egui::RichText::new(date)
+                .font(label_font(ui.ctx()))
+                .color(palette.gold),
+        );
+        let (rect, _) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), 10.0), egui::Sense::hover());
+        let rule = egui::Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 2.0));
+        ui.painter().rect_filled(rule, 0.0, palette.shade);
+    });
 }
 
-fn selection_row(
+/// Paints a backup's row behind its contents; returns the row's interaction.
+fn backup_row<R>(
     ui: &mut egui::Ui,
     backup: &Backup,
-    text: egui::RichText,
-    first_of_day: bool,
-    selected: &mut Option<String>,
-) {
+    selected: bool,
+    sense: egui::Sense,
+    trailing: impl FnOnce(&mut egui::Ui) -> R,
+) -> (egui::Response, R) {
+    let palette = Palette::of(ui);
+    let background = ui.painter().add(egui::Shape::Noop);
+    let frame = egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(10, 6))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.horizontal(|ui| {
+                let (sprite, tint) = if backup.zip {
+                    (sprites::PACKAGE, palette.gold)
+                } else {
+                    (sprites::FOLDER, palette.gold)
+                };
+                sprites::show(ui, sprite, 2.0, tint);
+                backup_text(ui, backup, selected);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), trailing)
+                    .inner
+            })
+            .inner
+        });
+    let rect = frame.response.rect;
+    let id = ui.id().with(&backup.record.name);
+    let response = ui.interact(rect, id, sense);
+    let enabled = ui.is_enabled();
+    let fill = match (selected, enabled && response.hovered()) {
+        (true, _) => palette.accent,
+        (false, true) => palette.raised,
+        (false, false) => egui::Color32::TRANSPARENT,
+    };
+    ui.painter()
+        .set(background, egui::Shape::rect_filled(rect, 0.0, fill));
+    (response, frame.inner)
+}
+
+fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) {
+    let palette = Palette::of(ui);
+    let record = &backup.record;
+    let (ink, dim) = if selected {
+        (palette.accent_ink, palette.accent_ink)
+    } else {
+        (palette.ink, palette.dim)
+    };
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(local_time(record.created, TIME))
+                    .font(label_font(ui.ctx()))
+                    .color(ink),
+            );
+            let kind = if backup.zip { "ZIP" } else { "Folder" };
+            ui.label(
+                egui::RichText::new(format!("{kind} · {}", format_bytes(record.bytes))).color(ink),
+            )
+            .on_hover_text(format!("{} bytes", record.bytes));
+            if !backup.available {
+                pixel::badge(ui, "Unavailable", palette.bad);
+            }
+            if record.protected {
+                pixel::badge(ui, "Protected", palette.good);
+            }
+        });
+        ui.label(egui::RichText::new(&record.name).small().color(dim));
+    });
+}
+
+fn protection_row(ui: &mut egui::Ui, backup: &Backup, saving: bool) -> Option<(String, bool)> {
+    let (_, change) = backup_row(ui, backup, false, egui::Sense::hover(), |ui| {
+        let mut protected = backup.record.protected;
+        // Unavailable backups can still be unprotected so retention may drop them.
+        let enabled = !saving && (backup.available || protected);
+        let checkbox = PixelCheckbox::new(&mut protected, "Protect from automatic deletion");
+        ui.add_enabled(enabled, checkbox)
+            .changed()
+            .then(|| (backup.record.name.clone(), protected))
+    });
+    change
+}
+
+fn selection_row(ui: &mut egui::Ui, backup: &Backup, selected: &mut Option<String>) {
     let is_selected = selected.as_deref() == Some(backup.record.name.as_str());
-    let mut button = egui::Button::new(text).selected(is_selected);
-    if first_of_day && !is_selected {
-        button = button.fill(ui.visuals().faint_bg_color);
-    }
-    if ui.add_enabled(backup.available, button).clicked() {
+    let palette = Palette::of(ui);
+    let row = ui.add_enabled_ui(backup.available, |ui| {
+        backup_row(ui, backup, is_selected, egui::Sense::click(), |ui| {
+            if is_selected {
+                sprites::show(ui, sprites::CHECK, 3.0, palette.accent_ink);
+            }
+        })
+        .0
+    });
+    let response = row.inner.on_hover_cursor(egui::CursorIcon::PointingHand);
+    if response.clicked() {
         *selected = Some(backup.record.name.clone());
     }
 }
