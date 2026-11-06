@@ -45,6 +45,9 @@ The interface must remain responsive during hashing, copying, compression, verif
 - **New job**: create and select a new independent job.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
 - **Restore backup…**: when no operation is active or queued, asynchronously list this job's recorded versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Pause automatic starts while the dialog is open. Show the full resolved source path, selected version, and an explicit warning that all current source contents will be replaced. Require a red **Replace contents and restore** confirmation; cancellation changes nothing.
+- **Manage backups…**: beside Restore, open the same history overview when no operation is running or queued, without requiring an available source folder. Pause automatic starts while open. Show each saved version’s protection checkbox and save changes in the background. Disable further edits and closing while saving; report errors without pretending the protection changed. Closing preserves job activation. Missing versions are marked unavailable, but existing protection can be removed.
+- In both history dialogs, subtly highlight the first list entry of each local calendar day, newest first. Keep selection and protection independently recognizable. Wrap job action buttons on narrow windows.
+- Show retention capacity warnings in the management overview and job details; refresh after protection changes, limit changes, and backup completion.
 - On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits, manual starts, and normal quitting while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
@@ -269,6 +272,9 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Damaged, missing, unsafe or foreign backup | Restore refused before source replacement |
 | Restore replacement fails | Original contents restored, or remaining recovery path reported without deleting original data |
 | Restore completes or fails | Job remains disabled; history and last backup time unchanged |
+| Protected versions with exceeded limits | Keep protected and newest versions; delete only eligible unprotected versions; report remaining excess |
+| Protection consumes count/size budget | Warn at three remaining places or 20% remaining size budget, inclusive |
+| History crosses local midnight | Highlight the first listed version of each local day in both dialogs |
 | Restart after normal edits | Settings, theme, next due time, and results restored |
 | Corrupt metadata or unsafe stored path | Explicit error; no destructive fallback |
 | Light and Dark themes | All job controls and results readable in each theme |

@@ -28,7 +28,7 @@ The selected version is prepared and fingerprint-verified beside the source befo
 
 You can also restore manually by copying a backup folder's contents or extracting a ZIP. Removing a job in the app does not delete its backups.
 
-The size limit counts the sizes of stored backup files, or the archive size for ZIP backups, rather than physically allocated disk blocks. After a successful backup, the oldest backups recorded in the manifest are removed. The latest successful backup is always kept; if it alone exceeds the limit, the app displays a notice. Unrelated files and incomplete backups are not deleted automatically. There must be enough free space for the new backup before cleanup begins.
+The size limit counts the sizes of stored backup files, or the archive size for ZIP backups, rather than physically allocated disk blocks. After a successful backup, the oldest unprotected backups recorded in the manifest are removed. Use **Manage backups…** next to **Restore backup…** to protect individual saved versions from automatic deletion or remove their protection. Changes are saved immediately; removing protection does not immediately delete anything. Protected versions still count toward both limits. The newest entry of each local day is subtly highlighted in both history dialogs. The latest successful backup and all protected versions are always kept. If the latest backup alone exceeds the size limit, the app displays a notice. Unrelated files and incomplete backups are not deleted automatically. There must be enough free space for the new backup before cleanup begins. With rolling retention enabled, warnings appear in the overview and job details when protected versions leave at most three count places or at most 20% of the size budget. Limits may remain exceeded when protected versions and the newest backup cannot be removed. These warnings describe the configured retention budget, not free disk space.
 
 ## Integrity and limitations
 
@@ -76,7 +76,7 @@ The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux
 python3 tools/ui_smoke.py target/release/portbak
 ```
 
-Requires an X11/XWayland session, libX11, libXtst, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution at a five-second interval, GUI restore/cancel for folder and ZIP versions, and persisted completion in both themes, measures memory usage, and captures only the app window at its default and minimum sizes. It terminates its test processes afterward. Artifacts remain in `/tmp/portbak-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
+Requires an X11/XWayland session, libX11, libXtst, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution at a five-second interval, protection toggles and GUI restore/cancel for folder and ZIP versions, and persisted completion in both themes, measures memory usage, and captures only the app window at its default and minimum sizes. It terminates its test processes afterward. Artifacts remain in `/tmp/portbak-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
 
 ### Included executables
 

@@ -26,6 +26,7 @@ x.XFetchName.argtypes = [C.c_void_p, C.c_ulong, C.POINTER(C.c_char_p)]
 x.XFree.argtypes = [C.c_void_p]
 x.XCloseDisplay.argtypes = [C.c_void_p]
 x.XResizeWindow.argtypes = [C.c_void_p, C.c_ulong, C.c_uint, C.c_uint]
+x.XMoveWindow.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.c_int]
 x.XFlush.argtypes = [C.c_void_p]
 x.XTranslateCoordinates.argtypes = [C.c_void_p, C.c_ulong, C.c_ulong, C.c_int, C.c_int, C.POINTER(C.c_int), C.POINTER(C.c_int), C.POINTER(C.c_ulong)]
 x.XRaiseWindow.argtypes = [C.c_void_p, C.c_ulong]
@@ -134,8 +135,29 @@ try:
                     time.sleep(0.1)
                 assert saved["jobs"][0]["status"].startswith("Unchanged"), "Second-based interval did not run again"
                 x.XResizeWindow(display, wid, 1100, 960)
+                x.XMoveWindow(display, wid, 0, 0)
                 x.XFlush(display)
                 time.sleep(0.5)
+                click(wid, 550, 781)
+                time.sleep(0.8)
+                click(wid, 236, 390)
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if json.loads(manifest.read_text())["records"][0]["protected"]:
+                        break
+                    time.sleep(0.1)
+                assert json.loads(manifest.read_text())["records"][0]["protected"], "Protection was not saved"
+                subprocess.run(["import", "-window", str(wid), str(case / "manage-protected.png")], check=True, timeout=10)
+                click(wid, 236, 390)
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if not json.loads(manifest.read_text())["records"][0]["protected"]:
+                        break
+                    time.sleep(0.1)
+                assert not json.loads(manifest.read_text())["records"][0]["protected"], "Protection was not removed"
+                assert len(json.loads(manifest.read_text())["records"]) == 1
+                click(wid, 250, 437)
+                assert json.loads((case / "portbak.json").read_text())["jobs"][0]["enabled"], "Management disabled the job"
                 click(wid, 410, 787)
                 time.sleep(0.8)
                 subprocess.run(["import", "-window", str(wid), str(case / "restore-dialog.png")], check=True, timeout=10)
@@ -165,7 +187,7 @@ try:
                 assert saved["jobs"][0]["last_success"] == last_backup
                 assert len(json.loads(manifest.read_text())["records"]) == 1
                 subprocess.run(["import", "-window", str(wid), str(case / "restore-complete.png")], check=True, timeout=10)
-                print(f"{theme}: scheduled backup + restore + persisted completion + screenshots OK; {memory}")
+                print(f"{theme}: scheduled backup + protection + restore + persisted completion + screenshots OK; {memory}")
             finally:
                 process.terminate()
                 process.wait(timeout=5)

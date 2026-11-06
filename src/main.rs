@@ -12,7 +12,7 @@ use fs2::FileExt;
 use model::{Config, IntervalUnit, Job, Schedule};
 
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{File, OpenOptions},
     path::PathBuf,
     sync::mpsc,
@@ -26,16 +26,32 @@ enum Event {
     Done(Uuid, Result<engine::Outcome, String>),
     History(
         Uuid,
-        Result<(Vec<engine::history::Backup>, PathBuf), String>,
+        Result<(Vec<engine::history::Backup>, Option<PathBuf>), String>,
     ),
+    ProtectionSaved(Uuid, String, bool, Result<(), String>),
+    Summary(Uuid, PathBuf, Uuid, Result<Vec<model::Record>, String>),
 }
 
-struct RestoreDialog {
+#[derive(Clone, Copy, PartialEq)]
+enum HistoryMode {
+    Restore,
+    Manage,
+}
+
+struct CachedHistory {
+    target: PathBuf,
+    records: Result<Vec<model::Record>, String>,
+}
+
+struct HistoryDialog {
     request: Uuid,
     job: Job,
     backups: Option<Result<Vec<engine::history::Backup>, String>>,
     selected: Option<String>,
     source_display: Option<PathBuf>,
+    mode: HistoryMode,
+    saving: bool,
+    error: String,
 }
 
 enum Operation {
@@ -50,7 +66,9 @@ struct App {
     queue: VecDeque<Uuid>,
     active: Option<Uuid>,
     restoring: bool,
-    restore_dialog: Option<RestoreDialog>,
+    history_dialog: Option<HistoryDialog>,
+    history_cache: HashMap<Uuid, CachedHistory>,
+    history_requests: HashMap<Uuid, (PathBuf, Uuid)>,
     tx: mpsc::Sender<Event>,
     rx: mpsc::Receiver<Event>,
     error: String,
@@ -73,7 +91,9 @@ impl App {
             queue: VecDeque::new(),
             active: None,
             restoring: false,
-            restore_dialog: None,
+            history_dialog: None,
+            history_cache: HashMap::new(),
+            history_requests: HashMap::new(),
             tx,
             rx,
             error: String::new(),
@@ -102,7 +122,7 @@ impl App {
 
     fn enqueue(&mut self, id: Uuid) {
         if !self.restoring
-            && self.restore_dialog.is_none()
+            && self.history_dialog.is_none()
             && self.active != Some(id)
             && !self.queue.contains(&id)
         {
@@ -152,26 +172,37 @@ impl App {
     }
 
     fn open_restore(&mut self, id: Uuid, ctx: &egui::Context) {
-        if self.active.is_some() || !self.queue.is_empty() || self.restore_dialog.is_some() {
+        self.open_history(id, HistoryMode::Restore, ctx);
+    }
+
+    fn open_history(&mut self, id: Uuid, mode: HistoryMode, ctx: &egui::Context) {
+        if self.active.is_some() || !self.queue.is_empty() || self.history_dialog.is_some() {
             return;
         }
         let Some(job) = self.config.jobs.iter().find(|job| job.id == id).cloned() else {
             return;
         };
         let request = Uuid::new_v4();
-        self.restore_dialog = Some(RestoreDialog {
+        self.history_dialog = Some(HistoryDialog {
             request,
             job: job.clone(),
             backups: None,
             selected: None,
             source_display: None,
+            mode,
+            saving: false,
+            error: String::new(),
         });
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| -> anyhow::Result<_> {
                 let backups = engine::history::list(&job)?;
-                let source = std::fs::canonicalize(&job.source)?;
+                let source = if mode == HistoryMode::Restore {
+                    Some(std::fs::canonicalize(&job.source)?)
+                } else {
+                    None
+                };
                 Ok((backups, source))
             })()
             .map_err(|error| format!("{error:#}"));
@@ -184,9 +215,12 @@ impl App {
         if self.active.is_some() || !self.queue.is_empty() {
             return;
         }
-        let Some(dialog) = &self.restore_dialog else {
+        let Some(dialog) = &self.history_dialog else {
             return;
         };
+        if dialog.mode != HistoryMode::Restore || dialog.saving {
+            return;
+        }
         let Some(name) = dialog.selected.clone() else {
             return;
         };
@@ -214,58 +248,117 @@ impl App {
         if self.dirty {
             return;
         }
-        self.restore_dialog = None;
+        self.history_dialog = None;
         self.start_worker(job, Operation::Restore(name), ctx);
     }
 
-    fn show_restore(&mut self, ctx: &egui::Context) {
-        let mut cancel = false;
+    fn refresh_history(&mut self, id: Uuid, ctx: &egui::Context, force: bool) {
+        let Some(job) = self.config.jobs.iter().find(|job| job.id == id).cloned() else {
+            return;
+        };
+        if job.target.as_os_str().is_empty() {
+            return;
+        }
+        if self
+            .history_requests
+            .get(&id)
+            .is_some_and(|(target, _)| target == &job.target)
+        {
+            return;
+        }
+        if !force
+            && self
+                .history_cache
+                .get(&id)
+                .is_some_and(|cache| cache.target == job.target)
+        {
+            return;
+        }
+        let request = Uuid::new_v4();
+        self.history_requests
+            .insert(id, (job.target.clone(), request));
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let records = engine::history::list(&job)
+                .map(|backups| backups.into_iter().map(|backup| backup.record).collect())
+                .map_err(|error| format!("{error:#}"));
+            let _ = tx.send(Event::Summary(id, job.target, request, records));
+            ctx.request_repaint();
+        });
+    }
+
+    fn save_protection(&mut self, name: String, protected: bool, ctx: &egui::Context) {
+        let Some(dialog) = &mut self.history_dialog else {
+            return;
+        };
+        if dialog.mode != HistoryMode::Manage || dialog.saving {
+            return;
+        }
+        dialog.saving = true;
+        dialog.error.clear();
+        let request = dialog.request;
+        let job = dialog.job.clone();
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = engine::history::set_protected(&job, &name, protected)
+                .map_err(|error| format!("{error:#}"));
+            let _ = tx.send(Event::ProtectionSaved(request, name, protected, result));
+            ctx.request_repaint();
+        });
+    }
+
+    fn show_history(&mut self, ctx: &egui::Context) {
+        let mut close = false;
         let mut confirm = false;
-        if let Some(dialog) = &mut self.restore_dialog {
-            egui::Window::new("Restore backup")
-                .collapsible(false).resizable(true).default_width(650.0)
-                .max_height(520.0)
-                .vscroll(true)
+        let mut protection = None;
+        if let Some(dialog) = &mut self.history_dialog {
+            let manage = dialog.mode == HistoryMode::Manage;
+            egui::Window::new(if manage { "Manage backups" } else { "Restore backup" })
+                .collapsible(false).resizable(true).default_width(650.0).max_height(520.0).vscroll(true)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.heading(&dialog.job.name);
-                    ui.label("Choose a saved version. Close programs that write to this folder before restoring.");
+                    ui.label(if manage { "Protect saved versions from automatic deletion. Protected versions still count toward retention limits." }
+                        else { "Choose a saved version. Close programs that write to this folder before restoring." });
                     match &dialog.backups {
                         None => { ui.spinner(); ui.label("Loading backup history …"); }
                         Some(Err(error)) => { ui.colored_label(egui::Color32::LIGHT_RED, error); }
                         Some(Ok(backups)) => {
                             if backups.is_empty() { ui.label("No saved backups for this job."); }
-                            egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
-                                for backup in backups {
-                                    let record = &backup.record;
-                                    let label = format!("{} · {} · {} bytes{}\n{}",
-                                        record.created.with_timezone(&chrono::Local).format("%d.%m.%Y %H:%M:%S"),
-                                        if backup.zip { "ZIP" } else { "Folder" }, record.bytes,
-                                        if backup.available { "" } else { " · unavailable" }, record.name);
-                                    if ui.add_enabled(backup.available, egui::Button::new(label).selected(dialog.selected.as_deref() == Some(&record.name))).clicked() {
-                                        dialog.selected = Some(record.name.clone());
-                                    }
-                                }
-                            });
+                            protection = backup_list(ui, backups, &mut dialog.selected, manage, dialog.saving);
+                            if manage {
+                                let records: Vec<_> = backups.iter().map(|backup| backup.record.clone()).collect();
+                                show_retention_warnings(ui, &dialog.job, &records);
+                            }
                         }
                     }
                     ui.separator();
-                    ui.label(format!("Source folder to replace: {}", dialog.source_display.as_ref().unwrap_or(&dialog.job.source).display()));
-                    if let Some(name) = &dialog.selected { ui.label(format!("Selected backup: {name}")); }
-                    ui.colored_label(egui::Color32::LIGHT_RED,
-                        "The ENTIRE current contents of this source folder will be replaced, including additional files, hidden entries and subfolders.");
-                    ui.label("Automatic backups for this job will remain disabled after restoration.");
-                    if !self.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &self.error); }
+                    if !manage {
+                        ui.label(format!("Source folder to replace: {}", dialog.source_display.as_ref().unwrap_or(&dialog.job.source).display()));
+                        if let Some(name) = &dialog.selected { ui.label(format!("Selected backup: {name}")); }
+                        ui.colored_label(egui::Color32::LIGHT_RED, "The ENTIRE current contents of this source folder will be replaced, including additional files, hidden entries and subfolders.");
+                        ui.label("Automatic backups for this job will remain disabled after restoration.");
+                        if !self.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &self.error); }
+                    }
+                    if dialog.saving { ui.label("Saving protection …"); }
+                    if !dialog.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &dialog.error); }
                     centered_row(ui, |ui| {
-                        cancel = ui.button("Cancel").clicked();
-                        confirm = ui.add_enabled(dialog.selected.is_some(), egui::Button::new(
-                            egui::RichText::new("Replace contents and restore").strong().color(egui::Color32::WHITE))
-                            .fill(egui::Color32::from_rgb(170, 35, 45))).clicked();
+                        close = ui.add_enabled(!dialog.saving, egui::Button::new(if manage { "Close" } else { "Cancel" })).clicked();
+                        if !manage {
+                            confirm = ui.add_enabled(dialog.selected.is_some(), egui::Button::new(
+                                egui::RichText::new("Replace contents and restore").strong().color(egui::Color32::WHITE))
+                                .fill(egui::Color32::from_rgb(170, 35, 45))).clicked();
+                        }
                     });
                 });
         }
-        if cancel {
-            self.restore_dialog = None;
+        if close {
+            self.history_dialog = None;
+        }
+        if let Some((name, protected)) = protection {
+            self.save_protection(name, protected, ctx);
         }
         if confirm {
             self.confirm_restore(ctx);
@@ -277,12 +370,72 @@ impl App {
             match e {
                 Event::Progress(s) => self.progress = s,
                 Event::History(request, result) => {
-                    if let Some(dialog) = &mut self.restore_dialog {
+                    if let Some(dialog) = &mut self.history_dialog {
                         if dialog.request == request {
                             dialog.backups = Some(result.map(|(backups, source)| {
-                                dialog.source_display = Some(source);
+                                dialog.source_display = source;
+                                self.history_requests.remove(&dialog.job.id);
+                                self.history_cache.insert(
+                                    dialog.job.id,
+                                    CachedHistory {
+                                        target: dialog.job.target.clone(),
+                                        records: Ok(backups
+                                            .iter()
+                                            .map(|backup| backup.record.clone())
+                                            .collect()),
+                                    },
+                                );
                                 backups
                             }));
+                        }
+                    }
+                }
+                Event::ProtectionSaved(request, name, protected, result) => {
+                    if let Some(dialog) = &mut self.history_dialog {
+                        if dialog.request == request {
+                            dialog.saving = false;
+                            match result {
+                                Ok(()) => {
+                                    self.history_requests.remove(&dialog.job.id);
+                                    if let Some(Ok(backups)) = &mut dialog.backups {
+                                        if let Some(backup) = backups
+                                            .iter_mut()
+                                            .find(|backup| backup.record.name == name)
+                                        {
+                                            backup.record.protected = protected;
+                                        }
+                                        self.history_cache.insert(
+                                            dialog.job.id,
+                                            CachedHistory {
+                                                target: dialog.job.target.clone(),
+                                                records: Ok(backups
+                                                    .iter()
+                                                    .map(|backup| backup.record.clone())
+                                                    .collect()),
+                                            },
+                                        );
+                                    }
+                                }
+                                Err(error) => dialog.error = error,
+                            }
+                        }
+                    }
+                }
+                Event::Summary(id, target, request, records) => {
+                    let current = self
+                        .history_requests
+                        .get(&id)
+                        .is_some_and(|(_, pending)| *pending == request);
+                    if current {
+                        self.history_requests.remove(&id);
+                        if self
+                            .config
+                            .jobs
+                            .iter()
+                            .any(|job| job.id == id && job.target == target)
+                        {
+                            self.history_cache
+                                .insert(id, CachedHistory { target, records });
                         }
                     }
                 }
@@ -309,6 +462,7 @@ impl App {
                     self.dirty = true;
 
                     self.persist();
+                    self.refresh_history(id, ctx, true);
                 }
             }
         }
@@ -321,7 +475,7 @@ impl App {
             .config
             .jobs
             .iter_mut()
-            .filter(|_| !self.restoring && self.restore_dialog.is_none())
+            .filter(|_| !self.restoring && self.history_dialog.is_none())
         {
             let previous = j.next_run;
 
@@ -338,7 +492,7 @@ impl App {
             self.enqueue(id)
         }
 
-        if self.active.is_none() && self.restore_dialog.is_none() {
+        if self.active.is_none() && self.history_dialog.is_none() {
             if let Some(id) = self.queue.pop_front() {
                 if let Some(job) = self.config.jobs.iter().find(|j| j.id == id).cloned() {
                     self.start_worker(job, Operation::Backup, ctx);
@@ -351,6 +505,103 @@ impl App {
         }
 
         ctx.request_repaint_after(Duration::from_millis(500));
+    }
+}
+
+fn day_starts<T: chrono::TimeZone>(backups: &[engine::history::Backup], zone: &T) -> Vec<bool> {
+    let mut previous = None;
+    backups
+        .iter()
+        .map(|backup| {
+            let date = backup.record.created.with_timezone(zone).date_naive();
+            let first = previous != Some(date);
+            previous = Some(date);
+            first
+        })
+        .collect()
+}
+
+fn backup_list(
+    ui: &mut egui::Ui,
+    backups: &[engine::history::Backup],
+    selected: &mut Option<String>,
+    manage: bool,
+    saving: bool,
+) -> Option<(String, bool)> {
+    let mut changed = None;
+    let starts = day_starts(backups, &chrono::Local);
+    egui::ScrollArea::vertical()
+        .max_height(220.0)
+        .show(ui, |ui| {
+            for (backup, first) in backups.iter().zip(starts) {
+                let record = &backup.record;
+                let label = format!(
+                    "{} · {} · {} bytes{}{}\n{}",
+                    record
+                        .created
+                        .with_timezone(&chrono::Local)
+                        .format("%d.%m.%Y %H:%M:%S"),
+                    if backup.zip { "ZIP" } else { "Folder" },
+                    record.bytes,
+                    if backup.available {
+                        ""
+                    } else {
+                        " · unavailable"
+                    },
+                    if record.protected {
+                        " · Protected"
+                    } else {
+                        ""
+                    },
+                    record.name
+                );
+                let text = if first {
+                    egui::RichText::new(label).strong()
+                } else {
+                    egui::RichText::new(label)
+                };
+                if manage {
+                    egui::Frame::new()
+                        .fill(if first {
+                            ui.visuals().faint_bg_color
+                        } else {
+                            egui::Color32::TRANSPARENT
+                        })
+                        .inner_margin(4.0)
+                        .show(ui, |ui| {
+                            ui.label(text);
+                            let mut protected = record.protected;
+                            if ui
+                                .add_enabled(
+                                    !saving && (backup.available || protected),
+                                    egui::Checkbox::new(
+                                        &mut protected,
+                                        "Protect from automatic deletion",
+                                    ),
+                                )
+                                .changed()
+                            {
+                                changed = Some((record.name.clone(), protected));
+                            }
+                        });
+                } else {
+                    let is_selected = selected.as_deref() == Some(record.name.as_str());
+                    let mut button = egui::Button::new(text).selected(is_selected);
+                    if first && !is_selected {
+                        button = button.fill(ui.visuals().faint_bg_color);
+                    }
+                    if ui.add_enabled(backup.available, button).clicked() {
+                        *selected = Some(record.name.clone());
+                    }
+                }
+            }
+        });
+    changed
+}
+
+fn show_retention_warnings(ui: &mut egui::Ui, job: &Job, records: &[model::Record]) {
+    for warning in engine::history::warnings(job, records) {
+        ui.colored_label(ui.visuals().warn_fg_color, warning);
     }
 }
 
@@ -406,6 +657,9 @@ fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.tick(ctx);
+        if let Some(id) = self.selected {
+            self.refresh_history(id, ctx, false);
+        }
 
         ctx.set_theme(match self.config.theme.as_str() {
             "Light" => egui::ThemePreference::Light,
@@ -476,7 +730,7 @@ impl eframe::App for App {
 
                 if ui
                     .add_enabled(
-                        !self.restoring && self.restore_dialog.is_none(),
+                        !self.restoring && self.history_dialog.is_none(),
                         egui::Button::new("New job"),
                     )
                     .clicked()
@@ -529,6 +783,7 @@ impl eframe::App for App {
 
         let mut remove = None;
         let mut restore = None;
+        let mut manage = None;
         let mut disabled = None;
 
         egui::CentralPanel::default().show(ctx,|ui|{
@@ -541,7 +796,7 @@ impl eframe::App for App {
 ui.heading(&j.name);
 ui.add_space(10.0);
 
-                    let busy=self.active==Some(j.id)||self.queue.contains(&j.id)||self.restoring||self.restore_dialog.is_some();
+                    let busy=self.active==Some(j.id)||self.queue.contains(&j.id)||self.restoring||self.history_dialog.is_some();
 
                     let can_enable = j.schedule != Schedule::Weekdays || j.weekdays.iter().any(|day| *day);
                     let (label, color) = if j.enabled {
@@ -551,7 +806,7 @@ ui.add_space(10.0);
                     };
                     let button = egui::Button::new(egui::RichText::new(label).strong().color(egui::Color32::WHITE))
                         .fill(color).min_size(egui::vec2(260.0, 40.0));
-                    if ui.add_enabled((can_enable || j.enabled) && !self.restoring && self.restore_dialog.is_none(), button).clicked() {
+                    if ui.add_enabled((can_enable || j.enabled) && !self.restoring && self.history_dialog.is_none(), button).clicked() {
                         j.enabled = !j.enabled;
                         j.reschedule(Utc::now());
                         if !j.enabled { disabled = Some(j.id); }
@@ -680,7 +935,13 @@ if ui.add(egui::DragValue::new(&mut gib).speed(0.1).range(0.001..=100000.0).suff
 
                         }
 );
-ui.small("The latest successful backup is always kept.");
+ui.small("The latest successful backup and protected versions are always kept.");
+if let Some(cache) = self.history_cache.get(&j.id).filter(|cache| cache.target == j.target) {
+    match &cache.records {
+        Ok(records) => show_retention_warnings(ui, j, records),
+        Err(error) => { ui.small(format!("Backup history unavailable: {error}")); }
+    }
+}
 
                     }
 );
@@ -690,12 +951,15 @@ ui.label(format!("Last backup: {}",j.last_success.map(|t|t.with_timezone(&chrono
 ui.label(&j.status);
 ui.add_space(8.0);
 
-                    centered_row(ui, |ui|{
+                    ui.horizontal_wrapped(|ui|{
 if ui.add_enabled(!busy,egui::Button::new("Check now")).clicked(){
 run=Some(j.id);
 }
 if ui.add_enabled(!busy && self.active.is_none() && self.queue.is_empty(), egui::Button::new("Restore backup…")).clicked(){
 restore=Some(j.id);
+}
+if ui.add_enabled(!busy && self.active.is_none() && self.queue.is_empty(), egui::Button::new("Manage backups…")).clicked(){
+manage=Some(j.id);
 }
 if ui.add_enabled(!busy,egui::Button::new("Remove job")).clicked(){
 remove=Some(j.id);
@@ -722,7 +986,10 @@ ui.label("Create a backup job and select source and destination folders.");
         if let Some(id) = restore {
             self.open_restore(id, ctx);
         }
-        self.show_restore(ctx);
+        if let Some(id) = manage {
+            self.open_history(id, HistoryMode::Manage, ctx);
+        }
+        self.show_history(ctx);
 
         if let Some(id) = disabled {
             self.remove_pending(id);
@@ -733,6 +1000,8 @@ ui.label("Create a backup job and select source and destination folders.");
         }
 
         if let Some(id) = remove {
+            self.history_cache.remove(&id);
+            self.history_requests.remove(&id);
             self.config.jobs.retain(|j| j.id != id);
 
             self.selected = self.config.jobs.first().map(|j| j.id);
@@ -949,17 +1218,20 @@ mod tests {
 
     fn select_restore(app: &mut App, name: &str) {
         let job = app.config.jobs[0].clone();
-        app.restore_dialog = Some(RestoreDialog {
+        app.history_dialog = Some(HistoryDialog {
             request: Uuid::new_v4(),
             source_display: Some(job.source.clone()),
             backups: Some(Ok(engine::history::list(&job).unwrap())),
             job,
             selected: Some(name.to_owned()),
+            mode: HistoryMode::Restore,
+            saving: false,
+            error: String::new(),
         });
     }
 
     #[test]
-    fn restore_dialog_pauses_scheduling_and_cancel_changes_nothing() {
+    fn history_dialog_pauses_scheduling_and_cancel_changes_nothing() {
         let (_directory, mut app, name) = restore_fixture();
         let due = app.config.jobs[0].next_run;
         select_restore(&mut app, &name);
@@ -968,7 +1240,7 @@ mod tests {
         app.enqueue(app.config.jobs[0].id);
         assert!(app.active.is_none());
         assert!(app.queue.is_empty());
-        app.restore_dialog = None;
+        app.history_dialog = None;
         assert!(app.config.jobs[0].enabled);
         assert_eq!(app.config.jobs[0].next_run, due);
     }
@@ -1005,10 +1277,10 @@ mod tests {
         let (_directory, mut app, name) = restore_fixture();
         let context = egui::Context::default();
         select_restore(&mut app, &name);
-        app.restore_dialog.as_mut().unwrap().selected = None;
+        app.history_dialog.as_mut().unwrap().selected = None;
         app.confirm_restore(&context);
         assert!(app.active.is_none());
-        app.restore_dialog.as_mut().unwrap().selected = Some(name);
+        app.history_dialog.as_mut().unwrap().selected = Some(name);
         app.active = Some(Uuid::new_v4());
         app.confirm_restore(&context);
         assert!(app.config.jobs[0].enabled);
@@ -1016,8 +1288,113 @@ mod tests {
         app.path = app.path.join("missing/config.json");
         app.confirm_restore(&context);
         assert!(app.active.is_none());
-        assert!(app.restore_dialog.is_some());
+        assert!(app.history_dialog.is_some());
         assert!(!app.error.is_empty());
+    }
+
+    #[test]
+    fn day_markers_use_first_list_entry_and_local_calendar_date() {
+        let dates = [
+            "2026-10-26T00:15:00Z",
+            "2026-10-25T23:15:00Z",
+            "2026-10-25T01:30:00Z",
+            "2026-10-25T00:30:00Z",
+        ];
+        let backups: Vec<_> = dates
+            .iter()
+            .enumerate()
+            .map(|(index, date)| engine::history::Backup {
+                record: model::Record {
+                    name: index.to_string(),
+                    hash: String::new(),
+                    bytes: 0,
+                    created: date.parse().unwrap(),
+                    protected: false,
+                },
+                available: true,
+                zip: false,
+            })
+            .collect();
+        assert_eq!(
+            day_starts(&backups, &chrono_tz::Europe::Berlin),
+            [true, false, true, false]
+        );
+        assert_eq!(day_starts(&backups, &Utc), [true, true, false, false]);
+    }
+
+    #[test]
+    fn manager_saves_protection_and_reports_errors_without_changing_activation() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        app.history_dialog.as_mut().unwrap().mode = HistoryMode::Manage;
+        let context = egui::Context::default();
+        app.confirm_restore(&context);
+        assert!(app.active.is_none());
+        app.save_protection(name.clone(), true, &context);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while app.history_dialog.as_ref().unwrap().saving && Instant::now() < deadline {
+            app.tick(&context);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!app.history_dialog.as_ref().unwrap().saving);
+        assert!(
+            engine::history::list(&app.config.jobs[0]).unwrap()[0]
+                .record
+                .protected
+        );
+        let id = app.config.jobs[0].id;
+        assert!(app.history_cache[&id].records.as_ref().unwrap()[0].protected);
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(app.config.jobs[0].target.join(".lock"))
+            .unwrap();
+        lock.try_lock_exclusive().unwrap();
+        app.save_protection(name, false, &context);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while app.history_dialog.as_ref().unwrap().saving && Instant::now() < deadline {
+            app.tick(&context);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!app.history_dialog.as_ref().unwrap().saving);
+        assert!(!app.history_dialog.as_ref().unwrap().error.is_empty());
+        assert!(
+            app.history_dialog
+                .as_ref()
+                .unwrap()
+                .backups
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()[0]
+                .record
+                .protected
+        );
+        assert!(app.config.jobs[0].enabled);
+        assert!(app.active.is_none());
+    }
+
+    #[test]
+    fn manager_history_does_not_require_source_folder() {
+        let (_directory, mut app, _name) = restore_fixture();
+        app.config.jobs[0].source.push("missing");
+        let context = egui::Context::default();
+        app.open_history(app.config.jobs[0].id, HistoryMode::Manage, &context);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while app.history_dialog.as_ref().unwrap().backups.is_none() && Instant::now() < deadline {
+            app.tick(&context);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(app
+            .history_dialog
+            .as_ref()
+            .unwrap()
+            .backups
+            .as_ref()
+            .unwrap()
+            .is_ok());
+        assert!(app.active.is_none());
+        assert!(app.config.jobs[0].enabled);
     }
 
     #[test]
