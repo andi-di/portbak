@@ -33,7 +33,7 @@ All application-owned interface text, errors, defaults, comments, and documentat
 Provide:
 
 - A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result.
-- An editor for the selected job.
+- An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
 - A global theme selector: **System**, **Light**, **Dark**. Default: **System**. Persist the selection.
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.

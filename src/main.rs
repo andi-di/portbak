@@ -508,6 +508,16 @@ impl App {
     }
 }
 
+fn enabled_indicator(ui: &mut egui::Ui, enabled: bool, height: f32) {
+    if enabled {
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(12.0, height), egui::Sense::hover());
+        ui.painter()
+            .circle_filled(rect.center(), 4.5, egui::Color32::from_rgb(40, 200, 90));
+        response.on_hover_text("Automatic backups enabled");
+    }
+}
+
 fn day_starts<T: chrono::TimeZone>(backups: &[engine::history::Backup], zone: &T) -> Vec<bool> {
     let mut previous = None;
     backups
@@ -747,12 +757,14 @@ impl eframe::App for App {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for j in &self.config.jobs {
                         ui.group(|ui| {
-                            if ui
-                                .selectable_label(self.selected == Some(j.id), &j.name)
-                                .clicked()
-                            {
-                                self.selected = Some(j.id);
-                            }
+                            ui.horizontal(|ui| {
+                                let title =
+                                    ui.selectable_label(self.selected == Some(j.id), &j.name);
+                                enabled_indicator(ui, j.enabled, title.rect.height());
+                                if title.clicked() {
+                                    self.selected = Some(j.id);
+                                }
+                            });
 
                             ui.small(if self.active == Some(j.id) {
                                 if self.restoring {
@@ -793,7 +805,10 @@ impl eframe::App for App {
                 if let Some(j)=self.config.jobs.iter_mut().find(|j|Some(j.id)==self.selected){
 
                     ui.add_space(10.0);
-ui.heading(&j.name);
+ui.horizontal(|ui| {
+    let title = ui.heading(&j.name);
+    enabled_indicator(ui, j.enabled, title.rect.height());
+});
 ui.add_space(10.0);
 
                     let busy=self.active==Some(j.id)||self.queue.contains(&j.id)||self.restoring||self.history_dialog.is_some();
