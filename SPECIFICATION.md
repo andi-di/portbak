@@ -38,7 +38,7 @@ Provide:
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
 
 ### Job actions
 

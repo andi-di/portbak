@@ -189,10 +189,23 @@ impl App {
     }
 }
 
+fn centered_row<R>(
+    ui: &mut egui::Ui,
+    contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let height =
+        ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0;
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), height),
+        egui::Layout::left_to_right(egui::Align::Center),
+        contents,
+    )
+}
+
 fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
     ui.label(label);
 
-    ui.horizontal(|ui| {
+    centered_row(ui, |ui| {
         let mut s = path.to_string_lossy().into_owned();
 
         if ui
@@ -231,7 +244,7 @@ impl eframe::App for App {
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.add_space(12.0);
 
-            ui.horizontal(|ui| {
+            centered_row(ui, |ui| {
                 ui.heading("Portable Backup");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -245,8 +258,6 @@ impl eframe::App for App {
                 });
             });
 
-            ui.label("Local backups · only when files change · no installation");
-
             ui.add_space(10.0);
         });
 
@@ -254,7 +265,7 @@ impl eframe::App for App {
             ui.add_space(5.0);
 
             if self.active.is_some() {
-                ui.horizontal(|ui| {
+                centered_row(ui, |ui| {
                     ui.spinner();
 
                     ui.label(&self.progress);
@@ -374,7 +385,7 @@ ui.heading("Scheduling");
 
                         let old=serde_json::to_vec(&(j.enabled,&j.schedule,j.hour,j.minute,j.weekdays,j.interval_value,j.interval_unit)).unwrap();
 
-                        ui.horizontal(|ui|{
+                        centered_row(ui, |ui|{
 ui.selectable_value(&mut j.schedule,Schedule::Interval,"Interval");
 ui.selectable_value(&mut j.schedule,Schedule::Daily,"Daily");
 ui.selectable_value(&mut j.schedule,Schedule::Weekdays,"Weekdays");
@@ -382,7 +393,7 @@ ui.selectable_value(&mut j.schedule,Schedule::Weekdays,"Weekdays");
 );
 
                         if j.schedule==Schedule::Interval{
-ui.horizontal(|ui|{
+centered_row(ui, |ui|{
 ui.label("Every");
 ui.add(egui::DragValue::new(&mut j.interval_value).range(1..=j.interval_unit.maximum()));
 egui::ComboBox::from_id_salt("interval_unit")
@@ -398,7 +409,7 @@ j.interval_value = j.interval_value.clamp(1, j.interval_unit.maximum());
 }
 else{
 
-                            ui.horizontal(|ui|{
+                            centered_row(ui, |ui|{
 ui.label("Local time");
 ui.add(egui::DragValue::new(&mut j.hour).range(0..=23).min_decimals(0));
 ui.label(":");
@@ -407,7 +418,7 @@ ui.add(egui::DragValue::new(&mut j.minute).range(0..=59).min_decimals(0));
 );
 
                             if j.schedule==Schedule::Weekdays{
-ui.horizontal(|ui|{
+centered_row(ui, |ui|{
 for (i,s) in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].iter().enumerate(){
 ui.toggle_value(&mut j.weekdays[i],*s);
 }
@@ -442,7 +453,7 @@ ui.checkbox(&mut j.rolling,"Enable rolling retention – delete oldest backups a
                         ui.add_enabled_ui(j.rolling,|ui|{
 
                             let mut count=j.max_count.is_some();
-ui.horizontal(|ui|{
+centered_row(ui, |ui|{
 if ui.checkbox(&mut count,"Maximum count").changed(){
 j.max_count=if count{
 Some(10)}
@@ -457,7 +468,7 @@ ui.add(egui::DragValue::new(n).range(1..=100000));
 );
 
                             let mut size=j.max_bytes.is_some();
-ui.horizontal(|ui|{
+centered_row(ui, |ui|{
 if ui.checkbox(&mut size,"Maximum total size").changed(){
 j.max_bytes=if size{
 Some(10*1024*1024*1024)}
@@ -486,7 +497,7 @@ ui.label(format!("Last backup: {}",j.last_success.map(|t|t.with_timezone(&chrono
 ui.label(&j.status);
 ui.add_space(8.0);
 
-                    ui.horizontal(|ui|{
+                    centered_row(ui, |ui|{
 if ui.add_enabled(!busy,egui::Button::new("Check now")).clicked(){
 run=Some(j.id);
 }
@@ -544,7 +555,7 @@ ui.label("Create a backup job and select source and destination folders.");
                         );
                     }
 
-                    ui.horizontal(|ui| {
+                    centered_row(ui, |ui| {
                         if ui.button("Keep running").clicked() {
                             self.closing = false;
                         }
