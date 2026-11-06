@@ -2320,6 +2320,7 @@ dependencies = [
  "chrono-tz",
  "eframe",
  "fs2",
+ "image",
  "rfd",
  "serde",
  "serde_json",

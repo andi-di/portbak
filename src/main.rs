@@ -26,6 +26,18 @@ fn main() {
     }
 }
 
+fn app_icon() -> egui::IconData {
+    let image = image::load_from_memory(include_bytes!("../assets/icon/portbak-64.png"))
+        .expect("the embedded icon is a valid PNG");
+    let rgba = image.into_rgba8();
+    let (width, height) = rgba.dimensions();
+    egui::IconData {
+        width,
+        height,
+        rgba: rgba.into_raw(),
+    }
+}
+
 fn startup() -> anyhow::Result<()> {
     let path = config_path()?;
     let lock = lock_config(&path)?;
@@ -33,7 +45,8 @@ fn startup() -> anyhow::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1100.0, 960.0])
-            .with_min_inner_size([800.0, 600.0]),
+            .with_min_inner_size([800.0, 600.0])
+            .with_icon(app_icon()),
         ..Default::default()
     };
     eframe::run_native(
