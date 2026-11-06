@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from xml.etree import ElementTree
 
 from PIL import Image
 
@@ -15,16 +14,10 @@ OUT = Path(__file__).resolve().parent.parent / "assets" / "icon"
 
 
 def render(target):
-    root = ElementTree.parse(OUT / "portbak.svg").getroot()
-    # Drop the soft shadow at tiny sizes to keep the silhouette crisp.
-    if target <= 32:
-        for child in list(root):
-            if child.get("id") == "details":
-                root.remove(child)
     side = target * 4
     result = subprocess.run(
         ["rsvg-convert", "--width", str(side), "--height", str(side)],
-        input=ElementTree.tostring(root), capture_output=True, check=True,
+        input=(OUT / "portbak.svg").read_bytes(), capture_output=True, check=True,
     )
     with Image.open(io.BytesIO(result.stdout)) as image:
         return image.convert("RGBA").resize((target, target), Image.Resampling.LANCZOS)
