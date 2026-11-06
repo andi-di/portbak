@@ -41,6 +41,14 @@ The size limit counts the sizes of stored backup files, or the archive size for 
 - A power failure or forced process termination may leave `.partial-*` entries or published backups that have not yet been recorded in the manifest. These are intentionally not deleted automatically. Settings and manifests are replaced atomically; complete protection against power loss at the storage level is not guaranteed.
 - The app works offline. Linux requires a graphical session with OpenGL and standard system libraries, including libc, X11/Wayland, and xkbcommon. The Linux build is not a fully static universal executable; build against a suitably old base system for older distributions. Linux folder selection uses XDG Desktop Portal and its desktop backend.
 
+## Contributing and branch rules
+
+Start each change on a dedicated branch from current `origin/main`, using names such as `feat/<topic>`, `fix/<topic>`, or `chore/<topic>`. Commit related changes separately with conventional commit messages, push the branch, and open a pull request to `main`. Do not commit or push directly to `main`. Agents can open PRs but must not merge them; the owner `andi-di` performs merges.
+
+The intended GitHub protections are versioned in [.github/rulesets](.github/rulesets). `main-pr-and-ci` requires a PR and successful GitHub Actions checks `build (ubuntu-22.04)` and `build (windows-latest)` against an up-to-date branch, and blocks force pushes and branch deletion without exceptions. `main-owner-merges` restricts updates to the repository admin role, with bypass only for pull requests. For this personal repository, that role belongs to owner `andi-di`; its exception does not bypass the separate CI ruleset. No second review is required for owner-authored PRs.
+
+These JSON files document the configuration; committing them does not activate GitHub settings. An authenticated repository administrator must apply them through GitHub Settings → Rules → Rulesets (Import a ruleset), or the GitHub REST API. Existing rulesets must be updated by ID rather than duplicated. Verify both are active and target `refs/heads/main`. Do not add broad bypass permissions or grant apps permission to bypass them. GitHub authorizes accounts, so the agent merge prohibition also applies when an agent uses the owner's credentials.
+
 ## Development and builds
 
 Install stable Rust, then run:

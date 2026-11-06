@@ -7,6 +7,10 @@ them here.
 
 ## Rules
 
+- Before making changes, create a dedicated branch from current `origin/main`, such as
+  `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, or `chore/<topic>`. Never commit or push directly to `main`.
+- Submit changes through a pull request to `main`. Agents may prepare and open PRs but must not merge
+  them; only the repository owner `andi-di` merges after both required CI builds pass.
 - Commit after each change set. Do not batch unrelated work into one commit.
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `chore:`.
   Imperative subject, optional scope, body explains the why.
