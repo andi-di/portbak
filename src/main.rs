@@ -339,12 +339,18 @@ ui.add_space(10.0);
 
                     let busy=self.active==Some(j.id)||self.queue.contains(&j.id);
 
-                    let mut enabled = j.enabled;
                     let can_enable = j.schedule != Schedule::Weekdays || j.weekdays.iter().any(|day| *day);
-                    if ui.add_enabled(can_enable || enabled, egui::Checkbox::new(&mut enabled, "Enable automatic backups")).changed() {
-                        j.enabled = enabled;
+                    let (label, color) = if j.enabled {
+                        ("Disable automatic backups", egui::Color32::from_rgb(170, 35, 45))
+                    } else {
+                        ("Enable automatic backups", egui::Color32::from_rgb(25, 120, 60))
+                    };
+                    let button = egui::Button::new(egui::RichText::new(label).strong().color(egui::Color32::WHITE))
+                        .fill(color).min_size(egui::vec2(260.0, 40.0));
+                    if ui.add_enabled(can_enable || j.enabled, button).clicked() {
+                        j.enabled = !j.enabled;
                         j.reschedule(Utc::now());
-                        if !enabled { disabled = Some(j.id); }
+                        if !j.enabled { disabled = Some(j.id); }
                     }
                     if !j.enabled && self.active == Some(j.id) {
                         ui.label("Automatic backups disabled; current backup will finish.");
@@ -583,7 +589,7 @@ fn startup() -> anyhow::Result<()> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1040.0, 780.0])
+            .with_inner_size([1100.0, 960.0])
             .with_min_inner_size([800.0, 600.0]),
         ..Default::default()
     };

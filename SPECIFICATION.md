@@ -38,13 +38,13 @@ Provide:
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
 
 ### Job actions
 
 - **New job**: create and select a new independent job.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
-- Enable or disable automatic scheduling for an individual job.
+- Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
 - Save changes automatically and preserve them across restarts.
 - Prevent editing or removing a running or queued job until its pending work finishes, except that automatic scheduling can be toggled at any time. Disabling removes queued work for that job but lets a running backup finish. Manual checks remain available when scheduling is disabled.
