@@ -1,5 +1,10 @@
 mod editor;
 mod history_view;
+mod pixel;
+mod settings_view;
+mod skins;
+mod sprites;
+mod style;
 mod ui;
 mod widgets;
 
@@ -120,6 +125,7 @@ pub struct App {
     active: Option<Uuid>,
     restoring: bool,
     history_dialog: Option<HistoryDialog>,
+    settings_open: bool,
     history_cache: HashMap<Uuid, CachedHistory>,
     history_requests: HashMap<Uuid, PendingSummary>,
     tx: mpsc::Sender<Event>,
@@ -143,6 +149,7 @@ impl App {
             active: None,
             restoring: false,
             history_dialog: None,
+            settings_open: false,
             history_cache: HashMap::new(),
             history_requests: HashMap::new(),
             tx,
@@ -197,6 +204,7 @@ impl App {
     fn add_job(&mut self) {
         let job = Job::default();
         self.selected = Some(job.id);
+        self.settings_open = false;
         self.config.jobs.push(job);
     }
 
