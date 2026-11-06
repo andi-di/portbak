@@ -8,8 +8,9 @@ from PIL import Image, ImageDraw
 GRID = 512  # design grid of portbak.svg; every coordinate below is on that grid
 TILE_START = (20, 184, 166)  # #14B8A6
 TILE_END = (17, 94, 89)  # #115E59
-WHITE = (255, 255, 255, 255)
-GREEN = (40, 200, 90, 255)  # matches the green status dot in the UI
+NAVY = "#172D46"
+GOLD = "#FFD16B"
+CREAM = "#FFF1D6"
 PNG_SIZES = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
 ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 
@@ -51,21 +52,31 @@ def render(target):
     img.paste(tile_gradient(side), (0, 0), mask)
     draw = ImageDraw.Draw(img)
 
-    # backup-cycle arc sweeping clockwise over the folder
-    draw.arc(ellipse(k, 256, 270, 165), 200, 340, fill=WHITE, width=30 * k)
-    draw.ellipse(ellipse(k, 115, 219, 15), fill=WHITE)  # round start cap
-    draw.polygon(scaled(k, [(409, 251), (370, 220), (419, 202)]), fill=WHITE)
+    # Broad silhouettes keep all three symbols readable at small sizes.
+    draw.polygon(scaled(k, [(78, 172), (174, 172), (204, 208),
+                            (322, 208), (322, 390), (78, 390)]), fill=NAVY)
+    draw.polygon(scaled(k, [(90, 184), (168, 184), (198, 220),
+                            (310, 220), (310, 378), (90, 378)]), fill="#E8A63F")
+    draw.rounded_rectangle(rect(k, 78, 218, 330, 398), radius=22 * k, fill=NAVY)
+    draw.rounded_rectangle(rect(k, 90, 230, 318, 386), radius=10 * k, fill=GOLD)
 
-    # folder: body, tab, and the slanted shoulder between them
-    draw.rounded_rectangle(rect(k, 140, 260, 372, 414), fill=WHITE, radius=24 * k)
-    draw.rounded_rectangle(rect(k, 140, 234, 240, 292), fill=WHITE, radius=20 * k)
-    draw.polygon(scaled(k, [(226, 234), (263, 262), (226, 262)]), fill=WHITE)
+    draw.arc(ellipse(k, 202, 308, 46), 45, 315, fill=NAVY, width=18 * k)
+    draw.polygon(scaled(k, [(254, 270), (254, 310), (214, 284)]), fill=NAVY)
 
-    # verified checkmark
-    points = scaled(k, [(214, 334), (240, 360), (298, 300)])
-    draw.line(points, fill=GREEN, width=28 * k, joint="curve")
-    for cx, cy in (points[0], points[-1]):
-        draw.ellipse((cx - 14 * k, cy - 14 * k, cx + 14 * k, cy + 14 * k), fill=GREEN)
+    # A cream keyline separates the overlapping anchor from the folder.
+    for color, width in ((CREAM, 44), (NAVY, 24)):
+        draw.ellipse(ellipse(k, 370, 158, 31 if color == CREAM else 25),
+                     outline=color, width=(24 if color == CREAM else 12) * k)
+        draw.line(scaled(k, [(370, 184), (370, 368)]), fill=color, width=width * k)
+        draw.line(scaled(k, [(332, 228), (408, 228)]), fill=color, width=width * k)
+        bounds = (300, 240, 440, 380) if color == CREAM else (310, 250, 430, 370)
+        draw.arc(rect(k, *bounds), 0, 180, fill=color, width=width * k)
+    for points in ([(294, 292), (334, 306), (307, 330)],
+                   [(446, 292), (406, 306), (433, 330)]):
+        draw.polygon(scaled(k, points), fill=CREAM)
+    for points in ([(303, 302), (326, 310), (310, 324)],
+                   [(437, 302), (414, 310), (430, 324)]):
+        draw.polygon(scaled(k, points), fill=NAVY)
 
     return img.resize((target, target), Image.LANCZOS)
 
@@ -79,7 +90,10 @@ def main():
         print(path)
     if all(size in images for size in ICO_SIZES):
         ico = OUT / "portbak.ico"
-        images[ICO_SIZES[0]].save(ico, sizes=[(size, size) for size in ICO_SIZES])
+        images[max(ICO_SIZES)].save(
+            ico, sizes=[(size, size) for size in ICO_SIZES],
+            append_images=[images[size] for size in ICO_SIZES[:-1]],
+        )
         print(ico)
 
 
