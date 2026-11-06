@@ -7,7 +7,6 @@ use super::App;
 use crate::model::Theme;
 use eframe::egui;
 
-const CONTENT_MAX_WIDTH: f32 = 880.0;
 const SWATCH: f32 = 14.0;
 
 impl App {
@@ -17,7 +16,6 @@ impl App {
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
             pixel::paint_scenery(ui);
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);
             });
         });

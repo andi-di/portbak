@@ -16,7 +16,6 @@ const MAX_COUNT_LIMIT: usize = 100_000;
 const BYTES_PER_GIB: f64 = 1_073_741_824.0;
 const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const CONTENT_MAX_WIDTH: f32 = 880.0;
 
 /// Everything that decides when a job runs; a change restarts its schedule.
 type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
@@ -59,7 +58,6 @@ impl App {
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
             pixel::paint_scenery(ui);
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
                 let (Some(job), Some(permissions)) = (job, permissions) else {
                     add = welcome(ui, can_add);
