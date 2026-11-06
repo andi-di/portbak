@@ -24,6 +24,23 @@ use uuid::Uuid;
 enum Event {
     Progress(String),
     Done(Uuid, Result<engine::Outcome, String>),
+    History(
+        Uuid,
+        Result<(Vec<engine::restore::Backup>, PathBuf), String>,
+    ),
+}
+
+struct RestoreDialog {
+    request: Uuid,
+    job: Job,
+    backups: Option<Result<Vec<engine::restore::Backup>, String>>,
+    selected: Option<String>,
+    source_display: Option<PathBuf>,
+}
+
+enum Operation {
+    Backup,
+    Restore(String),
 }
 
 struct App {
@@ -32,6 +49,8 @@ struct App {
     selected: Option<Uuid>,
     queue: VecDeque<Uuid>,
     active: Option<Uuid>,
+    restoring: bool,
+    restore_dialog: Option<RestoreDialog>,
     tx: mpsc::Sender<Event>,
     rx: mpsc::Receiver<Event>,
     error: String,
@@ -53,6 +72,8 @@ impl App {
             path,
             queue: VecDeque::new(),
             active: None,
+            restoring: false,
+            restore_dialog: None,
             tx,
             rx,
             error: String::new(),
@@ -80,7 +101,11 @@ impl App {
     }
 
     fn enqueue(&mut self, id: Uuid) {
-        if self.active != Some(id) && !self.queue.contains(&id) {
+        if !self.restoring
+            && self.restore_dialog.is_none()
+            && self.active != Some(id)
+            && !self.queue.contains(&id)
+        {
             self.queue.push_back(id);
         }
     }
@@ -89,10 +114,178 @@ impl App {
         self.queue.retain(|queued| *queued != id);
     }
 
+    fn start_worker(&mut self, job: Job, operation: Operation, ctx: &egui::Context) {
+        self.active = Some(job.id);
+        self.restoring = matches!(operation, Operation::Restore(_));
+        self.progress = if self.restoring {
+            "Preparing restore …"
+        } else {
+            "Preparing backup …"
+        }
+        .into();
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let (ptx, prx) = mpsc::channel();
+            let forward = tx.clone();
+            let pctx = ctx.clone();
+            let relay = std::thread::spawn(move || {
+                for message in prx {
+                    let _ = forward.send(Event::Progress(message));
+                    pctx.request_repaint();
+                }
+            });
+            let result = std::panic::catch_unwind(|| match operation {
+                Operation::Backup => engine::run(&job, &ptx),
+                Operation::Restore(name) => engine::restore::run(&job, &name, &ptx),
+            })
+            .map_err(|_| {
+                "Unexpected error in worker; check for restore recovery folders beside the source"
+                    .to_string()
+            })
+            .and_then(|result| result.map_err(|e| format!("{e:#}")));
+            drop(ptx);
+            let _ = relay.join();
+            let _ = tx.send(Event::Done(job.id, result));
+            ctx.request_repaint();
+        });
+    }
+
+    fn open_restore(&mut self, id: Uuid, ctx: &egui::Context) {
+        if self.active.is_some() || !self.queue.is_empty() || self.restore_dialog.is_some() {
+            return;
+        }
+        let Some(job) = self.config.jobs.iter().find(|job| job.id == id).cloned() else {
+            return;
+        };
+        let request = Uuid::new_v4();
+        self.restore_dialog = Some(RestoreDialog {
+            request,
+            job: job.clone(),
+            backups: None,
+            selected: None,
+            source_display: None,
+        });
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = (|| -> anyhow::Result<_> {
+                let backups = engine::restore::list(&job)?;
+                let source = std::fs::canonicalize(&job.source)?;
+                Ok((backups, source))
+            })()
+            .map_err(|error| format!("{error:#}"));
+            let _ = tx.send(Event::History(request, result));
+            ctx.request_repaint();
+        });
+    }
+
+    fn confirm_restore(&mut self, ctx: &egui::Context) {
+        if self.active.is_some() || !self.queue.is_empty() {
+            return;
+        }
+        let Some(dialog) = &self.restore_dialog else {
+            return;
+        };
+        let Some(name) = dialog.selected.clone() else {
+            return;
+        };
+        let valid = dialog
+            .backups
+            .as_ref()
+            .and_then(|result| result.as_ref().ok())
+            .is_some_and(|backups| {
+                backups
+                    .iter()
+                    .any(|backup| backup.available && backup.record.name == name)
+            });
+        if !valid {
+            return;
+        }
+        let id = dialog.job.id;
+        let Some(job) = self.config.jobs.iter_mut().find(|job| job.id == id) else {
+            return;
+        };
+        job.enabled = false;
+        job.reschedule(Utc::now());
+        let job = job.clone();
+        self.dirty = true;
+        self.persist();
+        if self.dirty {
+            return;
+        }
+        self.restore_dialog = None;
+        self.start_worker(job, Operation::Restore(name), ctx);
+    }
+
+    fn show_restore(&mut self, ctx: &egui::Context) {
+        let mut cancel = false;
+        let mut confirm = false;
+        if let Some(dialog) = &mut self.restore_dialog {
+            egui::Window::new("Restore backup")
+                .collapsible(false).resizable(true).default_width(650.0)
+                .max_height(520.0)
+                .vscroll(true)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.heading(&dialog.job.name);
+                    ui.label("Choose a saved version. Close programs that write to this folder before restoring.");
+                    match &dialog.backups {
+                        None => { ui.spinner(); ui.label("Loading backup history …"); }
+                        Some(Err(error)) => { ui.colored_label(egui::Color32::LIGHT_RED, error); }
+                        Some(Ok(backups)) => {
+                            if backups.is_empty() { ui.label("No saved backups for this job."); }
+                            egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
+                                for backup in backups {
+                                    let record = &backup.record;
+                                    let label = format!("{} · {} · {} bytes{}\n{}",
+                                        record.created.with_timezone(&chrono::Local).format("%d.%m.%Y %H:%M:%S"),
+                                        if backup.zip { "ZIP" } else { "Folder" }, record.bytes,
+                                        if backup.available { "" } else { " · unavailable" }, record.name);
+                                    if ui.add_enabled(backup.available, egui::Button::new(label).selected(dialog.selected.as_deref() == Some(&record.name))).clicked() {
+                                        dialog.selected = Some(record.name.clone());
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    ui.separator();
+                    ui.label(format!("Source folder to replace: {}", dialog.source_display.as_ref().unwrap_or(&dialog.job.source).display()));
+                    if let Some(name) = &dialog.selected { ui.label(format!("Selected backup: {name}")); }
+                    ui.colored_label(egui::Color32::LIGHT_RED,
+                        "The ENTIRE current contents of this source folder will be replaced, including additional files, hidden entries and subfolders.");
+                    ui.label("Automatic backups for this job will remain disabled after restoration.");
+                    if !self.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &self.error); }
+                    centered_row(ui, |ui| {
+                        cancel = ui.button("Cancel").clicked();
+                        confirm = ui.add_enabled(dialog.selected.is_some(), egui::Button::new(
+                            egui::RichText::new("Replace contents and restore").strong().color(egui::Color32::WHITE))
+                            .fill(egui::Color32::from_rgb(170, 35, 45))).clicked();
+                    });
+                });
+        }
+        if cancel {
+            self.restore_dialog = None;
+        }
+        if confirm {
+            self.confirm_restore(ctx);
+        }
+    }
+
     fn tick(&mut self, ctx: &egui::Context) {
         while let Ok(e) = self.rx.try_recv() {
             match e {
                 Event::Progress(s) => self.progress = s,
+                Event::History(request, result) => {
+                    if let Some(dialog) = &mut self.restore_dialog {
+                        if dialog.request == request {
+                            dialog.backups = Some(result.map(|(backups, source)| {
+                                dialog.source_display = Some(source);
+                                backups
+                            }));
+                        }
+                    }
+                }
                 Event::Done(id, result) => {
                     if let Some(j) = self.config.jobs.iter_mut().find(|j| j.id == id) {
                         match result {
@@ -109,6 +302,7 @@ impl App {
                     }
 
                     self.active = None;
+                    self.restoring = false;
 
                     self.progress.clear();
 
@@ -123,7 +317,12 @@ impl App {
 
         let mut due = vec![];
 
-        for j in &mut self.config.jobs {
+        for j in self
+            .config
+            .jobs
+            .iter_mut()
+            .filter(|_| !self.restoring && self.restore_dialog.is_none())
+        {
             let previous = j.next_run;
 
             if j.take_due(now) {
@@ -139,44 +338,10 @@ impl App {
             self.enqueue(id)
         }
 
-        if self.active.is_none() {
+        if self.active.is_none() && self.restore_dialog.is_none() {
             if let Some(id) = self.queue.pop_front() {
-                if let Some(j) = self.config.jobs.iter().find(|j| j.id == id).cloned() {
-                    self.active = Some(id);
-
-                    self.progress = "Preparing backup …".into();
-
-                    let tx = self.tx.clone();
-
-                    let ctx = ctx.clone();
-
-                    std::thread::spawn(move || {
-                        let (ptx, prx) = mpsc::channel();
-
-                        let forward = tx.clone();
-
-                        let pctx = ctx.clone();
-
-                        let relay = std::thread::spawn(move || {
-                            for s in prx {
-                                let _ = forward.send(Event::Progress(s));
-
-                                pctx.request_repaint();
-                            }
-                        });
-
-                        let result = std::panic::catch_unwind(|| engine::run(&j, &ptx))
-                            .map_err(|_| "Unexpected error in backup worker".to_string())
-                            .and_then(|result| result.map_err(|e| format!("{e:#}")));
-
-                        drop(ptx);
-
-                        let _ = relay.join();
-
-                        let _ = tx.send(Event::Done(id, result));
-
-                        ctx.request_repaint();
-                    });
+                if let Some(job) = self.config.jobs.iter().find(|j| j.id == id).cloned() {
+                    self.start_worker(job, Operation::Backup, ctx);
                 }
             }
         }
@@ -309,7 +474,13 @@ impl eframe::App for App {
 
                 ui.add_space(8.0);
 
-                if ui.button("New job").clicked() {
+                if ui
+                    .add_enabled(
+                        !self.restoring && self.restore_dialog.is_none(),
+                        egui::Button::new("New job"),
+                    )
+                    .clicked()
+                {
                     let j = Job::default();
 
                     self.selected = Some(j.id);
@@ -330,7 +501,11 @@ impl eframe::App for App {
                             }
 
                             ui.small(if self.active == Some(j.id) {
-                                "Backup running"
+                                if self.restoring {
+                                    "Restore running"
+                                } else {
+                                    "Backup running"
+                                }
                             } else if j.enabled {
                                 "Schedule enabled"
                             } else {
@@ -353,6 +528,7 @@ impl eframe::App for App {
         let mut run = None;
 
         let mut remove = None;
+        let mut restore = None;
         let mut disabled = None;
 
         egui::CentralPanel::default().show(ctx,|ui|{
@@ -365,7 +541,7 @@ impl eframe::App for App {
 ui.heading(&j.name);
 ui.add_space(10.0);
 
-                    let busy=self.active==Some(j.id)||self.queue.contains(&j.id);
+                    let busy=self.active==Some(j.id)||self.queue.contains(&j.id)||self.restoring||self.restore_dialog.is_some();
 
                     let can_enable = j.schedule != Schedule::Weekdays || j.weekdays.iter().any(|day| *day);
                     let (label, color) = if j.enabled {
@@ -375,12 +551,12 @@ ui.add_space(10.0);
                     };
                     let button = egui::Button::new(egui::RichText::new(label).strong().color(egui::Color32::WHITE))
                         .fill(color).min_size(egui::vec2(260.0, 40.0));
-                    if ui.add_enabled(can_enable || j.enabled, button).clicked() {
+                    if ui.add_enabled((can_enable || j.enabled) && !self.restoring && self.restore_dialog.is_none(), button).clicked() {
                         j.enabled = !j.enabled;
                         j.reschedule(Utc::now());
                         if !j.enabled { disabled = Some(j.id); }
                     }
-                    if !j.enabled && self.active == Some(j.id) {
+                    if !j.enabled && self.active == Some(j.id) && !self.restoring {
                         ui.label("Automatic backups disabled; current backup will finish.");
                     }
 
@@ -518,6 +694,9 @@ ui.add_space(8.0);
 if ui.add_enabled(!busy,egui::Button::new("Check now")).clicked(){
 run=Some(j.id);
 }
+if ui.add_enabled(!busy && self.active.is_none() && self.queue.is_empty(), egui::Button::new("Restore backup…")).clicked(){
+restore=Some(j.id);
+}
 if ui.add_enabled(!busy,egui::Button::new("Remove job")).clicked(){
 remove=Some(j.id);
 }
@@ -525,7 +704,7 @@ remove=Some(j.id);
 );
 
                     ui.add_space(10.0);
-ui.small("Backups are full copies. Links are skipped. Each check reads all file contents. Restore by copying or extracting.");
+ui.small("Backups are full copies. Links are skipped. Each check reads all file contents. Restore with Restore backup… or by copying/extracting.");
 
                 }
 else{
@@ -539,6 +718,11 @@ ui.label("Create a backup job and select source and destination folders.");
 
         }
 );
+
+        if let Some(id) = restore {
+            self.open_restore(id, ctx);
+        }
+        self.show_restore(ctx);
 
         if let Some(id) = disabled {
             self.remove_pending(id);
@@ -568,7 +752,7 @@ ui.label("Create a backup job and select source and destination folders.");
 
                     if self.active.is_some() {
                         ui.label(
-                            "A backup is running. Please wait for it to finish before quitting.",
+                            "An operation is running. Please wait for it to finish before quitting.",
                         );
                     }
 
@@ -732,6 +916,108 @@ mod tests {
                 });
             });
         });
+    }
+
+    fn restore_fixture() -> (tempfile::TempDir, App, String) {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source");
+        let target = directory.path().join("target");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(source.join("file"), "saved").unwrap();
+        let job = Job {
+            source,
+            target,
+            enabled: true,
+            next_run: Some(Utc::now() - chrono::Duration::seconds(1)),
+            last_success: Some(Utc::now()),
+            ..Job::default()
+        };
+        engine::run(&job, &mpsc::channel().0).unwrap();
+        let name = engine::restore::list(&job).unwrap()[0].record.name.clone();
+        let config = Config {
+            jobs: vec![job],
+            ..Config::default()
+        };
+        let app = App::new(
+            config,
+            directory.path().join("config.json"),
+            tempfile::tempfile().unwrap(),
+        );
+        (directory, app, name)
+    }
+
+    fn select_restore(app: &mut App, name: &str) {
+        let job = app.config.jobs[0].clone();
+        app.restore_dialog = Some(RestoreDialog {
+            request: Uuid::new_v4(),
+            source_display: Some(job.source.clone()),
+            backups: Some(Ok(engine::restore::list(&job).unwrap())),
+            job,
+            selected: Some(name.to_owned()),
+        });
+    }
+
+    #[test]
+    fn restore_dialog_pauses_scheduling_and_cancel_changes_nothing() {
+        let (_directory, mut app, name) = restore_fixture();
+        let due = app.config.jobs[0].next_run;
+        select_restore(&mut app, &name);
+        let context = egui::Context::default();
+        app.tick(&context);
+        app.enqueue(app.config.jobs[0].id);
+        assert!(app.active.is_none());
+        assert!(app.queue.is_empty());
+        app.restore_dialog = None;
+        assert!(app.config.jobs[0].enabled);
+        assert_eq!(app.config.jobs[0].next_run, due);
+    }
+
+    #[test]
+    fn restore_confirmation_disables_job_and_preserves_backup_timestamp() {
+        let (_directory, mut app, name) = restore_fixture();
+        let timestamp = app.config.jobs[0].last_success;
+        let source = app.config.jobs[0].source.clone();
+        std::fs::write(source.join("extra"), "remove").unwrap();
+        select_restore(&mut app, &name);
+        let context = egui::Context::default();
+        app.confirm_restore(&context);
+        assert!(app.restoring);
+        assert!(!app.config.jobs[0].enabled);
+        assert!(app.config.jobs[0].next_run.is_none());
+        app.enqueue(Uuid::new_v4());
+        assert!(app.queue.is_empty());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while app.active.is_some() && Instant::now() < deadline {
+            app.tick(&context);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(app.active.is_none());
+        assert!(!app.restoring);
+        assert!(app.config.jobs[0].status.starts_with("Restore complete"));
+        assert!(!app.config.jobs[0].enabled);
+        assert_eq!(app.config.jobs[0].last_success, timestamp);
+        assert!(!source.join("extra").exists());
+    }
+
+    #[test]
+    fn restore_requires_valid_selection_idle_worker_and_saved_disabled_state() {
+        let (_directory, mut app, name) = restore_fixture();
+        let context = egui::Context::default();
+        select_restore(&mut app, &name);
+        app.restore_dialog.as_mut().unwrap().selected = None;
+        app.confirm_restore(&context);
+        assert!(app.active.is_none());
+        app.restore_dialog.as_mut().unwrap().selected = Some(name);
+        app.active = Some(Uuid::new_v4());
+        app.confirm_restore(&context);
+        assert!(app.config.jobs[0].enabled);
+        app.active = None;
+        app.path = app.path.join("missing/config.json");
+        app.confirm_restore(&context);
+        assert!(app.active.is_none());
+        assert!(app.restore_dialog.is_some());
+        assert!(!app.error.is_empty());
     }
 
     #[test]

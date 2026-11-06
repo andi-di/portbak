@@ -22,7 +22,11 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 
 Backups are stored directly in the selected destination, alongside a per-job `manifest-<UUID>.json` and a destination `.lock` file. Backups are named `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix.
 
-Each backup contains the full source contents. To restore a version, copy its files into a folder of your choice or extract the ZIP archive. Check existing data before overwriting it. Removing a job in the app does not delete its backups.
+Each backup contains the full source contents. Select **Restore backup…** in the job, choose a saved folder or ZIP version, then confirm **Replace contents and restore**. This replaces **all current contents of the source folder**, including additional files and subfolders. Close programs that write to that folder first. The job remains disabled after restoration until you enable it again. Restore is available when no operation is running or queued; scheduling pauses while the selection dialog is open.
+
+The selected version is prepared and fingerprint-verified beside the source before replacement. Enough free space and write access to the source's parent folder are required. If replacement fails, the app attempts to restore the previous contents. If rollback or cleanup fails, the status reports the recovery folder path; keep that folder until you have recovered your data. A crash may leave `.portbak-restore-*` or `.portbak-previous-*` folders beside the source. Folder contents and empty directories are restored; metadata limitations below still apply.
+
+You can also restore manually by copying a backup folder's contents or extracting a ZIP. Removing a job in the app does not delete its backups.
 
 The size limit counts the sizes of stored backup files, or the archive size for ZIP backups, rather than physically allocated disk blocks. After a successful backup, the oldest backups recorded in the manifest are removed. The latest successful backup is always kept; if it alone exceeds the limit, the app displays a notice. Unrelated files and incomplete backups are not deleted automatically. There must be enough free space for the new backup before cleanup begins.
 
@@ -54,7 +58,7 @@ Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev 
 
 The GitHub Actions workflow runs formatting checks, tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs once the project is pushed to a GitHub repository.
 
-Tests cover content changes and renames, empty directories, ZIP readability, links, overlapping paths, failure cleanup, sources changing during backup, rolling retention, missing backups, atomic saves, and scheduling including daylight saving transitions.
+Tests cover folder/ZIP restore, full source replacement, rollback and recovery, unsafe archives, content changes and renames, empty directories, ZIP readability, links, overlapping paths, failure cleanup, sources changing during backup, rolling retention, missing backups, atomic saves, and scheduling including daylight saving transitions.
 
 ### Linux builds targeting older glibc
 
@@ -72,7 +76,7 @@ The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux
 python3 tools/ui_smoke.py target/release/portbak
 ```
 
-Requires an X11/XWayland session, libX11, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution at a five-second interval and persisted completion in both themes, measures memory usage, and captures only the app window at its default and minimum sizes. It terminates its test processes afterward. Artifacts remain in `/tmp/portbak-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
+Requires an X11/XWayland session, libX11, libXtst, and ImageMagick `import`. The test creates only temporary jobs, checks automatic execution at a five-second interval, GUI restore/cancel for folder and ZIP versions, and persisted completion in both themes, measures memory usage, and captures only the app window at its default and minimum sizes. It terminates its test processes afterward. Artifacts remain in `/tmp/portbak-ui-*` for inspection. To test the Windows executable under Wine, pass its path and add `--wine`.
 
 ### Included executables
 

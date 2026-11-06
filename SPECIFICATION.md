@@ -44,6 +44,8 @@ The interface must remain responsive during hashing, copying, compression, verif
 
 - **New job**: create and select a new independent job.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
+- **Restore backup…**: when no operation is active or queued, asynchronously list this job's recorded versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Pause automatic starts while the dialog is open. Show the full resolved source path, selected version, and an explicit warning that all current source contents will be replaced. Require a red **Replace contents and restore** confirmation; cancellation changes nothing.
+- On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits, manual starts, and normal quitting while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
 - Save changes automatically and preserve them across restarts.
@@ -51,7 +53,7 @@ The interface must remain responsive during hashing, copying, compression, verif
 
 ### Window lifecycle
 
-Minimizing keeps the application and scheduler running. Closing the window displays a confirmation explaining that quitting stops scheduled backups. Offer **Keep running** and **Quit**. While a backup is running, allow the user to keep the app running but prevent normal quitting until that backup finishes. No system tray or always-running service is required.
+Minimizing keeps the application and scheduler running. Closing the window displays a confirmation explaining that quitting stops scheduled backups. Offer **Keep running** and **Quit**. While a backup or restore is running, allow the user to keep the app running but prevent normal quitting until that operation finishes. No system tray or always-running service is required.
 
 ## 4. Job configuration and defaults
 
@@ -258,6 +260,11 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Quit request while idle | Confirmation explains scheduling stops |
 | Quit request while backup runs | Normal quitting blocked until completion |
 | Second instance or destination lock conflict | Clear refusal; no concurrent writes |
+| GUI restore selected folder or ZIP | Entire source contents replaced; extra and hidden entries removed; saved empty directories restored |
+| Restore cancelled | Source and job activation unchanged |
+| Damaged, missing, unsafe or foreign backup | Restore refused before source replacement |
+| Restore replacement fails | Original contents restored, or remaining recovery path reported without deleting original data |
+| Restore completes or fails | Job remains disabled; history and last backup time unchanged |
 | Restart after normal edits | Settings, theme, next due time, and results restored |
 | Corrupt metadata or unsafe stored path | Explicit error; no destructive fallback |
 | Light and Dark themes | All job controls and results readable in each theme |

@@ -152,8 +152,14 @@ fn copy_directory(source: &Path, target: &Path, progress: &Sender<String>) -> Re
         } else {
             anyhow::ensure!(metadata.is_file(), "Folder backup contains a special file");
             let _ = progress.send(format!("Preparing restore: {}", entry.path().display()));
-            fs::copy(entry.path(), &output)?;
-            File::open(&output)?.sync_all()?;
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&output)?;
+            std::io::copy(&mut File::open(entry.path())?, &mut file)?;
+            file.sync_all()?;
+            #[cfg(unix)]
+            fs::set_permissions(&output, metadata.permissions())?;
         }
     }
     Ok(())
@@ -209,10 +215,11 @@ fn extract_zip(source: &Path, target: &Path, progress: &Sender<String>) -> Resul
 fn move_contents(source: &Path, target: &Path, moved: &mut Vec<OsString>) -> Result<()> {
     for entry in fs::read_dir(source)? {
         let name = entry?.file_name();
-        anyhow::ensure!(
-            !target.join(&name).try_exists()?,
-            "Restore destination changed during replacement"
-        );
+        match fs::symlink_metadata(target.join(&name)) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+            Ok(_) => bail!("Restore destination changed during replacement"),
+        }
         fs::rename(source.join(&name), target.join(&name))?;
         moved.push(name);
     }
@@ -437,6 +444,49 @@ mod tests {
         linked.source = directory.path().join("linked-source");
         std::os::unix::fs::symlink(&job.source, &linked.source).unwrap();
         assert!(run(&linked, &name, &std::sync::mpsc::channel().0).is_err());
+    }
+
+    #[test]
+    fn zip_links_are_rejected() {
+        let (_directory, job, name) = fixture(true);
+        let original = inventory(&job.source).unwrap().0;
+        let mut zip = ZipWriter::new(File::create(job.target.join(&name)).unwrap());
+        zip.add_symlink("link", "../outside", SimpleFileOptions::default())
+            .unwrap();
+        zip.finish().unwrap();
+        let error = run(&job, &name, &std::sync::mpsc::channel().0)
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("link or special file"));
+        assert_eq!(original, inventory(&job.source).unwrap().0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn folder_special_files_are_rejected() {
+        let (_directory, job, name) = fixture(false);
+        let original = inventory(&job.source).unwrap().0;
+        let _socket =
+            std::os::unix::net::UnixDatagram::bind(job.target.join(&name).join("socket")).unwrap();
+        assert!(run(&job, &name, &std::sync::mpsc::channel().0).is_err());
+        assert_eq!(original, inventory(&job.source).unwrap().0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn locked_source_file_preserves_original_contents() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let (_directory, job, name) = fixture(false);
+        change_source(&job);
+        let original = inventory(&job.source).unwrap().0;
+        let lock = OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(job.source.join(".hidden"))
+            .unwrap();
+        assert!(run(&job, &name, &std::sync::mpsc::channel().0).is_err());
+        drop(lock);
+        assert_eq!(original, inventory(&job.source).unwrap().0);
     }
 
     #[test]
