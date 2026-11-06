@@ -1,4 +1,15 @@
-use super::*;
+use super::{
+    destination, exceeds_limits, is_link, is_zip_backup, lock_destination, manifest_path,
+    metadata_if_exists, read_manifest, save,
+};
+use crate::model::{Job, Record};
+use anyhow::{Context, Result};
+use std::cmp::Reverse;
+
+/// Warn once three or fewer unprotected places remain.
+const LOW_FREE_PLACES: usize = 3;
+/// Warn once 20 % or less of the size budget remains unprotected.
+const LOW_FREE_PERCENT: u128 = 20;
 
 #[derive(Clone)]
 pub struct Backup {
@@ -7,80 +18,84 @@ pub struct Backup {
     pub zip: bool,
 }
 
+/// Lists newest first without taking the destination lock: manifests are replaced atomically,
+/// and locking would leave `.lock` files in every folder typed into the destination field.
 pub fn list(job: &Job) -> Result<Vec<Backup>> {
-    let target = fs::canonicalize(&job.target).context("Destination folder is unavailable")?;
-    let _lock = lock_destination(&target)?;
+    let target = destination(job)?;
     let manifest = read_manifest(&target, job.id)?;
-    let mut backups = Vec::new();
-    for record in manifest.records.into_iter().rev() {
-        let path = target.join(&record.name);
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => Some(metadata),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
-        };
-        let zip = record.name.ends_with(".zip");
-        let available =
-            metadata.is_some_and(|m| !is_link(&m) && if zip { m.is_file() } else { m.is_dir() });
-        backups.push(Backup {
-            record,
-            available,
-            zip,
-        });
-    }
-    backups.sort_by_key(|backup| std::cmp::Reverse(backup.record.created));
+    let mut backups = manifest
+        .records
+        .into_iter()
+        .rev()
+        .map(|record| {
+            let zip = is_zip_backup(&record.name);
+            let available = metadata_if_exists(&target.join(&record.name))?
+                .is_some_and(|m| !is_link(&m) && if zip { m.is_file() } else { m.is_dir() });
+            Ok(Backup {
+                record,
+                available,
+                zip,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    backups.sort_by_key(|backup| Reverse(backup.record.created));
     Ok(backups)
 }
 
 pub fn set_protected(job: &Job, name: &str, protected: bool) -> Result<()> {
-    let target = fs::canonicalize(&job.target).context("Destination folder is unavailable")?;
+    let target = destination(job)?;
     let _lock = lock_destination(&target)?;
     let mut manifest = read_manifest(&target, job.id)?;
-    let record = manifest
+    manifest
         .records
         .iter_mut()
         .find(|record| record.name == name)
-        .context("Selected backup is no longer in this job's history")?;
-    record.protected = protected;
-    save(&target.join(format!("manifest-{}.json", job.id)), &manifest)
+        .context("Selected backup is no longer in this job's history")?
+        .protected = protected;
+    save(&manifest_path(&target, job.id), &manifest)
 }
 
+/// Explains how much room protected backups leave for rolling retention.
 pub fn warnings(job: &Job, records: &[Record]) -> Vec<String> {
-    let protected_count = records.iter().filter(|record| record.protected).count();
-    if !job.rolling || protected_count == 0 {
+    let protected: Vec<&Record> = records.iter().filter(|record| record.protected).collect();
+    if !job.rolling || protected.is_empty() {
         return Vec::new();
     }
-    let protected_bytes = records
-        .iter()
-        .filter(|record| record.protected)
-        .fold(0u128, |total, record| total + u128::from(record.bytes));
     let mut warnings = Vec::new();
     if let Some(limit) = job.max_count {
-        let free = limit.saturating_sub(protected_count);
-        if free <= 3 {
-            warnings.push(format!("Low retention capacity: {free} places remain ({protected_count} protected, limit {limit})."));
+        let free = limit.saturating_sub(protected.len());
+        if free <= LOW_FREE_PLACES {
+            warnings.push(format!(
+                "Low retention capacity: {free} places remain ({} protected, limit {limit}).",
+                protected.len()
+            ));
         }
     }
     if let Some(limit) = job.max_bytes {
-        let free = u128::from(limit).saturating_sub(protected_bytes);
-        if free * 100 <= u128::from(limit) * 20 {
+        let limit = u128::from(limit);
+        let protected_bytes: u128 = protected
+            .iter()
+            .map(|record| u128::from(record.bytes))
+            .sum();
+        let free = limit.saturating_sub(protected_bytes);
+        if free * 100 <= limit * LOW_FREE_PERCENT {
             let percent = if limit == 0 {
                 0.0
             } else {
                 free as f64 * 100.0 / limit as f64
             };
-            warnings.push(format!("Low retention size budget: {free} bytes ({percent:.1}%) remain after protected backups; limit {limit} bytes."));
+            warnings.push(format!(
+                "Low retention size budget: {free} bytes ({percent:.1}%) remain \
+                 after protected backups; limit {limit} bytes."
+            ));
         }
     }
-    let total_bytes = records
-        .iter()
-        .fold(0u128, |total, record| total + u128::from(record.bytes));
-    if job.max_count.is_some_and(|limit| records.len() > limit)
-        || job
-            .max_bytes
-            .is_some_and(|limit| total_bytes > u128::from(limit))
-    {
-        warnings.push("Current history exceeds retention limits; protected backups and the newest version are kept.".into());
+    if exceeds_limits(job, records) {
+        warnings.push(
+            "Current history exceeds retention limits; \
+             protected backups and the newest version are kept."
+                .into(),
+        );
     }
     warnings
 }
@@ -88,6 +103,10 @@ pub fn warnings(job: &Job, records: &[Record]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::{load, prune};
+    use crate::model::Manifest;
+    use chrono::Utc;
+    use std::{fs, path::PathBuf};
 
     fn record(index: u32, protected: bool, size: u64) -> Record {
         Record {
@@ -115,7 +134,7 @@ mod tests {
         for record in &manifest.records {
             fs::write(job.target.join(&record.name), b"saved").unwrap();
         }
-        let path = job.target.join(format!("manifest-{}.json", job.id));
+        let path = manifest_path(&job.target, job.id);
         save(&path, &manifest).unwrap();
         (directory, job, manifest, path)
     }
@@ -222,5 +241,19 @@ mod tests {
         fs::remove_file(job.target.join(&original.records[0].name)).unwrap();
         set_protected(&job, &original.records[0].name, false).unwrap();
         assert!(!load::<Manifest>(&path).unwrap().records[0].protected);
+    }
+
+    #[test]
+    fn listing_neither_creates_nor_waits_for_the_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        let job = Job {
+            target: directory.path().to_path_buf(),
+            ..Job::default()
+        };
+        assert!(list(&job).unwrap().is_empty());
+        assert!(!job.target.join(".lock").exists());
+        let (_directory, job, manifest, _path) = fixture(vec![record(0, false, 10)]);
+        let _lock = lock_destination(&job.target).unwrap();
+        assert_eq!(list(&job).unwrap()[0].record.name, manifest.records[0].name);
     }
 }
