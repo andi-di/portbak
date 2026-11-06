@@ -379,7 +379,12 @@ mod tests {
             })
             .unwrap();
         assert!(previous.join("additional/directory/file").is_file());
-        assert!(error.to_string().contains(previous.to_str().unwrap()));
+        // Restore reports canonical paths, including Windows prefixes and resolved aliases.
+        let reported_path = fs::canonicalize(&previous).unwrap();
+        assert!(
+            error.to_string().contains(reported_path.to_str().unwrap()),
+            "Recovery path missing from restore error: {error:#}"
+        );
     }
 
     #[test]
