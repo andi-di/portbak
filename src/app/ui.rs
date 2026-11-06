@@ -1,8 +1,8 @@
 use super::ornaments;
 use super::pixel::{self, PixelButton, Tone};
 use super::skins;
-use super::sprites;
-use super::style::{self, Palette, Skin};
+use super::sprites::{self, Sprite};
+use super::style::{self, IconStyle, Palette, Skin};
 use super::widgets::alert;
 use super::App;
 use crate::model::{Job, Theme};
@@ -69,7 +69,7 @@ impl App {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let settings = PixelButton::new("Settings")
-                            .sprite(sprites::GEAR)
+                            .sprite(Sprite::Gear)
                             .selected(self.settings_open);
                         if ui.add(settings).clicked() {
                             self.settings_open = !self.settings_open;
@@ -115,20 +115,17 @@ impl App {
                 let rule =
                     egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
                 ui.painter().rect_filled(rule, 0.0, palette.outline);
+                let wording = &Skin::of(ui.ctx()).wording;
                 ui.horizontal(|ui| {
                     if self.active.is_some() {
                         pixel::led(ui, palette.gold, pixel::blink(ui, 0.25));
-                        pixel::display_label(ui, "BUSY", 10.0, palette.gold);
+                        pixel::display_label(ui, wording.busy, 10.0, palette.gold);
                         pixel::marquee(ui, 180.0, palette.gold);
                         ui.label(&self.progress);
                     } else {
                         pixel::led(ui, palette.good, true);
-                        let cursor = if pixel::blink(ui, 0.5) {
-                            "READY_"
-                        } else {
-                            "READY "
-                        };
-                        pixel::display_label(ui, cursor, 10.0, palette.good);
+                        let ready = blinking_cursor(ui, wording.ready, wording.cursor);
+                        pixel::display_label(ui, &ready, 10.0, palette.good);
                         ui.label(
                             egui::RichText::new("Scheduling runs while the app is open")
                                 .color(palette.dim),
@@ -167,7 +164,7 @@ impl App {
                 });
                 ui.add_space(10.0);
                 let new_job = PixelButton::new("New job")
-                    .sprite(sprites::PLUS)
+                    .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
                 if ui.add_enabled(!self.scheduling_paused(), new_job).clicked() {
@@ -206,7 +203,7 @@ impl App {
                     } else {
                         palette.metal
                     };
-                    sprites::show(ui, sprites::FLOPPY, 3.0, tint);
+                    sprites::show(ui, Sprite::Floppy, 3.0, tint);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 2.0;
                         ui.add(
@@ -230,7 +227,7 @@ impl App {
                         }
                         if let Some(remaining) = job.countdown(Utc::now()) {
                             ui.horizontal(|ui| {
-                                sprites::show(ui, sprites::CLOCK, 1.0, palette.paper);
+                                sprites::show(ui, Sprite::Clock, 1.0, palette.paper);
                                 ui.label(
                                     egui::RichText::new(format!("Next check in: {remaining}"))
                                         .small()
@@ -274,12 +271,13 @@ impl App {
     }
 }
 
-/// The floppy mascot with a twinkling glint, next to the wordmark.
+/// The skin's mascot next to the wordmark; pixel mascots get a twinkling glint.
 fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
-    let floppy = sprites::show(ui, sprites::FLOPPY, 4.0, palette.hot);
-    if pixel::blink(ui, 0.8) {
-        let glint = floppy.rect.right_top() + egui::vec2(-2.0, 2.0);
+    let skin = Skin::of(ui.ctx());
+    let mascot = sprites::show(ui, skin.wording.mascot, 4.0, palette.hot);
+    if skin.icons == IconStyle::Pixel && pixel::blink(ui, 0.8) {
+        let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [
             (egui::vec2(-2.0, -6.0), egui::vec2(4.0, 12.0)),
             (egui::vec2(-6.0, -2.0), egui::vec2(12.0, 4.0)),
@@ -292,8 +290,18 @@ fn logo(ui: &mut egui::Ui) {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         pixel::display_label(ui, "PORTBAK", 24.0, palette.gold);
-        ui.label(egui::RichText::new("PORTABLE BACKUP SYSTEM").color(palette.accent));
+        let tagline = Skin::of(ui.ctx()).wording.tagline;
+        ui.label(egui::RichText::new(tagline).color(palette.accent));
     });
+}
+
+/// `text` followed by a cursor that blinks, padded while hidden so the width stays put.
+fn blinking_cursor(ui: &egui::Ui, text: &str, cursor: &str) -> String {
+    if cursor.is_empty() || pixel::blink(ui, 0.5) {
+        format!("{text}{cursor}")
+    } else {
+        format!("{text}{}", " ".repeat(cursor.chars().count()))
+    }
 }
 
 fn card_shapes(

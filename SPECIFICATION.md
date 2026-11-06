@@ -35,7 +35,7 @@ Provide:
 - A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result.
 - An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
 - A global theme selector: **System**, **Light**, **Dark**. Default: **System**. Persist the selection.
-- A look selector in the settings view: **Retro** (pixel fonts and arcade colors) and **Dark Fantasy** (serif capitals, crimson on black, drifting embers). Default: **Retro**. Each look has a light and a dark variant that follows the theme selector. Persist the selection; an unknown saved look falls back to the default.
+- A look selector in the settings view: **Retro** (pixel fonts and arcade colors) and **Dark Fantasy** (serif capitals, engraved icons, crimson on black, drifting embers). Default: **Retro**. Each look has a light and a dark variant that follows the theme selector. Persist the selection; an unknown saved look falls back to the default.
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
 

@@ -1,6 +1,9 @@
 //! Retro: pixel fonts, a night-arcade dark mode and a beige handheld light mode.
 
-use crate::app::style::{Effects, Fonts, Metrics, Palette, Skin, TitleBar, Typography};
+use crate::app::sprites::Sprite;
+use crate::app::style::{
+    Effects, Fonts, IconStyle, Metrics, Palette, Skin, TitleBar, Typography, Wording,
+};
 use eframe::egui::Color32;
 
 pub static RETRO: Skin = Skin {
@@ -36,6 +39,16 @@ pub static RETRO: Skin = Skin {
         embers: false,
         vignette: false,
         title_bar: TitleBar::Striped,
+    },
+    icons: IconStyle::Pixel,
+    wording: Wording {
+        mascot: Sprite::Floppy,
+        tagline: "PORTABLE BACKUP SYSTEM",
+        welcome_title: "INSERT DISK",
+        welcome_prompt: "PRESS START",
+        ready: "READY",
+        busy: "BUSY",
+        cursor: "_",
     },
 };
 

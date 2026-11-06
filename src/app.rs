@@ -1,4 +1,5 @@
 mod editor;
+mod glyphs;
 mod history_view;
 mod ornaments;
 mod pixel;

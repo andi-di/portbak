@@ -96,7 +96,7 @@ pub fn engraved_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: 
         rect.right_bottom(),
     );
     fading_rule(painter, rule, band);
-    let icon = sprites::size(sprite, ICON_SCALE);
+    let icon = sprites::size(ui.ctx(), sprite, ICON_SCALE);
     let icon_pos = egui::pos2(rect.left() + 12.0, rect.center().y - icon.y / 2.0 - 1.0);
     sprites::paint(painter, icon_pos, sprite, ICON_SCALE, band);
     let galley = painter.layout_no_wrap(title.to_uppercase(), label_font(ui.ctx()), palette.ink);
@@ -115,6 +115,27 @@ pub fn engraved_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: 
     painter.hline(line_left..=line_right, y, line);
     diamond(painter, egui::pos2(line_left, y), 3.0, band);
     diamond(painter, egui::pos2(line_right, y), 5.0, band);
+}
+
+/// A faceted gem lamp; lit lamps glow softly around the stone.
+pub fn diamond_lamp(painter: &egui::Painter, rect: Rect, fill: Color32, lit: bool) {
+    let palette = Palette::of_ctx(painter.ctx());
+    let center = rect.center();
+    let radius = rect.width() / 2.0;
+    if lit {
+        painter.circle_filled(center, radius * 1.1, fade(fill, 0.25));
+    }
+    diamond(painter, center, radius, palette.outline);
+    diamond(painter, center, radius - 1.5, fill);
+    if lit {
+        let glint = center + Vec2::new(-radius * 0.25, -radius * 0.25);
+        diamond(
+            painter,
+            glint,
+            radius * 0.25,
+            mix(fill, Color32::WHITE, 0.7),
+        );
+    }
 }
 
 fn diamond(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
@@ -169,7 +190,7 @@ mod tests {
             let _ = context.run(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     paint_embers(ui, ui.clip_rect(), Palette::of(ui));
-                    engraved_title_bar(ui, "Folders", sprites::FOLDER, Palette::of(ui).accent);
+                    engraved_title_bar(ui, "Folders", Sprite::Folder, Palette::of(ui).accent);
                 });
                 paint_vignette(ctx, Palette::of_ctx(ctx));
             });

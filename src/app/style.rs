@@ -1,6 +1,7 @@
 //! Skin machinery: everything visual comes from the active `Skin`, so new looks are data only.
 
 use super::skins;
+use super::sprites::Sprite;
 use eframe::egui::{
     self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Shadow, Stroke,
     TextStyle,
@@ -19,6 +20,29 @@ pub struct Skin {
     pub typography: Typography,
     pub metrics: Metrics,
     pub effects: Effects,
+    pub icons: IconStyle,
+    pub wording: Wording,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum IconStyle {
+    /// Hard-edged pixel sprites and square lamps.
+    Pixel,
+    /// Smooth vector line art with dark bodies and diamond lamps.
+    Engraved,
+}
+
+/// Flavor text in the display face; plain instructions stay the same in every skin.
+pub struct Wording {
+    /// Icon beside the wordmark in the header.
+    pub mascot: Sprite,
+    pub tagline: &'static str,
+    pub welcome_title: &'static str,
+    pub welcome_prompt: &'static str,
+    pub ready: &'static str,
+    pub busy: &'static str,
+    /// Blinks after the ready text; empty for none.
+    pub cursor: &'static str,
 }
 
 /// Colors by role, so widgets never hard-code a color.

@@ -1,5 +1,5 @@
 use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
-use super::sprites;
+use super::sprites::{self, Sprite};
 use super::style::{label_font, Palette};
 use super::widgets::{alert, caption, format_bytes, local_time, retention_warnings, DATE, TIME};
 use super::{records_of, App, HistoryDialog, HistoryMode};
@@ -26,8 +26,8 @@ impl App {
         let palette = Palette::of_ctx(ctx);
         let app_error = &self.error;
         let (title, sprite, band) = match dialog.mode {
-            HistoryMode::Manage => ("Manage backups", sprites::CHEST, palette.accent),
-            HistoryMode::Restore => ("Restore backup", sprites::REWIND, palette.hot),
+            HistoryMode::Manage => ("Manage backups", Sprite::Chest, palette.accent),
+            HistoryMode::Restore => ("Restore backup", Sprite::Rewind, palette.hot),
         };
         let window = egui::Window::new(title)
             .collapsible(false)
@@ -62,7 +62,7 @@ fn dialog_contents(
     let manage = dialog.mode == HistoryMode::Manage;
     let mut response = DialogResponse::default();
     ui.horizontal(|ui| {
-        sprites::show(ui, sprites::FLOPPY, 3.0, palette.hot);
+        sprites::show(ui, Sprite::Floppy, 3.0, palette.hot);
         ui.add(egui::Label::new(egui::RichText::new(&dialog.job.name).heading()).truncate());
     });
     ui.label(
@@ -113,7 +113,7 @@ fn dialog_contents(
         response.close = ui.add_enabled(!dialog.saving, close).clicked();
         if !manage {
             let restore = PixelButton::new("Replace contents and restore")
-                .sprite(sprites::REWIND)
+                .sprite(Sprite::Rewind)
                 .tone(Tone::Danger);
             response.confirm = ui.add_enabled(dialog.selected.is_some(), restore).clicked();
         }
@@ -127,7 +127,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
     caption(ui, "Source folder to replace");
     sunken(ui, |ui| {
         ui.horizontal(|ui| {
-            sprites::show(ui, sprites::FOLDER, 2.0, palette.gold);
+            sprites::show(ui, Sprite::Folder, 2.0, palette.gold);
             ui.add(egui::Label::new(source.display().to_string()).wrap());
         });
     });
@@ -222,7 +222,7 @@ fn day_header(ui: &mut egui::Ui, backup: &Backup) {
     let palette = Palette::of(ui);
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        sprites::show(ui, sprites::CURSOR, 2.0, palette.gold);
+        sprites::show(ui, Sprite::Cursor, 2.0, palette.gold);
         let date = local_time(backup.record.created, DATE).to_uppercase();
         ui.label(
             egui::RichText::new(date)
@@ -252,9 +252,9 @@ fn backup_row<R>(
             ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
                 let (sprite, tint) = if backup.zip {
-                    (sprites::PACKAGE, palette.gold)
+                    (Sprite::Package, palette.gold)
                 } else {
-                    (sprites::FOLDER, palette.gold)
+                    (Sprite::Folder, palette.gold)
                 };
                 sprites::show(ui, sprite, 2.0, tint);
                 backup_text(ui, backup, selected);
@@ -328,7 +328,7 @@ fn selection_row(ui: &mut egui::Ui, backup: &Backup, selected: &mut Option<Strin
     let row = ui.add_enabled_ui(backup.available, |ui| {
         backup_row(ui, backup, is_selected, egui::Sense::click(), |ui| {
             if is_selected {
-                sprites::show(ui, sprites::CHECK, 3.0, palette.accent_ink);
+                sprites::show(ui, Sprite::Check, 3.0, palette.accent_ink);
             }
         })
         .0

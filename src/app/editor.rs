@@ -1,6 +1,6 @@
 use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use super::sprites::{self, Sprite};
-use super::style::{label_font, Palette};
+use super::style::{label_font, Palette, Skin};
 use super::widgets::{
     alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
     DATE_MINUTE, DATE_TIME,
@@ -101,9 +101,10 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         ui.add_space(50.0);
         let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
         ui.add_space(bob);
-        sprites::show(ui, sprites::FLOPPY, 10.0, palette.hot);
+        sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
         ui.add_space(24.0 - bob);
-        pixel::display_label(ui, "INSERT DISK", 24.0, palette.gold);
+        let wording = &Skin::of(ui.ctx()).wording;
+        pixel::display_label(ui, wording.welcome_title, 24.0, palette.gold);
         ui.add_space(14.0);
         ui.heading("Your folders. Safely backed up.");
         ui.label(
@@ -112,13 +113,13 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         );
         ui.add_space(22.0);
         let start = PixelButton::new("New job")
-            .sprite(sprites::PLUS)
+            .sprite(Sprite::Plus)
             .tone(Tone::Accent)
             .min_size(egui::vec2(240.0, 52.0));
         let clicked = ui.add_enabled(can_add, start).clicked();
         ui.add_space(14.0);
         let prompt = if pixel::blink(ui, 0.5) {
-            "PRESS START"
+            wording.welcome_prompt
         } else {
             " "
         };
@@ -145,17 +146,17 @@ fn job_editor(
     }
     ui.add_space(14.0);
     ui.add_enabled_ui(!permissions.busy, |ui| {
-        pixel::section(ui, "Folders", sprites::FOLDER, palette.accent, |ui| {
+        pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
             folder_settings(ui, job)
         });
-        pixel::section(ui, "Scheduling", sprites::CLOCK, palette.hot, |ui| {
+        pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
             schedule_settings(ui, job)
         });
-        pixel::section(ui, "Retention", sprites::SHIELD, palette.good, |ui| {
+        pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
             retention_settings(ui, job, summary)
         });
     });
-    pixel::section(ui, "Status", sprites::MONITOR, palette.gold, |ui| {
+    pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
         status_panel(ui, job, permissions)
     })
 }
@@ -169,7 +170,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         } else {
             palette.metal
         };
-        sprites::show(ui, sprites::FLOPPY, 5.0, tint);
+        sprites::show(ui, Sprite::Floppy, 5.0, tint);
         ui.add_space(6.0);
         let activation_width = 320.0;
         ui.allocate_ui(
@@ -202,7 +203,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         ("Enable automatic backups", Tone::Good)
     };
     let button = PixelButton::new(label)
-        .sprite(sprites::POWER)
+        .sprite(Sprite::Power)
         .tone(tone)
         .min_size(egui::vec2(300.0, 52.0));
     let can_toggle = (job.enabled || job.has_runnable_schedule()) && !locked;
@@ -226,7 +227,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
-        sprites::show(ui, sprites::PACKAGE, 2.0, Palette::of(ui).gold);
+        sprites::show(ui, Sprite::Package, 2.0, Palette::of(ui).gold);
     });
 }
 
@@ -247,9 +248,9 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
     centered_row(ui, |ui| {
         let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", sprites::REWIND),
-            (Schedule::Daily, "Daily", sprites::SUN),
-            (Schedule::Weekdays, "Weekdays", sprites::CLOCK),
+            (Schedule::Interval, "Interval", Sprite::Rewind),
+            (Schedule::Daily, "Daily", Sprite::Sun),
+            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
         ];
         for (schedule, label, sprite) in modes {
             pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
@@ -397,7 +398,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
         });
     });
     ui.horizontal(|ui| {
-        sprites::show(ui, sprites::SHIELD, 1.0, palette.good);
+        sprites::show(ui, Sprite::Shield, 1.0, palette.good);
         ui.label(
             egui::RichText::new(
                 "The latest successful backup and protected versions are always kept.",
@@ -470,28 +471,28 @@ fn action_buttons(ui: &mut egui::Ui, permissions: &Permissions) -> Option<JobAct
     let buttons = [
         (
             "Check now",
-            sprites::PLAY,
+            Sprite::Play,
             Tone::Accent,
             can_edit,
             JobAction::Check,
         ),
         (
             "Restore backup…",
-            sprites::REWIND,
+            Sprite::Rewind,
             Tone::Plain,
             can_open_history,
             JobAction::Restore,
         ),
         (
             "Manage backups…",
-            sprites::CHEST,
+            Sprite::Chest,
             Tone::Plain,
             can_open_history,
             JobAction::Manage,
         ),
         (
             "Remove job",
-            sprites::TRASH,
+            Sprite::Trash,
             Tone::Danger,
             can_edit,
             JobAction::Remove,

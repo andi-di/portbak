@@ -1,6 +1,9 @@
 //! Dark Fantasy: carved capitals, crimson on ash-black nights and candlelit parchment days.
 
-use crate::app::style::{Effects, Fonts, Metrics, Palette, Skin, TitleBar, Typography};
+use crate::app::sprites::Sprite;
+use crate::app::style::{
+    Effects, Fonts, IconStyle, Metrics, Palette, Skin, TitleBar, Typography, Wording,
+};
 use eframe::egui::Color32;
 
 pub static DARK_FANTASY: Skin = Skin {
@@ -37,6 +40,16 @@ pub static DARK_FANTASY: Skin = Skin {
         embers: true,
         vignette: true,
         title_bar: TitleBar::Engraved,
+    },
+    icons: IconStyle::Engraved,
+    wording: Wording {
+        mascot: Sprite::Power,
+        tagline: "KEEPER OF FORGOTTEN FILES",
+        welcome_title: "THE VAULT LIES EMPTY",
+        welcome_prompt: "KINDLE THE FIRST FLAME",
+        ready: "KINDLED",
+        busy: "FORGING",
+        cursor: "",
     },
 };
 

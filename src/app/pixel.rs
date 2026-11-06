@@ -2,7 +2,7 @@
 
 use super::ornaments;
 use super::sprites::{self, Sprite};
-use super::style::{self, display_font, label_font, Palette, Skin, TitleBar};
+use super::style::{self, display_font, label_font, IconStyle, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
     WidgetInfo, WidgetType,
@@ -82,9 +82,9 @@ impl Widget for PixelButton {
         let galley = ui
             .painter()
             .layout_no_wrap(text.clone(), font, Color32::PLACEHOLDER);
-        let icon = self
-            .sprite
-            .map_or(Vec2::ZERO, |sprite| sprites::size(sprite, ICON_SCALE));
+        let icon = self.sprite.map_or(Vec2::ZERO, |sprite| {
+            sprites::size(ui.ctx(), sprite, ICON_SCALE)
+        });
         let gap = if icon.x > 0.0 && !text.is_empty() {
             8.0
         } else {
@@ -242,7 +242,7 @@ impl Widget for PixelCheckbox<'_> {
         );
         if checked {
             let tint = if enabled { palette.good } else { palette.dim };
-            sprites::paint_centered(painter, square.center(), sprites::CHECK, ICON_SCALE, tint);
+            sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
         }
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =
@@ -347,7 +347,7 @@ fn striped_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color
         rect.right_bottom(),
     );
     painter.rect_filled(rule, 0.0, palette.outline);
-    let icon = sprites::size(sprite, ICON_SCALE);
+    let icon = sprites::size(ui.ctx(), sprite, ICON_SCALE);
     let icon_pos = egui::pos2(rect.left() + 10.0, rect.center().y - icon.y / 2.0 - 1.0);
     sprites::paint(painter, icon_pos, sprite, ICON_SCALE, palette.paper);
     let galley = painter.layout_no_wrap(title.to_uppercase(), label_font(ui.ctx()), ink);
@@ -393,16 +393,18 @@ pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -
     let galley = ui
         .painter()
         .layout_no_wrap(text.to_owned(), display_font(size), color);
-    let drop = (size * typography.display_drop).round().max(1.0);
+    let drop = (size * typography.display_drop).round();
     let (rect, response) =
         ui.allocate_exact_size(galley.size() + Vec2::splat(drop), Sense::hover());
     let painter = ui.painter();
-    let shadow = painter.layout_no_wrap(text.to_owned(), display_font(size), palette.outline);
-    painter.galley(
-        rect.min.round() + Vec2::splat(drop),
-        shadow,
-        palette.outline,
-    );
+    if drop > 0.0 {
+        let shadow = painter.layout_no_wrap(text.to_owned(), display_font(size), palette.outline);
+        painter.galley(
+            rect.min.round() + Vec2::splat(drop),
+            shadow,
+            palette.outline,
+        );
+    }
     painter.galley(rect.min.round(), galley, color);
     response
 }
@@ -431,7 +433,7 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
     response
 }
 
-/// A square status lamp with a glint; unlit lamps are drawn dark.
+/// A status lamp with a glint, square or diamond by skin; unlit lamps are drawn dark.
 pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
@@ -442,6 +444,10 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     } else {
         mix(color, palette.outline, 0.7)
     };
+    if Skin::of(ui.ctx()).icons == IconStyle::Engraved {
+        ornaments::diamond_lamp(painter, rect, fill, lit);
+        return response;
+    }
     painter.rect_filled(rect, 0.0, fill);
     painter.rect_stroke(
         rect,
