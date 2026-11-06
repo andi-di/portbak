@@ -157,7 +157,16 @@ Each successful backup is a complete, independent snapshot of the included sourc
 - Preserve all existing backups. If a name already exists, add `_1`, `_2`, and so on before the optional extension.
 - The backup folder or archive contains the source's contents with their relative directory structure, including empty directories.
 
-Restoration must be possible without this application by copying a backup folder's contents or extracting an archive. An integrated restore interface is not required.
+Restoration must also remain possible without this application by copying a backup folder's contents or extracting an archive.
+
+### Restore execution
+
+- Restore only a version recorded in the selected job's manifest, from a folder or ZIP. Preserve the source folder itself but replace all its contents, including hidden entries, extra files, and extra directories.
+- Reject missing or damaged backups, foreign manifests, overlapping paths, linked source roots, filesystem roots, links or special files in backups, unsafe ZIP paths, and duplicate normalized ZIP entries.
+- Prepare the chosen backup in a temporary sibling folder and verify its content fingerprint before modifying the source. This requires writable space beside the source and enough space for the prepared version in addition to the current contents.
+- Move current contents into a sibling recovery folder, install and verify the prepared version, then remove the previous contents without following links. If replacement fails, roll back; if rollback cannot complete, preserve original data and report the recovery folder path.
+- Preparation failures leave the source untouched. If removal of old recovery data fails after successful replacement, report that path and the cleanup error. A crash can leave `.portbak-restore-*` or `.portbak-previous-*` folders; complete crash atomicity is not guaranteed.
+- Restore must not change backup history, retention, or the last successful backup time. Existing metadata limitations apply; close applications that write to the source before restoring.
 
 ## 9. Integrity and failure handling
 
@@ -259,6 +268,6 @@ Verify the user interface, folder selection, window lifecycle, and scheduling on
 
 Deliver the complete source project, runnable portable executables for both platforms, automated tests, English usage/recovery instructions, measured release size and memory usage, and a verification report describing platform coverage and remaining limitations.
 
-The initial version does not require cloud storage, encryption, compression formats other than ZIP, deduplication, incremental backups, file exclusion rules, live filesystem watching, system task integration, automatic startup, a tray icon, a built-in restore wizard, or guaranteed preservation of all filesystem metadata.
+The initial version does not require cloud storage, encryption, compression formats other than ZIP, deduplication, incremental backups, file exclusion rules, live filesystem watching, system task integration, automatic startup, a tray icon, or guaranteed preservation of all filesystem metadata.
 
 When rebuilding from this document, implement the complete behavior and acceptance scenarios before adding optional features. Document any unavoidable platform limitation rather than silently changing backup or deletion rules.

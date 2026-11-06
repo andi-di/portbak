@@ -1,3 +1,5 @@
+pub mod restore;
+
 use crate::model::{Job, Manifest, Record};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
@@ -130,6 +132,54 @@ impl Drop for Temp {
         }
     }
 }
+fn reject_metadata_link(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => anyhow::ensure!(!is_link(&metadata), "Backup metadata must not be a link"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    Ok(())
+}
+
+fn lock_destination(root: &Path) -> Result<File> {
+    let lock_path = root.join(".lock");
+    reject_metadata_link(&lock_path)?;
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&lock_path)?;
+    lock.try_lock_exclusive()
+        .context("This destination is already in use")?;
+    Ok(lock)
+}
+
+fn read_manifest(root: &Path, id: uuid::Uuid) -> Result<Manifest> {
+    let manifest_path = root.join(format!("manifest-{id}.json"));
+    reject_metadata_link(&manifest_path)?;
+    let manifest: Manifest = if manifest_path.exists() {
+        load(&manifest_path)?
+    } else {
+        Manifest {
+            version: 1,
+            job_id: Some(id),
+            records: vec![],
+        }
+    };
+    if manifest.version != 1 || manifest.job_id != Some(id) {
+        bail!("Unknown backup manifest")
+    }
+    for r in &manifest.records {
+        if Path::new(&r.name).components().count() != 1
+            || !r.name.starts_with(|c: char| c.is_ascii_digit())
+        {
+            bail!("Invalid backup name in manifest")
+        }
+    }
+    Ok(manifest)
+}
+
 pub struct Outcome {
     pub message: String,
     pub created: bool,
@@ -156,44 +206,9 @@ fn run_inner(
     }
     anyhow::ensure!(target.is_dir(), "Destination is not a folder");
     let root = target;
-    let lock_path = root.join(".lock");
+    let _lock = lock_destination(&root)?;
     let manifest_path = root.join(format!("manifest-{}.json", job.id));
-    for path in [&lock_path, &manifest_path] {
-        match fs::symlink_metadata(path) {
-            Ok(metadata) => {
-                anyhow::ensure!(!is_link(&metadata), "Backup metadata must not be a link")
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(&lock_path)?;
-    lock.try_lock_exclusive()
-        .context("This destination is already in use")?;
-    let mut manifest: Manifest = if manifest_path.exists() {
-        load(&manifest_path)?
-    } else {
-        Manifest {
-            version: 1,
-            job_id: Some(job.id),
-            records: vec![],
-        }
-    };
-    if manifest.version != 1 || manifest.job_id != Some(job.id) {
-        bail!("Unknown backup manifest")
-    }
-    for r in &manifest.records {
-        if Path::new(&r.name).components().count() != 1
-            || !r.name.starts_with(|c: char| c.is_ascii_digit())
-        {
-            bail!("Invalid backup name in manifest")
-        }
-    }
+    let mut manifest = read_manifest(&root, job.id)?;
     let _ = progress.send("Hashing all source contents …".into());
     let (entries, skipped) = inventory(&source)?;
     let hash = digest(&entries)?;
