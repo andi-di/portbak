@@ -294,6 +294,9 @@ impl App {
         let Some(job) = self.job(id).cloned() else {
             return;
         };
+        if job.target.as_os_str().is_empty() {
+            return;
+        }
         let dialog = BackupHistory::new(job.clone());
         let request = dialog.request;
         self.backup_history = Some(dialog);
@@ -831,6 +834,18 @@ mod tests {
         assert_eq!(app.selected, Some(app.config.jobs[1].id));
         assert!(!app.backups_tab);
         assert!(app.backup_history.is_none());
+        assert!(!app.scheduling_paused());
+    }
+
+    #[test]
+    fn backup_history_without_destination_does_not_start_filesystem_work() {
+        let (_directory, mut app, _name) = restore_fixture();
+        app.config.jobs[0].target.clear();
+        let context = egui::Context::default();
+        app.open_history(app.config.jobs[0].id, &context);
+        assert!(app.backup_history.is_none());
+        assert!(app.rx.try_recv().is_err());
+        assert!(app.error.is_empty());
         assert!(!app.scheduling_paused());
     }
 

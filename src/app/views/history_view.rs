@@ -24,6 +24,9 @@ impl App {
         let Some(id) = self.selected else {
             return;
         };
+        let destination_missing = self
+            .job(id)
+            .is_some_and(|job| job.target.as_os_str().is_empty());
         self.open_history(id, &ctx);
         let frame =
             egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
@@ -48,6 +51,8 @@ impl App {
                         } else {
                             ui.label("Finishing protection changes for the previous job ...");
                         }
+                    } else if destination_missing {
+                        ui.label("Choose a destination folder in Job settings to view backups.");
                     } else {
                         ui.label(
                             "Backups will be available when active and queued operations finish.",
