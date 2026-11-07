@@ -32,13 +32,14 @@ All application-owned interface text, errors, defaults, comments, and documentat
 
 Provide:
 
-- A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result.
+- A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result. Its divider remains at the selected width after dragging and is restored after restarting.
 - An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
 - A global theme selector: **System**, **Light**, **Dark**. Default: **System**. Persist the selection.
+- A look selector in the settings view: **Retro** (pixel fonts and arcade colors) and **Dark Fantasy** (serif capitals, engraved icons, forged plate buttons, crimson on black, drifting embers). Default: **Retro**. Each look has a light and a dark variant that follows the theme selector. Persist the selection; an unknown saved look falls back to the default.
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
 
 ### Job actions
 
@@ -275,6 +276,8 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Protected versions with exceeded limits | Keep protected and newest versions; delete only eligible unprotected versions; report remaining excess |
 | Protection consumes count/size budget | Warn at three remaining places or 20% remaining size budget, inclusive |
 | History crosses local midnight | Highlight the first listed version of each local day in both dialogs |
+| Narrow window with a wide job list | Selected job remains visible and usable without a crash |
+| Resize job list, then release and restart | Divider stays at the chosen width and is restored after restart |
 | Restart after normal edits | Settings, theme, next due time, and results restored |
 | Corrupt metadata or unsafe stored path | Explicit error; no destructive fallback |
 | Light and Dark themes | All job controls and results readable in each theme |

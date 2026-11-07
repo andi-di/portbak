@@ -203,6 +203,7 @@ pub struct Config {
     pub theme: Theme,
     /// Id of the chosen skin; unknown ids fall back to the default skin.
     pub skin: String,
+    pub sidebar_width: f32,
     pub jobs: Vec<Job>,
 }
 
@@ -212,6 +213,7 @@ impl Default for Config {
             version: 1,
             theme: Theme::System,
             skin: "retro".into(),
+            sidebar_width: 290.0,
             jobs: vec![],
         }
     }
@@ -424,6 +426,7 @@ mod tests {
         let saved: Config =
             serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();
         assert_eq!(saved.skin, "retro");
+        assert_eq!(saved.sidebar_width, 290.0);
         assert_eq!(saved.theme, Theme::Light);
     }
 

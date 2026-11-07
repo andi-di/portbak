@@ -1,5 +1,8 @@
 mod editor;
+mod forge;
+mod glyphs;
 mod history_view;
+mod ornaments;
 mod pixel;
 mod settings_view;
 mod skins;

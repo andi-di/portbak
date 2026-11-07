@@ -1,7 +1,9 @@
 //! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
 
+use super::forge;
+use super::ornaments;
 use super::sprites::{self, Sprite};
-use super::style::{self, display_font, label_font, Palette};
+use super::style::{self, display_font, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
     WidgetInfo, WidgetType,
@@ -81,9 +83,9 @@ impl Widget for PixelButton {
         let galley = ui
             .painter()
             .layout_no_wrap(text.clone(), font, Color32::PLACEHOLDER);
-        let icon = self
-            .sprite
-            .map_or(Vec2::ZERO, |sprite| sprites::size(sprite, ICON_SCALE));
+        let icon = self.sprite.map_or(Vec2::ZERO, |sprite| {
+            sprites::size(ui.ctx(), sprite, ICON_SCALE)
+        });
         let gap = if icon.x > 0.0 && !text.is_empty() {
             8.0
         } else {
@@ -91,9 +93,16 @@ impl Widget for PixelButton {
         };
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
         let padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
-        let face_size = (content + padding * 2.0).max(self.min_size);
-        let (rect, response) =
-            ui.allocate_exact_size(face_size + Vec2::splat(m.lift), Sense::click());
+        let engraved = Skin::of(ui.ctx()).finish == Finish::Engraved;
+        // Engraved plates press straight down, so they only need room below.
+        let margin = if engraved {
+            Vec2::new(0.0, m.lift)
+        } else {
+            Vec2::splat(m.lift)
+        };
+        // `min_size` bounds the whole footprint, so a full-width button cannot widen its panel.
+        let face_size = (content + padding * 2.0).max(self.min_size - margin);
+        let (rect, response) = ui.allocate_exact_size(face_size + margin, Sense::click());
         let enabled = ui.is_enabled();
         response.widget_info(|| {
             WidgetInfo::selected(WidgetType::Button, enabled, self.selected, &text)
@@ -102,49 +111,39 @@ impl Widget for PixelButton {
             return response;
         }
         let sunk = enabled && (self.selected || response.is_pointer_button_down_on());
-        let offset = if sunk {
-            Vec2::splat(m.lift)
-        } else {
-            Vec2::ZERO
-        };
-        let face = Rect::from_min_size(rect.min + offset, face_size);
+        let hovered = enabled && response.hovered();
+        let glow = ui
+            .ctx()
+            .animate_bool_with_time(response.id.with("glow"), hovered, 0.15);
         let base = self.base_fill(palette);
-        let fill = match (enabled, response.hovered()) {
+        let fill = match (enabled, hovered) {
             (false, _) => palette.surface,
             (true, true) => mix(base, Color32::WHITE, 0.18),
             (true, false) => base,
         };
         let painter = ui.painter();
-        if !sunk {
-            let shadow = if enabled {
-                palette.outline
-            } else {
-                palette.shade
+        let face = if engraved {
+            let press = Vec2::new(0.0, if sunk { 1.0 } else { 0.0 });
+            let face = Rect::from_min_size(rect.min + press, face_size);
+            let look = forge::PlateLook {
+                fill,
+                enabled,
+                pressed: sunk,
+                glow,
+                focused: response.has_focus(),
             };
-            painter.rect_filled(face.translate(Vec2::splat(m.lift)), 0.0, shadow);
-        }
-        painter.rect_filled(face, 0.0, fill);
-        bevel(painter, face.shrink(m.border), fill, sunk, m.border);
-        let outline = if enabled {
-            palette.outline
+            forge::plate(painter, face, &look);
+            face
         } else {
-            palette.shade
+            let offset = if sunk {
+                Vec2::splat(m.lift)
+            } else {
+                Vec2::ZERO
+            };
+            let face = Rect::from_min_size(rect.min + offset, face_size);
+            pixel_face(painter, face, fill, sunk, enabled, response.has_focus());
+            face
         };
-        painter.rect_stroke(
-            face,
-            0.0,
-            Stroke::new(m.border, outline),
-            StrokeKind::Inside,
-        );
-        if response.has_focus() {
-            let ring = face.expand(2.0);
-            painter.rect_stroke(
-                ring,
-                0.0,
-                Stroke::new(2.0_f32, palette.hot),
-                StrokeKind::Outside,
-            );
-        }
         let ink = if enabled {
             readable_on(fill, palette)
         } else {
@@ -158,7 +157,8 @@ impl Widget for PixelButton {
                 _ => ink,
             };
             let top = cursor.y + (content.y - icon.y) / 2.0;
-            sprites::paint(painter, egui::pos2(cursor.x, top), sprite, ICON_SCALE, tint);
+            let origin = egui::pos2(cursor.x, top);
+            sprites::paint_awake(painter, origin, sprite, ICON_SCALE, tint, glow);
             cursor.x += icon.x + gap;
         }
         let top = cursor.y + (content.y - galley.size().y) / 2.0;
@@ -167,7 +167,39 @@ impl Widget for PixelButton {
     }
 }
 
-/// A square check box with a pixel check mark; the label wraps beside it.
+/// A beveled face over a hard shadow, the retro button look.
+fn pixel_face(
+    painter: &egui::Painter,
+    face: Rect,
+    fill: Color32,
+    sunk: bool,
+    enabled: bool,
+    focused: bool,
+) {
+    let m = style::metrics(painter.ctx());
+    let palette = Palette::of_ctx(painter.ctx());
+    let edge = if enabled {
+        palette.outline
+    } else {
+        palette.shade
+    };
+    if !sunk {
+        painter.rect_filled(face.translate(Vec2::splat(m.lift)), 0.0, edge);
+    }
+    painter.rect_filled(face, 0.0, fill);
+    bevel(painter, face.shrink(m.border), fill, sunk, m.border);
+    painter.rect_stroke(face, 0.0, Stroke::new(m.border, edge), StrokeKind::Inside);
+    if focused {
+        painter.rect_stroke(
+            face.expand(2.0),
+            0.0,
+            Stroke::new(2.0_f32, palette.hot),
+            StrokeKind::Outside,
+        );
+    }
+}
+
+/// A check box, square or spiked by skin; the label wraps beside it.
 pub struct PixelCheckbox<'a> {
     checked: &'a mut bool,
     label: String,
@@ -225,23 +257,27 @@ impl Widget for PixelCheckbox<'_> {
             (true, true) => palette.accent,
             (true, false) => palette.outline,
         };
-        painter.rect_filled(square, 0.0, palette.sunken);
-        bevel(
-            painter,
-            square.shrink(m.border),
-            palette.sunken,
-            true,
-            m.border,
-        );
-        painter.rect_stroke(
-            square,
-            0.0,
-            Stroke::new(m.border, border),
-            StrokeKind::Inside,
-        );
+        if Skin::of(ui.ctx()).finish == Finish::Engraved {
+            forge::spiked_socket(painter, square, border);
+        } else {
+            painter.rect_filled(square, 0.0, palette.sunken);
+            bevel(
+                painter,
+                square.shrink(m.border),
+                palette.sunken,
+                true,
+                m.border,
+            );
+            painter.rect_stroke(
+                square,
+                0.0,
+                Stroke::new(m.border, border),
+                StrokeKind::Inside,
+            );
+        }
         if checked {
             let tint = if enabled { palette.good } else { palette.dim };
-            sprites::paint_centered(painter, square.center(), sprites::CHECK, ICON_SCALE, tint);
+            sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
         }
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =
@@ -293,12 +329,7 @@ pub fn section<R>(
 ) -> R {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
-    let shadow = egui::Shadow {
-        offset: [m.shadow, m.shadow],
-        blur: 0,
-        spread: 0,
-        color: palette.outline,
-    };
+    let shadow = style::drop_shadow(m, palette, m.shadow);
     egui::Frame::new()
         .fill(palette.surface)
         .stroke(Stroke::new(m.border, palette.outline))
@@ -326,6 +357,13 @@ pub fn section<R>(
 }
 
 pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
+    match Skin::of(ui.ctx()).effects.title_bar {
+        TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
+        TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
+    }
+}
+
+fn striped_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
     let height = 30.0;
@@ -339,7 +377,7 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
         rect.right_bottom(),
     );
     painter.rect_filled(rule, 0.0, palette.outline);
-    let icon = sprites::size(sprite, ICON_SCALE);
+    let icon = sprites::size(ui.ctx(), sprite, ICON_SCALE);
     let icon_pos = egui::pos2(rect.left() + 10.0, rect.center().y - icon.y / 2.0 - 1.0);
     sprites::paint(painter, icon_pos, sprite, ICON_SCALE, palette.paper);
     let galley = painter.layout_no_wrap(title.to_uppercase(), label_font(ui.ctx()), ink);
@@ -377,22 +415,26 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
     }
 }
 
-/// Text in the blocky display face with a hard drop shadow.
+/// Text in the display face with a hard drop shadow; `size` is scaled by the skin.
 pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
+    let typography = &Skin::of(ui.ctx()).typography;
+    let size = size * typography.display_scale;
     let galley = ui
         .painter()
         .layout_no_wrap(text.to_owned(), display_font(size), color);
-    let drop = (size / 8.0).round().max(1.0);
+    let drop = (size * typography.display_drop).round();
     let (rect, response) =
         ui.allocate_exact_size(galley.size() + Vec2::splat(drop), Sense::hover());
     let painter = ui.painter();
-    let shadow = painter.layout_no_wrap(text.to_owned(), display_font(size), palette.outline);
-    painter.galley(
-        rect.min.round() + Vec2::splat(drop),
-        shadow,
-        palette.outline,
-    );
+    if drop > 0.0 {
+        let shadow = painter.layout_no_wrap(text.to_owned(), display_font(size), palette.outline);
+        painter.galley(
+            rect.min.round() + Vec2::splat(drop),
+            shadow,
+            palette.outline,
+        );
+    }
     painter.galley(rect.min.round(), galley, color);
     response
 }
@@ -421,7 +463,7 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
     response
 }
 
-/// A square status lamp with a glint; unlit lamps are drawn dark.
+/// A status lamp with a glint, square or diamond by skin; unlit lamps are drawn dark.
 pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
@@ -432,6 +474,10 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     } else {
         mix(color, palette.outline, 0.7)
     };
+    if Skin::of(ui.ctx()).finish == Finish::Engraved {
+        ornaments::diamond_lamp(painter, rect, fill, lit);
+        return response;
+    }
     painter.rect_filled(rect, 0.0, fill);
     painter.rect_stroke(
         rect,
@@ -506,8 +552,32 @@ pub fn stripes(painter: &egui::Painter, rect: Rect, palette: &Palette) {
     }
 }
 
+/// The skin's decorations behind a central panel's content; call before adding the content.
+pub fn paint_scenery(ui: &egui::Ui) {
+    let effects = &Skin::of(ui.ctx()).effects;
+    let palette = Palette::of(ui);
+    if effects.grid {
+        paint_grid(ui.painter(), ui.clip_rect(), palette);
+    }
+    if effects.embers {
+        ornaments::paint_embers(ui, ui.clip_rect(), palette);
+    }
+}
+
+/// The skin's screen-wide overlays; call after everything else has been laid out.
+pub fn paint_overlays(ctx: &egui::Context) {
+    let effects = &Skin::of(ctx).effects;
+    let palette = Palette::of_ctx(ctx);
+    if effects.vignette {
+        ornaments::paint_vignette(ctx, palette);
+    }
+    if effects.scanlines {
+        paint_scanlines(ctx, palette);
+    }
+}
+
 /// A faint graph-paper grid behind the content.
-pub fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
+fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
     const STEP: f32 = 24.0;
     let stroke = Stroke::new(1.0_f32, palette.grid);
     let mut x = rect.left() - rect.left() % STEP;
@@ -523,7 +593,7 @@ pub fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
 }
 
 /// CRT scanlines over everything; painted only, so input passes straight through.
-pub fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
+fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     const PITCH: f32 = 3.0;
     let layer = egui::LayerId::new(egui::Order::Debug, egui::Id::new("scanlines"));
     let screen = ctx.screen_rect();
@@ -623,6 +693,23 @@ mod tests {
             assert_eq!(readable_on(palette.gold, palette).r(), 0x1a);
             assert_eq!(readable_on(palette.outline, palette), palette.paper);
             assert_eq!(readable_on(palette.bad, palette), palette.paper);
+        }
+    }
+
+    #[test]
+    fn buttons_stay_within_their_minimum_footprint_in_every_skin() {
+        let context = egui::Context::default();
+        for skin in skins::ALL {
+            style::install(&context, skin);
+            let _ = context.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    let size = egui::vec2(260.0, 52.0);
+                    let button = PixelButton::new("New job")
+                        .sprite(Sprite::Plus)
+                        .min_size(size);
+                    assert_eq!(ui.add(button).rect.size(), size, "skin {}", skin.id);
+                });
+            });
         }
     }
 

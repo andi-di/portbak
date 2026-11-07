@@ -7,7 +7,6 @@ use super::App;
 use crate::model::Theme;
 use eframe::egui;
 
-const CONTENT_MAX_WIDTH: f32 = 880.0;
 const SWATCH: f32 = 14.0;
 
 impl App {
@@ -15,11 +14,8 @@ impl App {
         let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
         let mut close = false;
         egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-            if Skin::of(ui.ctx()).effects.grid {
-                pixel::paint_grid(ui.painter(), ui.clip_rect(), Palette::of(ui));
-            }
+            pixel::paint_scenery(ui);
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.set_max_width(CONTENT_MAX_WIDTH.min(ui.available_width()));
                 close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);
             });
         });
@@ -34,12 +30,12 @@ fn settings_page(ui: &mut egui::Ui, skin: &mut String, theme: &mut Theme) -> boo
     let palette = Palette::of(ui);
     let close = ui
         .horizontal(|ui| {
-            sprites::show(ui, sprites::GEAR, 4.0, palette.metal);
+            sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
             ui.add_space(6.0);
             pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let back = PixelButton::new("Back to jobs")
-                    .sprite(sprites::REWIND)
+                    .sprite(Sprite::Rewind)
                     .tone(Tone::Accent);
                 ui.add(back).clicked()
             })
@@ -47,13 +43,13 @@ fn settings_page(ui: &mut egui::Ui, skin: &mut String, theme: &mut Theme) -> boo
         })
         .inner;
     ui.add_space(14.0);
-    pixel::section(ui, "Theme", sprites::MONITOR, palette.hot, |ui| {
+    pixel::section(ui, "Theme", Sprite::Monitor, palette.hot, |ui| {
         caption(ui, "Look");
         for candidate in skins::ALL {
             skin_card(ui, candidate, skin);
         }
     });
-    pixel::section(ui, "Brightness", sprites::SUN, palette.gold, |ui| {
+    pixel::section(ui, "Brightness", Sprite::Sun, palette.gold, |ui| {
         caption(ui, "Light or dark mode");
         ui.horizontal_wrapped(|ui| {
             for mode in Theme::ALL {
@@ -154,9 +150,9 @@ fn swatches(ui: &mut egui::Ui, palette: &Palette) {
 
 fn mode_sprite(theme: Theme) -> Sprite {
     match theme {
-        Theme::System => sprites::MONITOR,
-        Theme::Light => sprites::SUN,
-        Theme::Dark => sprites::MOON,
+        Theme::System => Sprite::Monitor,
+        Theme::Light => Sprite::Sun,
+        Theme::Dark => Sprite::Moon,
     }
 }
 
