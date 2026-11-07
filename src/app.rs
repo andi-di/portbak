@@ -219,6 +219,17 @@ impl App {
         }
     }
 
+    fn job_activation_changed(&mut self, id: Uuid, was_enabled: bool) {
+        let Some(job) = self.job(id) else {
+            return;
+        };
+        if was_enabled && !job.enabled {
+            self.remove_pending(id);
+        } else if !was_enabled && job.enabled && job.check_on_enable {
+            self.enqueue(id);
+        }
+    }
+
     fn remove_pending(&mut self, id: Uuid) {
         self.queue.retain(|queued| *queued != id);
     }
@@ -595,6 +606,40 @@ mod tests {
         assert_eq!(second.interval_value, 15);
         assert_eq!(app.selected, Some(second.id));
         assert_ne!(first.id, second.id);
+    }
+
+    #[test]
+    fn enabling_can_queue_one_immediate_check_without_changing_future_due_time() {
+        let mut config = Config::default();
+        config.job_defaults.check_on_enable = true;
+        let config: Config =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        let mut app = app_with(config, PathBuf::new());
+        app.add_job();
+        let id = app.selected.unwrap();
+        let job = app.job_mut(id).unwrap();
+        assert!(job.check_on_enable);
+        job.enabled = true;
+        job.reschedule(Utc::now());
+        let next = job.next_run;
+        app.job_activation_changed(id, false);
+        app.job_activation_changed(id, false);
+        assert_eq!(app.queue, VecDeque::from([id]));
+        assert_eq!(app.job(id).unwrap().next_run, next);
+        app.queue.clear();
+        app.job_activation_changed(id, true);
+        assert!(app.queue.is_empty());
+        app.active = Some(id);
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
+        app.active = None;
+        app.job_mut(id).unwrap().check_on_enable = false;
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
+        app.queue.push_back(id);
+        app.job_mut(id).unwrap().enabled = false;
+        app.job_activation_changed(id, true);
+        assert!(app.queue.is_empty());
     }
 
     /// Ticks until `done` holds or five seconds pass.

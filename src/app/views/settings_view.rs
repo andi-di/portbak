@@ -91,6 +91,10 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
         ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut defaults.check_on_enable,
+            "Check immediately when enabled",
+        ));
         let mut job = defaults.new_job();
         super::editor::schedule_controls(ui, &mut job);
         defaults.update_schedule(&job);

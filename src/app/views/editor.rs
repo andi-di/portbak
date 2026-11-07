@@ -57,7 +57,7 @@ impl App {
             .unwrap_or_else(|| std::path::Path::new("."));
         let jobs = &mut self.config.jobs;
         let mut action = None;
-        let mut disabled = false;
+        let mut activation = None;
         let mut add = false;
         let frame =
             egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
@@ -84,14 +84,16 @@ impl App {
                                 format!("Could not update automatic destination: {error:#}");
                         }
                     }
-                    disabled = was_enabled && !job.enabled;
+                    if was_enabled != job.enabled {
+                        activation = Some((job.id, was_enabled));
+                    }
                 });
             });
         if add {
             self.add_job();
         }
-        if let (true, Some(id)) = (disabled, selected) {
-            self.remove_pending(id);
+        if let Some((id, was_enabled)) = activation {
+            self.job_activation_changed(id, was_enabled);
         }
         if let Some((id, action)) = action {
             self.apply(id, action, &ctx);
