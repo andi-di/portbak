@@ -139,10 +139,12 @@ impl Job {
             .take(100)
             .collect();
         let name = name.trim().trim_end_matches('.');
-        let name = if name.is_empty() { "New job" } else { name };
-        let target = std::fs::canonicalize(app_dir)?
-            .join("backups")
-            .join(format!("{}-{name}", self.id));
+        let folder = if name.is_empty() {
+            self.id.to_string()
+        } else {
+            format!("{}-{name}", self.id)
+        };
+        let target = std::fs::canonicalize(app_dir)?.join("backups").join(folder);
         anyhow::ensure!(
             !target.starts_with(&source),
             "Destination must be outside the source folder"
@@ -432,6 +434,14 @@ mod tests {
         );
         let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
         assert_eq!(saved.destination_name, DestinationName::JobName);
+        let previous = job.clone();
+        job.name.clear();
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert_eq!(job.target.file_name().unwrap(), job.id.to_string().as_str());
+        assert_eq!(
+            std::fs::read_to_string(job.target.join("saved-backup")).unwrap(),
+            "keep"
+        );
         let previous = job.clone();
         job.target = root.path().join("manual");
         job.name = "Another name".into();
