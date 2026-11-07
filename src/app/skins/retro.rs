@@ -1,6 +1,9 @@
 //! Retro: pixel fonts, a night-arcade dark mode and a beige handheld light mode.
 
-use crate::app::style::{Effects, Fonts, Metrics, Palette, Skin, Typography};
+use crate::app::sprites::Sprite;
+use crate::app::style::{
+    Effects, Finish, Fonts, Metrics, Palette, Skin, TitleBar, Typography, Wording,
+};
 use eframe::egui::Color32;
 
 pub static RETRO: Skin = Skin {
@@ -21,16 +24,32 @@ pub static RETRO: Skin = Skin {
         body: 20.0,
         small: 17.0,
         label: 10.0,
+        display_scale: 1.0,
+        display_drop: 0.125,
     },
     metrics: Metrics {
         border: 2.0,
         lift: 3.0,
         shadow: 5,
+        shadow_blur: 0,
     },
     effects: Effects {
         scanlines: true,
         grid: true,
         stripes: true,
+        embers: false,
+        vignette: false,
+        title_bar: TitleBar::Striped,
+    },
+    finish: Finish::Pixel,
+    wording: Wording {
+        mascot: Sprite::Floppy,
+        tagline: "PORTABLE BACKUP SYSTEM",
+        welcome_title: "INSERT DISK",
+        welcome_prompt: "PRESS START",
+        ready: "READY",
+        busy: "BUSY",
+        cursor: "_",
     },
 };
 
@@ -54,6 +73,7 @@ const NIGHT: Palette = Palette {
     metal: Color32::from_rgb(0xc2, 0xc3, 0xd6),
     paper: Color32::from_rgb(0xf4, 0xec, 0xff),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 34),
+    vignette: Color32::TRANSPARENT,
 };
 
 const DAY: Palette = Palette {
@@ -76,4 +96,5 @@ const DAY: Palette = Palette {
     metal: Color32::from_rgb(0x9a, 0x9a, 0xae),
     paper: Color32::from_rgb(0xff, 0xfd, 0xf6),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 12),
+    vignette: Color32::TRANSPARENT,
 };
