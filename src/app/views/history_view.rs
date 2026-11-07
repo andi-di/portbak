@@ -133,11 +133,22 @@ fn restore_confirmation(
     history: &BackupHistory,
     app_error: &str,
 ) -> (bool, bool) {
+    let response = restore_modal(ctx, history, app_error);
+    let (confirm, cancel) = response.inner.inner;
+    (confirm, cancel || response.should_close())
+}
+
+fn restore_modal(
+    ctx: &egui::Context,
+    history: &BackupHistory,
+    app_error: &str,
+) -> egui::ModalResponse<egui::scroll_area::ScrollAreaOutput<(bool, bool)>> {
     let mut confirm = false;
     let mut cancel = false;
-    let response = egui::Modal::new(egui::Id::new("confirm_backup_restore")).show(ctx, |ui| {
+    egui::Modal::new(egui::Id::new("confirm_backup_restore")).show(ctx, |ui| {
         ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 760.0));
         egui::ScrollArea::vertical()
+            .min_scrolled_height((ctx.content_rect().height() - 64.0).clamp(120.0, 480.0))
             .max_height((ctx.content_rect().height() - 64.0).max(120.0))
             .show(ui, |ui| {
                 ui.heading("Restore backup?");
@@ -153,9 +164,9 @@ fn restore_confirmation(
                             .clicked();
                     });
                 });
-            });
-    });
-    (confirm, cancel || response.should_close())
+                (confirm, cancel)
+            })
+    })
 }
 
 fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
@@ -418,14 +429,26 @@ mod tests {
     #[test]
     fn confirmation_modal_fits_and_escape_cancels_without_confirming() {
         for skin in crate::app::theme::skins::ALL {
-            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+            for (theme, screen_size) in [egui::Theme::Light, egui::Theme::Dark]
+                .into_iter()
+                .flat_map(|theme| {
+                    [egui::vec2(800.0, 600.0), egui::vec2(1100.0, 960.0)]
+                        .into_iter()
+                        .map(move |size| (theme, size))
+                })
+            {
                 let ctx = egui::Context::default();
                 crate::app::theme::style::install(&ctx, skin);
                 ctx.set_theme(theme);
-                let history = BackupHistory::new(crate::model::Job::default());
+                let mut history = BackupHistory::new(crate::model::Job {
+                    source: r"C:\Users\Someone\Documents\Projects\Important documents".into(),
+                    ..Default::default()
+                });
+                history.source_display = Some(history.job.source.clone());
+                history.selected =
+                    Some("2026-11-08_18-30-00_Important documents and project files".into());
                 for frame in 0..4 {
-                    let screen =
-                        egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(750.0, 600.0));
+                    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, screen_size);
                     let mut input = egui::RawInput {
                         screen_rect: Some(screen),
                         ..Default::default()
@@ -440,7 +463,19 @@ mod tests {
                         });
                     }
                     let _ = ctx.run_ui(input, |ui| {
-                        let (confirm, cancel) = restore_confirmation(ui.ctx(), &history, "");
+                        let response = restore_modal(ui.ctx(), &history, "");
+                        if frame >= 2 {
+                            assert!(
+                                response.inner.content_size.y
+                                    <= response.inner.inner_rect.height() + 1.0,
+                                "{} {theme:?}: content={:?}, viewport={:?}",
+                                skin.id,
+                                response.inner.content_size,
+                                response.inner.inner_rect
+                            );
+                        }
+                        let (confirm, cancel) = response.inner.inner;
+                        let cancel = cancel || response.should_close();
                         assert!(!confirm);
                         assert_eq!(cancel, frame == 3);
                     });
