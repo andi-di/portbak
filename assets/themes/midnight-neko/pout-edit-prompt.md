@@ -1,3 +1,0 @@
-# Built-in imagegen pout correction
-
-Edit this exact transparent 4x4 portrait sprite atlas. Preserve all existing cells, identity, detailed green eyes, natural proportions, cell positions and transparency. ONLY change cell row4 column3 (currently neutral duplicate): replace it with an unmistakable annoyed POUT: puffed cheeks, brows drawn inward, small protruding downturned pursed lips, NO smile, NO smug expression, NO :3 cat mouth. Keep row1 column3 EXACTLY unchanged: its current smug :3 expression will be used separately. Preserve every other cell unchanged. No frames, grid lines, background, halo or scythe. Same adult black-haired green-eyed gothic catgirl and same scale. Keep the regular4x4 atlas, transparent padding, high illustration quality.
