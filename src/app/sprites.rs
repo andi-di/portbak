@@ -4,6 +4,7 @@
 //! Legend: `.` transparent, `K` outline, `W` paper, `M` metal, `S` shade,
 //! `A` the caller's tint, `Y` gold, `G` good, `R` bad.
 
+use super::glossy;
 use super::glyphs;
 use super::style::{Finish, Palette, Skin};
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
@@ -295,7 +296,7 @@ pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
             let width = bitmap.first().map_or(0, |row| row.len());
             egui::vec2(width as f32, bitmap.len() as f32)
         }
-        Finish::Engraved => glyphs::grid(sprite),
+        Finish::Engraved | Finish::Glass => glyphs::grid(sprite),
         Finish::Modern => glyphs::grid(sprite) * 0.8,
     };
     grid * scale
@@ -325,6 +326,10 @@ pub fn paint_awake(
         Finish::Engraved => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
             glyphs::paint(painter, rect, sprite, tint, wake);
+        }
+        Finish::Glass => {
+            let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
+            glossy::paint(painter, rect, sprite, tint, wake);
         }
     }
 }

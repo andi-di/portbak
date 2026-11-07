@@ -1,6 +1,7 @@
+use super::glass::{self, Tint};
 use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use super::sprites::{self, Sprite};
-use super::style::{label_font, Palette};
+use super::style::{self, label_font, Finish, Palette, Skin};
 use super::widgets::{alert, caption, format_bytes, local_time, retention_warnings, DATE, TIME};
 use super::{records_of, App, HistoryDialog, HistoryMode};
 use crate::engine::history::Backup;
@@ -143,9 +144,9 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
         ui.label(format!("Selected backup: {name}"));
     }
     egui::Frame::new()
-        .corner_radius(super::style::radius(ui.ctx(), 6))
         .fill(pixel::mix(palette.bad, palette.surface, 0.8))
         .stroke(egui::Stroke::new(2.0_f32, palette.bad))
+        .corner_radius(style::control_radius(ui.ctx()))
         .inner_margin(egui::Margin::same(10))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
@@ -168,12 +169,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
 }
 
 fn sunken<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let palette = Palette::of(ui);
-    egui::Frame::new()
-        .fill(palette.sunken)
-        .corner_radius(super::style::radius(ui.ctx(), 6))
-        .stroke(egui::Stroke::new(2.0_f32, palette.outline))
-        .inner_margin(egui::Margin::symmetric(10, 6))
+    style::well(ui.ctx())
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             contents(ui)
@@ -256,6 +252,7 @@ fn backup_row<R>(
 ) -> (egui::Response, R) {
     let palette = Palette::of(ui);
     let background = ui.painter().add(egui::Shape::Noop);
+    let mut size = egui::Rect::NOTHING;
     let frame = egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
@@ -267,7 +264,7 @@ fn backup_row<R>(
                     (Sprite::Folder, palette.gold)
                 };
                 sprites::show(ui, sprite, 2.0, tint);
-                backup_text(ui, backup, selected);
+                size = backup_text(ui, backup, selected);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), trailing)
                     .inner
             })
@@ -276,20 +273,35 @@ fn backup_row<R>(
     let rect = frame.response.rect;
     let id = ui.id().with(&backup.record.name);
     let response = ui.interact(rect, id, sense);
+    let exact = format!("{} bytes", backup.record.bytes);
+    pixel::tooltip(ui, size, id.with("size"), &exact);
     let enabled = ui.is_enabled();
-    let fill = match (selected, enabled && response.hovered()) {
+    let hovered = enabled && response.hovered();
+    if Skin::of(ui.ctx()).finish == Finish::Glass {
+        let tint = match (selected, hovered) {
+            (true, _) => Some(Tint::Accent),
+            (false, true) => Some(Tint::Hover),
+            (false, false) => None,
+        };
+        if let Some(tint) = tint {
+            ui.painter()
+                .set(background, glass::tile(ui.ctx(), rect, tint));
+        }
+        return (response, frame.inner);
+    }
+    let fill = match (selected, hovered) {
         (true, _) => palette.accent,
         (false, true) => palette.raised,
         (false, false) => egui::Color32::TRANSPARENT,
     };
-    ui.painter().set(
-        background,
-        egui::Shape::rect_filled(rect, super::style::radius(ui.ctx(), 6), fill),
-    );
+    let radius = style::control_radius(ui.ctx());
+    ui.painter()
+        .set(background, egui::Shape::rect_filled(rect, radius, fill));
     (response, frame.inner)
 }
 
-fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) {
+/// The backup's time, kind and size; returns where the size is, for its exact-bytes tooltip.
+fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) -> egui::Rect {
     let palette = Palette::of(ui);
     let record = &backup.record;
     let (ink, dim) = if selected {
@@ -297,6 +309,7 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) {
     } else {
         (palette.ink, palette.dim)
     };
+    let mut size = egui::Rect::NOTHING;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
         ui.horizontal(|ui| {
@@ -306,10 +319,12 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) {
                     .color(ink),
             );
             let kind = if backup.zip { "ZIP" } else { "Folder" };
-            ui.label(
-                egui::RichText::new(format!("{kind} · {}", format_bytes(record.bytes))).color(ink),
-            )
-            .on_hover_text(format!("{} bytes", record.bytes));
+            size = ui
+                .label(
+                    egui::RichText::new(format!("{kind} · {}", format_bytes(record.bytes)))
+                        .color(ink),
+                )
+                .rect;
             if !backup.available {
                 pixel::badge(ui, "Unavailable", palette.bad);
             }
@@ -319,6 +334,7 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) {
         });
         ui.label(egui::RichText::new(&record.name).small().color(dim));
     });
+    size
 }
 
 fn protection_row(ui: &mut egui::Ui, backup: &Backup, saving: bool) -> Option<(String, bool)> {

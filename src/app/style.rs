@@ -32,6 +32,8 @@ pub enum Finish {
     Modern,
     /// Vector glyphs, forged plates, spiked sockets and diamond lamps.
     Engraved,
+    /// Glossy icons, gel buttons, glass tiles and orb lamps.
+    Glass,
 }
 
 /// Flavor text in the display face; plain instructions stay the same in every skin.
@@ -68,6 +70,8 @@ pub struct Palette {
     pub metal: Color32,
     pub paper: Color32,
     pub scanline: Color32,
+    /// Top of the wallpaper gradient, which fades down into `background`.
+    pub sky: Color32,
     /// Color the window edges sink into when the vignette effect is on.
     pub vignette: Color32,
 }
@@ -90,6 +94,10 @@ pub struct Typography {
     pub display_scale: f32,
     /// Drop shadow offset of display labels as a fraction of their size.
     pub display_drop: f32,
+    /// Radius of the halo behind display text in pixels; 0 for none.
+    pub display_glow: f32,
+    /// Buttons, badges, captions and title bars are set in capitals.
+    pub capitals: bool,
 }
 
 pub struct Metrics {
@@ -101,6 +109,8 @@ pub struct Metrics {
     pub shadow: i8,
     /// Blur of that shadow; 0 gives a hard diagonal pixel shadow.
     pub shadow_blur: u8,
+    /// Corner rounding of panels, cards and windows; small controls use half of it.
+    pub radius: u8,
 }
 
 pub struct Effects {
@@ -110,6 +120,12 @@ pub struct Effects {
     /// Sparks drifting up behind the content; keeps the window repainting while visible.
     pub embers: bool,
     pub vignette: bool,
+    /// A sky, aurora and hills painted behind every panel.
+    pub wallpaper: bool,
+    /// Bubbles drifting up behind the panels; keeps the window repainting while visible.
+    pub bubbles: bool,
+    /// Opacity of panels, sections and cards; below 1 needs the wallpaper to show through.
+    pub opacity: f32,
     pub title_bar: TitleBar,
 }
 
@@ -121,6 +137,8 @@ pub enum TitleBar {
     Modern,
     /// A dark band with a tinted icon, a fading colored rule and diamond ornaments.
     Engraved,
+    /// A tinted glass band with a glossy reflection and a glowing title.
+    Glass,
 }
 
 impl Skin {
@@ -166,14 +184,6 @@ pub fn face_font(ctx: &egui::Context, size: f32) -> FontId {
     }
 }
 
-pub fn radius(ctx: &egui::Context, modern: u8) -> CornerRadius {
-    CornerRadius::same(if Skin::of(ctx).finish == Finish::Modern {
-        modern
-    } else {
-        0
-    })
-}
-
 /// Modern keeps decorative details neutral; status colors retain their meaning.
 pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
     if Skin::of(ctx).finish == Finish::Modern {
@@ -185,6 +195,46 @@ pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
 
 pub fn metrics(ctx: &egui::Context) -> &'static Metrics {
     &Skin::of(ctx).metrics
+}
+
+/// `color` at the skin's panel opacity, for panels, sections and cards.
+pub fn glazed(ctx: &egui::Context, color: Color32) -> Color32 {
+    color.gamma_multiply(Skin::of(ctx).effects.opacity)
+}
+
+/// `text` in capitals when the skin sets its labels that way.
+pub fn cased(ctx: &egui::Context, text: &str) -> String {
+    if Skin::of(ctx).typography.capitals {
+        text.to_uppercase()
+    } else {
+        text.to_owned()
+    }
+}
+
+/// A sunken well around a readout or list; glass skins give it a thin glowing rim and Modern a
+/// hairline.
+pub fn well(ctx: &egui::Context) -> egui::Frame {
+    let palette = Palette::of_ctx(ctx);
+    let stroke = match Skin::of(ctx).finish {
+        Finish::Glass => Stroke::new(1.0_f32, palette.hot.gamma_multiply(0.8)),
+        Finish::Modern => Stroke::new(1.0_f32, palette.outline),
+        Finish::Pixel | Finish::Engraved => Stroke::new(2.0_f32, palette.outline),
+    };
+    egui::Frame::new()
+        .fill(ctx.global_style().visuals.extreme_bg_color)
+        .stroke(stroke)
+        .corner_radius(control_radius(ctx))
+        .inner_margin(egui::Margin::symmetric(10, 6))
+}
+
+/// Corner rounding of panels and cards.
+pub fn panel_radius(ctx: &egui::Context) -> CornerRadius {
+    CornerRadius::same(metrics(ctx).radius)
+}
+
+/// Corner rounding of small controls such as fields and badges.
+pub fn control_radius(ctx: &egui::Context) -> CornerRadius {
+    CornerRadius::same(metrics(ctx).radius / 2)
 }
 
 pub fn installed(ctx: &egui::Context) -> Option<&'static Skin> {
@@ -256,37 +306,38 @@ fn apply(style: &mut egui::Style, skin: &Skin, palette: &Palette) {
     spacing.scroll.bar_width = 12.0;
     spacing.scroll.handle_min_length = 24.0;
     style.interaction.selectable_labels = false;
-    apply_visuals(&mut style.visuals, &skin.metrics, palette);
+    apply_visuals(&mut style.visuals, skin, palette);
     if skin.finish == Finish::Modern {
-        style.visuals.window_corner_radius = CornerRadius::same(10);
-        style.visuals.menu_corner_radius = CornerRadius::same(6);
+        // Modern keeps windows to a hairline edge and selects in its calm blue.
         style.visuals.window_stroke = Stroke::new(1.0_f32, palette.outline);
         style.visuals.selection.bg_fill = palette.accent;
-        for state in [
-            &mut style.visuals.widgets.noninteractive,
-            &mut style.visuals.widgets.inactive,
-            &mut style.visuals.widgets.hovered,
-            &mut style.visuals.widgets.active,
-            &mut style.visuals.widgets.open,
-        ] {
-            state.corner_radius = CornerRadius::same(6);
-        }
     }
 }
 
-fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palette) {
+fn apply_visuals(visuals: &mut egui::Visuals, skin: &Skin, palette: &Palette) {
+    let metrics = &skin.metrics;
     let outline = Stroke::new(metrics.border, palette.outline);
+    let control_radius = CornerRadius::same(metrics.radius / 2);
     visuals.override_text_color = Some(palette.ink);
-    visuals.panel_fill = palette.background;
-    visuals.window_fill = palette.surface;
-    visuals.window_stroke = Stroke::new(metrics.border + 1.0, palette.outline);
-    visuals.window_corner_radius = CornerRadius::ZERO;
-    visuals.menu_corner_radius = CornerRadius::ZERO;
+    // The open background is clearer than the panels on it, so the scenery stays the brightest layer.
+    visuals.panel_fill = palette
+        .background
+        .gamma_multiply(skin.effects.opacity * skin.effects.opacity);
+    // Inputs and popups stay denser than panels so their text reads over the scenery.
+    let field = (skin.effects.opacity + 1.0) / 2.0;
+    visuals.window_fill = palette.surface.gamma_multiply(field);
+    visuals.window_stroke = if skin.finish == Finish::Glass {
+        Stroke::new(metrics.border, palette.hot)
+    } else {
+        Stroke::new(metrics.border + 1.0, palette.outline)
+    };
+    visuals.window_corner_radius = CornerRadius::same(metrics.radius);
+    visuals.menu_corner_radius = control_radius;
     visuals.window_shadow = drop_shadow(metrics, palette, metrics.shadow + 3);
     visuals.popup_shadow = drop_shadow(metrics, palette, metrics.shadow - 1);
-    visuals.faint_bg_color = palette.raised;
-    visuals.extreme_bg_color = palette.sunken;
-    visuals.code_bg_color = palette.sunken;
+    visuals.faint_bg_color = palette.raised.gamma_multiply(field);
+    visuals.extreme_bg_color = palette.sunken.gamma_multiply(field);
+    visuals.code_bg_color = palette.sunken.gamma_multiply(field);
     visuals.warn_fg_color = palette.gold;
     visuals.error_fg_color = palette.bad;
     visuals.hyperlink_color = palette.accent;
@@ -307,11 +358,12 @@ fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palet
         (&mut widgets.open, palette.highlight, palette.ink),
     ];
     for (state, fill, ink) in states {
+        let fill = fill.gamma_multiply(field);
         state.bg_fill = fill;
         state.weak_bg_fill = fill;
         state.bg_stroke = outline;
         state.fg_stroke = Stroke::new(metrics.border, ink);
-        state.corner_radius = CornerRadius::ZERO;
+        state.corner_radius = control_radius;
         state.expansion = 0.0;
     }
     widgets.noninteractive.bg_stroke = Stroke::new(metrics.border, palette.shade);
@@ -358,7 +410,7 @@ mod tests {
                 let modern = skin.finish == Finish::Modern;
                 assert_eq!(
                     style.visuals.widgets.inactive.corner_radius,
-                    CornerRadius::same(if modern { 6 } else { 0 })
+                    CornerRadius::same(skin.metrics.radius / 2)
                 );
                 assert_eq!(
                     style.text_styles[&TextStyle::Heading].family,

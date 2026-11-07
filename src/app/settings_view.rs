@@ -1,7 +1,8 @@
+use super::glass::{self, Tint};
 use super::pixel::{self, PixelButton, Tone};
 use super::skins;
 use super::sprites::{self, Sprite};
-use super::style::{metrics, Palette, Skin};
+use super::style::{self, metrics, Finish, Palette, Skin};
 use super::widgets::caption;
 use super::App;
 use crate::model::Theme;
@@ -105,18 +106,29 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     if response.clicked() && !selected {
         *selected_id = candidate.id.to_owned();
     }
+    if Skin::of(ui.ctx()).finish == Finish::Glass {
+        let tint = match (selected, response.hovered()) {
+            (true, _) => Tint::Accent,
+            (false, true) => Tint::Hover,
+            (false, false) => Tint::Rest,
+        };
+        ui.painter()
+            .set(background, glass::tile(ui.ctx(), rect, tint));
+        return;
+    }
     let fill = match (selected, response.hovered()) {
         (true, _) => palette.accent,
         (false, true) => palette.raised,
         (false, false) => palette.sunken,
     };
+    let radius = style::panel_radius(ui.ctx());
     ui.painter().set(
         background,
         vec![
-            egui::Shape::rect_filled(rect, super::style::radius(ui.ctx(), 10), fill),
+            egui::Shape::rect_filled(rect, radius, style::glazed(ui.ctx(), fill)),
             egui::Shape::rect_stroke(
                 rect,
-                super::style::radius(ui.ctx(), 10),
+                radius,
                 egui::Stroke::new(metrics(ui.ctx()).border, palette.outline),
                 egui::StrokeKind::Inside,
             ),
@@ -141,11 +153,14 @@ fn swatches(ui: &mut egui::Ui, palette: &Palette) {
         ui.spacing_mut().item_spacing.x = 2.0;
         for color in colors {
             let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(SWATCH), egui::Sense::hover());
-            ui.painter()
-                .rect_filled(rect, super::style::radius(ui.ctx(), 3), color);
+            ui.painter().rect_filled(
+                rect,
+                egui::CornerRadius::same(metrics(ui.ctx()).radius / 4),
+                color,
+            );
             ui.painter().rect_stroke(
                 rect,
-                super::style::radius(ui.ctx(), 3),
+                egui::CornerRadius::same(metrics(ui.ctx()).radius / 4),
                 egui::Stroke::new(1.0_f32, outline),
                 egui::StrokeKind::Inside,
             );
