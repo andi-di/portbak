@@ -180,76 +180,106 @@ fn job_editor(
     action
 }
 
-/// Keep job actions beside the identity, or below it in narrow windows.
+/// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
-    let mut action = None;
-    if ui.available_width() < 620.0 {
-        ui.horizontal(|ui| job_identity(ui, job));
+    let narrow = ui.available_width() < 620.0;
+    if narrow {
+        let (rect, _) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+        centered_identity(ui, job, rect);
         ui.add_space(8.0);
-        action = job_controls(ui, job, permissions);
-    } else {
-        ui.horizontal(|ui| {
-            ui.allocate_ui(
-                egui::vec2((ui.available_width() - 188.0).max(0.0), 60.0),
-                |ui| {
-                    ui.horizontal(|ui| job_identity(ui, job));
-                },
-            );
-            action = job_controls(ui, job, permissions);
-        });
+    }
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+    let mut action = None;
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(rect)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        |ui| {
+            activation_button(ui, job, permissions.locked);
+            if job_action_button(
+                ui,
+                "Check now",
+                Sprite::Play,
+                Tone::Accent,
+                !permissions.busy,
+            ) {
+                action = Some(JobAction::Check);
+            }
+        },
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(rect)
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+        |ui| {
+            if job_action_button(
+                ui,
+                "Remove job",
+                Sprite::Trash,
+                Tone::Danger,
+                !permissions.busy,
+            ) {
+                action = Some(JobAction::Remove);
+            }
+        },
+    );
+    if !narrow {
+        centered_identity(ui, job, rect.shrink2(egui::vec2(124.0, 0.0)));
     }
     action
 }
 
-fn job_controls(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let mut action = None;
-        for (label, sprite, tone, candidate) in [
-            ("Remove job", Sprite::Trash, Tone::Danger, JobAction::Remove),
-            ("Check now", Sprite::Play, Tone::Accent, JobAction::Check),
-        ] {
-            let button = PixelButton::new(label)
-                .icon_only()
-                .sprite(sprite)
-                .tone(tone)
-                .min_size(egui::vec2(52.0, 52.0));
-            if ui
-                .add_enabled(!permissions.busy, button)
-                .on_hover_text(label)
-                .on_disabled_hover_text(label)
-                .clicked()
-            {
-                action = Some(candidate);
-            }
-        }
-        activation_button(ui, job, permissions.locked);
-        action
-    })
-    .inner
+fn job_action_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    sprite: Sprite,
+    tone: Tone,
+    enabled: bool,
+) -> bool {
+    let button = PixelButton::new(label)
+        .icon_only()
+        .sprite(sprite)
+        .tone(tone)
+        .min_size(egui::vec2(52.0, 52.0));
+    ui.add_enabled(enabled, button)
+        .on_hover_text(label)
+        .on_disabled_hover_text(label)
+        .clicked()
 }
 
-fn job_identity(ui: &mut egui::Ui, job: &Job) {
+fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
     let palette = Palette::of(ui);
-    let tint = if job.enabled {
-        palette.good
-    } else {
-        palette.metal
-    };
-    let tint = style::decorative_color(ui.ctx(), tint);
-    sprites::show(ui, Sprite::Floppy, 5.0, tint);
-    ui.add_space(6.0);
-    ui.vertical(|ui| {
-        ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
-        pixel::status_row(ui, |ui| {
-            let (color, text) = if job.enabled {
-                (palette.good, "Automatic backups enabled")
+    let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 5.0);
+    let font = egui::TextStyle::Heading.resolve(ui.style());
+    let name_width = ui
+        .painter()
+        .layout_no_wrap(job.name.clone(), font, palette.ink)
+        .size()
+        .x;
+    let width = (icon_size.x + ui.spacing().item_spacing.x + 6.0 + name_width).min(rect.width());
+    let centered = egui::Rect::from_center_size(rect.center(), egui::vec2(width, rect.height()));
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(centered)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        |ui| {
+            let tint = if job.enabled {
+                palette.good
             } else {
-                (palette.dim, "Automatic backups disabled")
+                palette.metal
             };
-            pixel::led(ui, color, job.enabled);
-            pixel::glowing_label(ui, text, color);
-        });
-    });
+            sprites::show(
+                ui,
+                Sprite::Floppy,
+                5.0,
+                style::decorative_color(ui.ctx(), tint),
+            );
+            ui.add_space(6.0);
+            ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
+        },
+    );
 }
 
 fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {

@@ -556,20 +556,6 @@ pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -
     response
 }
 
-/// Body text with the skin's halo behind it, like captions glowing on Aero glass.
-pub fn glowing_label(ui: &mut egui::Ui, text: &str, color: Color32) -> Response {
-    let glow = Skin::of(ui.ctx()).typography.display_glow;
-    let font = TextStyle::Body.resolve(ui.style());
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text.to_owned(), font.clone(), color);
-    let (rect, response) = ui.allocate_exact_size(galley.size(), Sense::hover());
-    let origin = rect.min.round();
-    halo(ui.painter(), origin, text, &font, glow);
-    ui.painter().galley(origin, galley, color);
-    response
-}
-
 /// A soft halo of `radius` pixels around text, lifting it off a busy backdrop: light behind the
 /// dark ink of light palettes, dark behind the light ink of dark ones. 0 paints nothing.
 pub fn halo(painter: &egui::Painter, origin: Pos2, text: &str, font: &egui::FontId, radius: f32) {
@@ -857,30 +843,6 @@ fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     ctx.layer_painter(layer).add(mesh);
 }
 
-/// A row of status text; glass skins set it on a small frosted capsule so it reads over the sky.
-pub fn status_row<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let ctx = ui.ctx().clone();
-    if Skin::of(&ctx).finish != Finish::Glass {
-        return ui.horizontal(contents).inner;
-    }
-    let backing = ui.painter().add(egui::Shape::Noop);
-    let framed = egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(10, 3))
-        .show(ui, |ui| ui.horizontal(contents).inner);
-    let rect = framed.response.rect;
-    let clear = Glaze::clear(&ctx);
-    // Mostly frost: a light tint calms the sky behind the text without hiding it.
-    let glaze = Glaze {
-        opacity: (clear.opacity * 1.5).min(1.0),
-        ..clear
-    };
-    ui.painter().set(
-        backing,
-        glass::pane(&ctx, rect, rect.height() / 2.0, &glaze),
-    );
-    framed.inner
-}
-
 /// A tooltip with `text` while the pointer rests on `rect`. Its hover zone is registered when
 /// this is called, so call it after a clickable card or row laid over the same spot, which would
 /// otherwise take the hover; the zone senses no clicks, so the card stays clickable.
@@ -1057,19 +1019,6 @@ mod tests {
             });
         }
         assert!(zone_hovered && card_clickable);
-    }
-
-    #[test]
-    fn status_rows_return_their_contents_under_every_skin() {
-        let context = egui::Context::default();
-        for skin in skins::ALL {
-            style::install(&context, skin);
-            let _ = context.run_ui(egui::RawInput::default(), |ui| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
-                    assert!(status_row(ui, |ui| ui.label("Enabled").rect.height() > 0.0));
-                });
-            });
-        }
     }
 
     #[test]
