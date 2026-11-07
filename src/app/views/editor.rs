@@ -72,17 +72,14 @@ impl App {
                         return;
                     };
                     let was_enabled = job.enabled;
-                    let source_before = job.source.clone();
+                    let previous = job.clone();
                     let summary = summaries
                         .get(&job.id)
                         .filter(|summary| summary.target == job.target);
                     action =
                         job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
-                    if job.auto_destination && job.source != source_before && job.source.is_dir() {
-                        if let Err(error) = job.set_auto_destination(app_dir) {
-                            self.error =
-                                format!("Could not prepare automatic destination: {error:#}");
-                        }
+                    if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                        self.error = format!("Could not update automatic destination: {error:#}");
                     }
                     disabled = was_enabled && !job.enabled;
                 });

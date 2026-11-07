@@ -5,7 +5,7 @@ use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
 use crate::app::views::widgets::caption;
 use crate::app::App;
-use crate::model::{Config, JobDefaults};
+use crate::model::{Config, DestinationName, JobDefaults};
 use eframe::egui;
 
 const SWATCH: f32 = 14.0;
@@ -88,6 +88,18 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
             &mut defaults.auto_destination,
             "Auto destination folder",
         ));
+        if defaults.auto_destination {
+            caption(ui, "Destination folder name based on");
+            egui::ComboBox::from_id_salt("destination_name")
+                .selected_text(defaults.destination_name.label())
+                .show_ui(ui, |ui| {
+                    pixel::popup(ui, |ui| {
+                        for mode in [DestinationName::JobName, DestinationName::SourceFolder] {
+                            ui.selectable_value(&mut defaults.destination_name, mode, mode.label());
+                        }
+                    });
+                });
+        }
         ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
