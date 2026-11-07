@@ -1,6 +1,7 @@
 //! Skin machinery: everything visual comes from the active `Skin`, so new looks are data only.
 
 use super::skins;
+use super::sprites::Sprite;
 use eframe::egui::{
     self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Shadow, Stroke,
     TextStyle,
@@ -19,6 +20,29 @@ pub struct Skin {
     pub typography: Typography,
     pub metrics: Metrics,
     pub effects: Effects,
+    pub finish: Finish,
+    pub wording: Wording,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Finish {
+    /// Pixel sprites, beveled buttons, square boxes and lamps.
+    Pixel,
+    /// Vector glyphs, forged plates, spiked sockets and diamond lamps.
+    Engraved,
+}
+
+/// Flavor text in the display face; plain instructions stay the same in every skin.
+pub struct Wording {
+    /// Icon beside the wordmark in the header.
+    pub mascot: Sprite,
+    pub tagline: &'static str,
+    pub welcome_title: &'static str,
+    pub welcome_prompt: &'static str,
+    pub ready: &'static str,
+    pub busy: &'static str,
+    /// Blinks after the ready text; empty for none.
+    pub cursor: &'static str,
 }
 
 /// Colors by role, so widgets never hard-code a color.
@@ -42,6 +66,8 @@ pub struct Palette {
     pub metal: Color32,
     pub paper: Color32,
     pub scanline: Color32,
+    /// Color the window edges sink into when the vignette effect is on.
+    pub vignette: Color32,
 }
 
 /// Font files placed in front of egui's defaults, which stay as glyph fallbacks.
@@ -58,6 +84,10 @@ pub struct Typography {
     pub small: f32,
     /// Section titles, readouts and other small display-face text.
     pub label: f32,
+    /// Multiplier for fixed display-face sizes, since faces differ in size at the same em.
+    pub display_scale: f32,
+    /// Drop shadow offset of display labels as a fraction of their size.
+    pub display_drop: f32,
 }
 
 pub struct Metrics {
@@ -65,14 +95,28 @@ pub struct Metrics {
     pub border: f32,
     /// How far raised buttons stand off their shadow.
     pub lift: f32,
-    /// Offset of the hard shadow behind panels and windows.
+    /// Offset of the shadow behind panels and windows.
     pub shadow: i8,
+    /// Blur of that shadow; 0 gives a hard diagonal pixel shadow.
+    pub shadow_blur: u8,
 }
 
 pub struct Effects {
     pub scanlines: bool,
     pub grid: bool,
     pub stripes: bool,
+    /// Sparks drifting up behind the content; keeps the window repainting while visible.
+    pub embers: bool,
+    pub vignette: bool,
+    pub title_bar: TitleBar,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TitleBar {
+    /// A solid colored band with stripes and three window lights.
+    Striped,
+    /// A dark band with a tinted icon, a fading colored rule and diamond ornaments.
+    Engraved,
 }
 
 impl Skin {
@@ -187,8 +231,8 @@ fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palet
     visuals.window_stroke = Stroke::new(metrics.border + 1.0, palette.outline);
     visuals.window_corner_radius = CornerRadius::ZERO;
     visuals.menu_corner_radius = CornerRadius::ZERO;
-    visuals.window_shadow = hard_shadow(metrics.shadow + 3, palette.outline);
-    visuals.popup_shadow = hard_shadow(metrics.shadow - 1, palette.outline);
+    visuals.window_shadow = drop_shadow(metrics, palette, metrics.shadow + 3);
+    visuals.popup_shadow = drop_shadow(metrics, palette, metrics.shadow - 1);
     visuals.faint_bg_color = palette.raised;
     visuals.extreme_bg_color = palette.sunken;
     visuals.code_bg_color = palette.sunken;
@@ -224,12 +268,21 @@ fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palet
     widgets.open.bg_stroke = Stroke::new(metrics.border, palette.accent);
 }
 
-fn hard_shadow(offset: i8, color: Color32) -> Shadow {
+/// The skin's drop shadow: hard and diagonal without blur, soft and falling straight down with it.
+pub fn drop_shadow(metrics: &Metrics, palette: &Palette, offset: i8) -> Shadow {
+    if metrics.shadow_blur == 0 {
+        return Shadow {
+            offset: [offset, offset],
+            blur: 0,
+            spread: 0,
+            color: palette.outline,
+        };
+    }
     Shadow {
-        offset: [offset, offset],
-        blur: 0,
+        offset: [0, offset],
+        blur: metrics.shadow_blur,
         spread: 0,
-        color,
+        color: palette.outline.gamma_multiply(0.7),
     }
 }
 

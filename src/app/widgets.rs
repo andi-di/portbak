@@ -1,5 +1,5 @@
 use super::pixel::{self, PixelButton};
-use super::sprites;
+use super::sprites::{self, Sprite};
 use super::style::Palette;
 use crate::engine;
 use crate::model::{Job, Record};
@@ -58,7 +58,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
     centered_row(ui, |ui| {
         // Right-to-left so the field takes exactly the width the button leaves.
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let choose = PixelButton::new("Choose folder …").sprite(sprites::FOLDER);
+            let choose = PixelButton::new("Choose folder …").sprite(Sprite::Folder);
             if ui.add(choose).clicked() {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
@@ -78,7 +78,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
 
 pub fn alert(ui: &mut egui::Ui, color: egui::Color32, text: &str) {
     ui.horizontal_top(|ui| {
-        sprites::show(ui, sprites::WARNING, 2.0, color);
+        sprites::show(ui, Sprite::Warning, 2.0, color);
         ui.add(egui::Label::new(egui::RichText::new(text).color(color)).wrap());
     });
 }

@@ -1,14 +1,85 @@
-//! Hand-drawn pixel sprites as text grids, painted as one mesh per sprite.
+//! Icons by meaning; each skin draws them as pixel sprites or engraved vector glyphs.
 //!
+//! Pixel sprites are hand-drawn text grids, painted as one mesh per sprite.
 //! Legend: `.` transparent, `K` outline, `W` paper, `M` metal, `S` shade,
 //! `A` the caller's tint, `Y` gold, `G` good, `R` bad.
 
-use super::style::Palette;
+use super::glyphs;
+use super::style::{Finish, Palette, Skin};
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 
-pub type Sprite = &'static [&'static str];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sprite {
+    Floppy,
+    Folder,
+    Clock,
+    Shield,
+    Trash,
+    Rewind,
+    Play,
+    Chest,
+    Package,
+    Sun,
+    Moon,
+    Monitor,
+    Warning,
+    Power,
+    Check,
+    Cursor,
+    Plus,
+    Gear,
+}
 
-pub const FLOPPY: Sprite = &[
+impl Sprite {
+    #[cfg(test)]
+    pub const ALL: [Sprite; 18] = [
+        Sprite::Floppy,
+        Sprite::Folder,
+        Sprite::Clock,
+        Sprite::Shield,
+        Sprite::Trash,
+        Sprite::Rewind,
+        Sprite::Play,
+        Sprite::Chest,
+        Sprite::Package,
+        Sprite::Sun,
+        Sprite::Moon,
+        Sprite::Monitor,
+        Sprite::Warning,
+        Sprite::Power,
+        Sprite::Check,
+        Sprite::Cursor,
+        Sprite::Plus,
+        Sprite::Gear,
+    ];
+
+    fn bitmap(self) -> Bitmap {
+        match self {
+            Sprite::Floppy => FLOPPY,
+            Sprite::Folder => FOLDER,
+            Sprite::Clock => CLOCK,
+            Sprite::Shield => SHIELD,
+            Sprite::Trash => TRASH,
+            Sprite::Rewind => REWIND,
+            Sprite::Play => PLAY,
+            Sprite::Chest => CHEST,
+            Sprite::Package => PACKAGE,
+            Sprite::Sun => SUN,
+            Sprite::Moon => MOON,
+            Sprite::Monitor => MONITOR,
+            Sprite::Warning => WARNING,
+            Sprite::Power => POWER,
+            Sprite::Check => CHECK,
+            Sprite::Cursor => CURSOR,
+            Sprite::Plus => PLUS,
+            Sprite::Gear => GEAR,
+        }
+    }
+}
+
+type Bitmap = &'static [&'static str];
+
+const FLOPPY: Bitmap = &[
     "KKKKKKKKKKK.",
     "KAAMMMMMAAAK",
     "KAAMKKMMAAAK",
@@ -23,7 +94,7 @@ pub const FLOPPY: Sprite = &[
     "KKKKKKKKKKKK",
 ];
 
-pub const FOLDER: Sprite = &[
+const FOLDER: Bitmap = &[
     ".KKKKK......",
     "KYYYYYKKKKK.",
     "KYYYYYYYYYYK",
@@ -36,7 +107,7 @@ pub const FOLDER: Sprite = &[
     "KKKKKKKKKKKK",
 ];
 
-pub const CLOCK: Sprite = &[
+const CLOCK: Bitmap = &[
     "...KKKKK...",
     "..KWWWWWK..",
     ".KWWWKWWWK.",
@@ -50,7 +121,7 @@ pub const CLOCK: Sprite = &[
     "...KKKKK...",
 ];
 
-pub const SHIELD: Sprite = &[
+const SHIELD: Bitmap = &[
     "KKKKKKKKKKK",
     "KAAAAWAAAAK",
     "KAAAAWAAAAK",
@@ -65,7 +136,7 @@ pub const SHIELD: Sprite = &[
     "....KKK....",
 ];
 
-pub const TRASH: Sprite = &[
+const TRASH: Bitmap = &[
     "...KKKK...",
     "KKKKKKKKKK",
     "KWWWWWWWWK",
@@ -78,7 +149,7 @@ pub const TRASH: Sprite = &[
     ".KKKKKKKK.",
 ];
 
-pub const REWIND: Sprite = &[
+const REWIND: Bitmap = &[
     "....KK....KK",
     "...KAK...KAK",
     "..KAAK..KAAK",
@@ -90,12 +161,12 @@ pub const REWIND: Sprite = &[
     "....KK....KK",
 ];
 
-pub const PLAY: Sprite = &[
+const PLAY: Bitmap = &[
     "KK......", "KAKK....", "KAAAKK..", "KAAAAAKK", "KAAAAAAK", "KAAAAAKK", "KAAAKK..", "KAKK....",
     "KK......",
 ];
 
-pub const CHEST: Sprite = &[
+const CHEST: Bitmap = &[
     ".KKKKKKKKKK.",
     "KYAAAAAAAAYK",
     "KAAAAAAAAAAK",
@@ -107,7 +178,7 @@ pub const CHEST: Sprite = &[
     "KKKKKKKKKKKK",
 ];
 
-pub const PACKAGE: Sprite = &[
+const PACKAGE: Bitmap = &[
     ".KKKKKKKKK.",
     "KAAAAKAAAAK",
     "KKKKKKKKKKK",
@@ -119,7 +190,7 @@ pub const PACKAGE: Sprite = &[
     "KKKKKKKKKKK",
 ];
 
-pub const SUN: Sprite = &[
+const SUN: Bitmap = &[
     ".....Y.....",
     ".Y...Y...Y.",
     "..Y.....Y..",
@@ -133,7 +204,7 @@ pub const SUN: Sprite = &[
     ".....Y.....",
 ];
 
-pub const MOON: Sprite = &[
+const MOON: Bitmap = &[
     "...YYYY....",
     ".YYYY......",
     ".YYY.......",
@@ -145,7 +216,7 @@ pub const MOON: Sprite = &[
     "...YYYYY...",
 ];
 
-pub const MONITOR: Sprite = &[
+const MONITOR: Bitmap = &[
     "KKKKKKKKKKKK",
     "KMMMMMMMMMMK",
     "KMKKKKKKKKMK",
@@ -159,7 +230,7 @@ pub const MONITOR: Sprite = &[
     "..KKKKKKKK..",
 ];
 
-pub const WARNING: Sprite = &[
+const WARNING: Bitmap = &[
     ".....K.....",
     "....KYK....",
     "....KYK....",
@@ -172,7 +243,7 @@ pub const WARNING: Sprite = &[
     "KKKKKKKKKKK",
 ];
 
-pub const POWER: Sprite = &[
+const POWER: Bitmap = &[
     ".....AA.....",
     "..A..AA..A..",
     ".AA..AA..AA.",
@@ -184,13 +255,13 @@ pub const POWER: Sprite = &[
     "...AAAAAA...",
 ];
 
-pub const CHECK: Sprite = &[
+const CHECK: Bitmap = &[
     "......A", ".....AA", "A...AA.", "AA.AA..", ".AAA...", "..A....",
 ];
 
-pub const CURSOR: Sprite = &["A...", "AA..", "AAA.", "AAAA", "AAA.", "AA..", "A..."];
+const CURSOR: Bitmap = &["A...", "AA..", "AAA.", "AAAA", "AAA.", "AA..", "A..."];
 
-pub const PLUS: Sprite = &[
+const PLUS: Bitmap = &[
     "...KKKK...",
     "...KAAK...",
     "...KAAK...",
@@ -203,7 +274,7 @@ pub const PLUS: Sprite = &[
     "...KKKK...",
 ];
 
-pub const GEAR: Sprite = &[
+const GEAR: Bitmap = &[
     "....KKK....",
     ".KK.KMK.KK.",
     ".KMKKMKKMK.",
@@ -217,17 +288,46 @@ pub const GEAR: Sprite = &[
     "....KKK....",
 ];
 
-pub fn size(sprite: Sprite, scale: f32) -> Vec2 {
-    let width = sprite.first().map_or(0, |row| row.len());
-    egui::vec2(width as f32, sprite.len() as f32) * scale
+pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
+    let grid = match Skin::of(ctx).finish {
+        Finish::Pixel => {
+            let bitmap = sprite.bitmap();
+            let width = bitmap.first().map_or(0, |row| row.len());
+            egui::vec2(width as f32, bitmap.len() as f32)
+        }
+        Finish::Engraved => glyphs::grid(sprite),
+    };
+    grid * scale
 }
 
-/// Paints the sprite with its top-left corner at `origin`, snapped to whole pixels.
+/// Paints the icon with its top-left corner at `origin`, snapped to whole pixels.
 pub fn paint(painter: &egui::Painter, origin: Pos2, sprite: Sprite, scale: f32, tint: Color32) {
-    let palette = Palette::of_ctx(painter.ctx());
+    paint_awake(painter, origin, sprite, scale, tint, 0.0);
+}
+
+/// Like `paint`, with `wake` from 0 to 1 bringing engraved icons to life, e.g. while hovered.
+pub fn paint_awake(
+    painter: &egui::Painter,
+    origin: Pos2,
+    sprite: Sprite,
+    scale: f32,
+    tint: Color32,
+    wake: f32,
+) {
     let origin = origin.round();
+    match Skin::of(painter.ctx()).finish {
+        Finish::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
+        Finish::Engraved => {
+            let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
+            glyphs::paint(painter, rect, sprite, tint, wake);
+        }
+    }
+}
+
+fn paint_bitmap(painter: &egui::Painter, origin: Pos2, bitmap: Bitmap, scale: f32, tint: Color32) {
+    let palette = Palette::of_ctx(painter.ctx());
     let mut mesh = egui::Mesh::default();
-    for (y, row) in sprite.iter().enumerate() {
+    for (y, row) in bitmap.iter().enumerate() {
         for (x, cell) in row.chars().enumerate() {
             let Some(color) = cell_color(cell, palette, tint) else {
                 continue;
@@ -248,7 +348,7 @@ pub fn paint_centered(
 ) {
     paint(
         painter,
-        center - size(sprite, scale) / 2.0,
+        center - size(painter.ctx(), sprite, scale) / 2.0,
         sprite,
         scale,
         tint,
@@ -257,8 +357,20 @@ pub fn paint_centered(
 
 /// Allocates room for the sprite in the layout and paints it.
 pub fn show(ui: &mut egui::Ui, sprite: Sprite, scale: f32, tint: Color32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(size(sprite, scale), egui::Sense::hover());
-    paint(ui.painter(), rect.min, sprite, scale, tint);
+    show_awake(ui, sprite, scale, tint, 0.0)
+}
+
+/// Like `show`, with `wake` as in `paint_awake`.
+pub fn show_awake(
+    ui: &mut egui::Ui,
+    sprite: Sprite,
+    scale: f32,
+    tint: Color32,
+    wake: f32,
+) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(size(ui.ctx(), sprite, scale), egui::Sense::hover());
+    paint_awake(ui.painter(), rect.min, sprite, scale, tint, wake);
     response
 }
 
@@ -280,16 +392,12 @@ fn cell_color(cell: char, palette: &Palette, tint: Color32) -> Option<Color32> {
 mod tests {
     use super::*;
 
-    const ALL: [Sprite; 18] = [
-        FLOPPY, FOLDER, CLOCK, SHIELD, TRASH, REWIND, PLAY, CHEST, PACKAGE, SUN, MOON, MONITOR,
-        WARNING, POWER, CHECK, CURSOR, PLUS, GEAR,
-    ];
-
     #[test]
     fn sprites_are_rectangular_and_use_known_colors() {
-        for sprite in ALL {
-            let width = sprite[0].len();
-            for row in sprite {
+        for sprite in Sprite::ALL {
+            let bitmap = sprite.bitmap();
+            let width = bitmap[0].len();
+            for row in bitmap {
                 assert_eq!(row.len(), width, "ragged sprite row {row:?}");
                 for cell in row.chars() {
                     assert!(
