@@ -264,18 +264,20 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             .desired_width(ui.available_width().min(420.0))
             .margin(egui::vec2(8.0, 4.0)),
     );
-    ui.add_space(6.0);
+    ui.add_space(ui.spacing().item_spacing.y);
     path_picker(ui, "Source folder", &mut job.source);
-    ui.add_space(6.0);
-    ui.add(PixelCheckbox::new(
-        &mut job.auto_destination,
-        "Auto destination folder",
-    ));
+    ui.add_space(ui.spacing().item_spacing.y);
+    centered_row(ui, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut job.auto_destination,
+            "Auto destination folder",
+        ));
+    });
     if path_picker(ui, "Destination folder", &mut job.target) {
         job.auto_destination = false;
     }
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
+    ui.add_space(ui.spacing().item_spacing.y);
+    centered_row(ui, |ui| {
         ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
         let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
         sprites::show(ui, Sprite::Package, 2.0, tint);
@@ -297,10 +299,12 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let palette = Palette::of(ui);
     let before = schedule_key(job);
-    ui.add(PixelCheckbox::new(
-        &mut job.check_on_enable,
-        "Check immediately when enabled",
-    ));
+    centered_row(ui, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut job.check_on_enable,
+            "Check immediately when enabled",
+        ));
+    });
     schedule_controls(ui, job);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
@@ -428,10 +432,12 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
 
 fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
     let palette = Palette::of(ui);
-    ui.add(PixelCheckbox::new(
-        &mut job.rolling,
-        "Enable rolling retention – delete oldest backups automatically",
-    ));
+    centered_row(ui, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut job.rolling,
+            "Enable rolling retention – delete oldest backups automatically",
+        ));
+    });
     ui.add_enabled_ui(job.rolling, |ui| {
         ui.indent("limits", |ui| {
             optional_limit(
@@ -459,11 +465,13 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     }
                 },
             );
-            ui.add(PixelCheckbox::new(
-                &mut job.count_protected,
-                "Count protected backups toward retention limits",
-            ))
-            .on_hover_text("Protected backups are never deleted by retention");
+            centered_row(ui, |ui| {
+                ui.add(PixelCheckbox::new(
+                    &mut job.count_protected,
+                    "Count protected backups toward retention limits",
+                ))
+                .on_hover_text("Protected backups are never deleted by retention");
+            });
         });
     });
     ui.horizontal(|ui| {
