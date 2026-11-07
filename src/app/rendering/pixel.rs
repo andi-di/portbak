@@ -39,6 +39,7 @@ pub struct FaceLook {
 pub struct PixelButton {
     label: String,
     sprite: Option<Sprite>,
+    icon_only: bool,
     tone: Tone,
     selected: bool,
     min_size: Vec2,
@@ -49,6 +50,7 @@ impl PixelButton {
         Self {
             label: label.into(),
             sprite: None,
+            icon_only: false,
             tone: Tone::Plain,
             selected: false,
             min_size: Vec2::ZERO,
@@ -57,6 +59,11 @@ impl PixelButton {
 
     pub fn sprite(mut self, sprite: Sprite) -> Self {
         self.sprite = Some(sprite);
+        self
+    }
+
+    pub fn icon_only(mut self) -> Self {
+        self.icon_only = true;
         self
     }
 
@@ -93,7 +100,11 @@ impl Widget for PixelButton {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
         let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
-        let text = style::cased(ui.ctx(), &self.label);
+        let text = if self.icon_only {
+            String::new()
+        } else {
+            style::cased(ui.ctx(), &self.label)
+        };
         let font = TextStyle::Button.resolve(ui.style());
         let galley = ui
             .painter()
@@ -120,7 +131,7 @@ impl Widget for PixelButton {
         let (rect, response) = ui.allocate_exact_size(face_size + margin, Sense::click());
         let enabled = ui.is_enabled();
         response.widget_info(|| {
-            WidgetInfo::selected(WidgetType::Button, enabled, self.selected, &text)
+            WidgetInfo::selected(WidgetType::Button, enabled, self.selected, &self.label)
         });
         if !ui.is_rect_visible(rect) {
             return response;

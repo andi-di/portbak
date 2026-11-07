@@ -88,9 +88,10 @@ impl App {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let settings = PixelButton::new("Settings")
+                            .icon_only()
                             .sprite(Sprite::Gear)
                             .selected(self.settings_open);
-                        if ui.add(settings).clicked() {
+                        if ui.add(settings).on_hover_text("Settings").clicked() {
                             self.settings_open = !self.settings_open;
                         }
                         let dark = self.config.theme == Theme::Dark;
@@ -100,7 +101,7 @@ impl App {
                             ("Dark", Sprite::Moon)
                         };
                         if ui
-                            .add(PixelButton::new(label).sprite(sprite))
+                            .add(PixelButton::new(label).sprite(sprite).icon_only())
                             .on_hover_text(format!("Switch to {label} mode"))
                             .clicked()
                         {

@@ -72,19 +72,26 @@ pub fn path_picker_with_auto(
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some((active, can_enable)) = auto {
                 let button = PixelButton::new("Auto updates")
+                    .icon_only()
                     .sprite(Sprite::Rewind)
                     .selected(active);
+                let tooltip = if active {
+                    "Auto updates enabled"
+                } else if can_enable {
+                    "Enable automatic destination updates"
+                } else {
+                    "Choose a source folder to enable automatic destination updates"
+                };
                 enable_auto = ui
                     .add_enabled(!active && can_enable, button)
-                    .on_hover_text(if active {
-                        "Automatic destination updates are enabled"
-                    } else {
-                        "Use the automatic destination and follow name/source changes"
-                    })
+                    .on_hover_text(tooltip)
+                    .on_disabled_hover_text(tooltip)
                     .clicked();
             }
-            let choose = PixelButton::new("Choose folder …").sprite(Sprite::Folder);
-            if ui.add(choose).clicked() {
+            let choose = PixelButton::new("Choose folder …")
+                .sprite(Sprite::Folder)
+                .icon_only();
+            if ui.add(choose).on_hover_text("Choose folder").clicked() {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
                     changed = true;
