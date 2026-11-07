@@ -27,12 +27,15 @@ pub static DARK_FANTASY: Skin = Skin {
         display_scale: 1.4,
         // A hairline engraving; a deep hard shadow would double the thin serifs.
         display_drop: 0.03,
+        display_glow: 0.0,
+        capitals: true,
     },
     metrics: Metrics {
         border: 1.0,
         lift: 2.0,
         shadow: 6,
         shadow_blur: 20,
+        radius: 0,
     },
     effects: Effects {
         scanlines: false,
@@ -40,6 +43,9 @@ pub static DARK_FANTASY: Skin = Skin {
         stripes: false,
         embers: true,
         vignette: true,
+        wallpaper: false,
+        bubbles: false,
+        opacity: 1.0,
         title_bar: TitleBar::Engraved,
     },
     finish: Finish::Engraved,
@@ -74,6 +80,7 @@ const ABYSS: Palette = Palette {
     metal: Color32::from_rgb(0x8c, 0x8a, 0x90),
     paper: Color32::from_rgb(0xf5, 0xe9, 0xd6),
     scanline: Color32::TRANSPARENT,
+    sky: Color32::from_rgb(0x0b, 0x09, 0x09),
     vignette: Color32::from_rgba_premultiplied(0, 0, 0, 190),
 };
 
@@ -97,6 +104,7 @@ const PARCHMENT: Palette = Palette {
     metal: Color32::from_rgb(0x8a, 0x85, 0x80),
     paper: Color32::from_rgb(0xfa, 0xf5, 0xea),
     scanline: Color32::TRANSPARENT,
+    sky: Color32::from_rgb(0xd6, 0xcb, 0xb6),
     // Premultiplied scorched brown, darkening the parchment edges like old burns.
     vignette: Color32::from_rgba_premultiplied(0x1e, 0x0c, 0x05, 0x64),
 };

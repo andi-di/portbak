@@ -1,23 +1,13 @@
 //! Forged-iron widget faces for engraved skins: chamfered plates and thorned check box sockets.
 
-use super::pixel::mix;
+use super::pixel::{mix, shaded_polygon, FaceLook};
 use super::style::Palette;
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, Shape, Stroke, Vec2};
 
 const CURVE_STEPS: u32 = 6;
 
-/// How a plate should look in its current interaction state.
-pub struct PlateLook {
-    pub fill: Color32,
-    pub enabled: bool,
-    pub pressed: bool,
-    /// Hover glow from 0 (none) to 1 (full).
-    pub glow: f32,
-    pub focused: bool,
-}
-
 /// A chamfered, gradient-lit plate with a gilded inner line, a soft shadow and an ember glow.
-pub fn plate(painter: &egui::Painter, face: Rect, look: &PlateLook) {
+pub fn plate(painter: &egui::Painter, face: Rect, look: &FaceLook) {
     let palette = Palette::of_ctx(painter.ctx());
     painter.add(soft_shadow(face, palette));
     if look.glow > 0.0 {
@@ -169,17 +159,7 @@ fn gradient_polygon(
             ((y - bounds.top()) / bounds.height()).clamp(0.0, 1.0),
         )
     };
-    let center = bounds.center();
-    let mut mesh = Mesh::default();
-    mesh.colored_vertex(center, shade(center.y));
-    for point in points {
-        mesh.colored_vertex(*point, shade(point.y));
-    }
-    let count = points.len() as u32;
-    for index in 0..count {
-        mesh.add_triangle(0, index + 1, (index + 1) % count + 1);
-    }
-    painter.add(mesh);
+    painter.add(shaded_polygon(points, |point| shade(point.y)));
 }
 
 #[cfg(test)]

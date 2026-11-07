@@ -1,3 +1,4 @@
+use super::glass::{self, Tint};
 use super::ornaments;
 use super::pixel::{self, PixelButton, Tone};
 use super::skins;
@@ -29,6 +30,7 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        pixel::paint_underlay(&ctx);
         let before = self.config.clone();
         self.show_header(ui);
         self.show_footer(ui);
@@ -58,18 +60,17 @@ impl App {
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame = egui::Frame::new()
-            .fill(palette.surface)
-            .inner_margin(egui::Margin {
-                left: 20,
-                right: 20,
-                top: 14,
-                bottom: 0,
-            });
+        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: 0,
+        });
         egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
+                pixel::panel_glass(ui, 1.9);
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -84,6 +85,10 @@ impl App {
                 ui.add_space(12.0);
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
+                if Skin::of(ui.ctx()).finish == Finish::Glass {
+                    ui.add_space(8.0);
+                    return;
+                }
                 if !Skin::of(ui.ctx()).effects.stripes {
                     let rule = egui::Rect::from_min_max(
                         egui::pos2(clip.left(), top),
@@ -114,17 +119,19 @@ impl App {
     fn show_footer(&self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame = egui::Frame::new()
-            .fill(palette.sunken)
-            .inner_margin(egui::Margin::symmetric(18, 8));
+        let frame =
+            pixel::panel_frame(&ctx, palette.sunken).inner_margin(egui::Margin::symmetric(18, 10));
         egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                let clip = ui.clip_rect();
-                let rule =
-                    egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
-                ui.painter().rect_filled(rule, 0.0, palette.outline);
+                pixel::panel_glass(ui, 1.0);
+                if Skin::of(ui.ctx()).finish != Finish::Glass {
+                    let clip = ui.clip_rect();
+                    let rule =
+                        egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
+                    ui.painter().rect_filled(rule, 0.0, palette.outline);
+                }
                 let wording = &Skin::of(ui.ctx()).wording;
                 ui.horizontal(|ui| {
                     if self.active.is_some() {
@@ -156,19 +163,18 @@ impl App {
     fn show_job_list(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame = egui::Frame::new()
-            .fill(palette.surface)
-            .inner_margin(egui::Margin {
-                left: 16,
-                right: 14,
-                top: 16,
-                bottom: 8,
-            });
+        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
+            left: 16,
+            right: 14,
+            top: 16,
+            bottom: 8,
+        });
         let panel = egui::Panel::left("jobs")
             .default_size(self.config.sidebar_width.clamp(240.0, 460.0))
             .size_range(240.0..=460.0)
             .frame(frame)
             .show_inside(ui, |ui| {
+                pixel::panel_glass(ui, 1.0);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(ui, "JOBS", 16.0, palette.accent);
@@ -221,6 +227,7 @@ impl App {
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         let width = ui.available_width() - CARD_SHADOW;
+        let mut lamp = egui::Rect::NOTHING;
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
@@ -245,7 +252,7 @@ impl App {
                                 (false, true) => (palette.good, true),
                                 (false, false) => (palette.dim, false),
                             };
-                            pixel::led(ui, color, lit).on_hover_text(self.activity(job));
+                            lamp = pixel::led(ui, color, lit).rect;
                             ui.label(egui::RichText::new(self.activity(job)).small());
                             if self.queue.contains(&job.id) {
                                 pixel::badge(ui, "Queued", palette.hot);
@@ -282,6 +289,7 @@ impl App {
         let response = ui
             .interact(rect, card_id, egui::Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand);
+        pixel::tooltip(ui, lamp, card_id.with("lamp"), self.activity(job));
         ui.painter().set(
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),
@@ -354,6 +362,14 @@ fn card_shapes(
     selected: bool,
     hovered: bool,
 ) -> Vec<egui::Shape> {
+    if Skin::of(ctx).finish == Finish::Glass {
+        let tint = match (selected, hovered) {
+            (true, _) => Tint::Current,
+            (false, true) => Tint::Hover,
+            (false, false) => Tint::Rest,
+        };
+        return glass::tile(ctx, rect, tint);
+    }
     let palette = palette_of(ctx);
     let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);
     let fill = match (selected, hovered) {
@@ -367,10 +383,10 @@ fn card_shapes(
         palette.outline
     };
     let modern = Skin::of(ctx).finish == Finish::Modern;
-    let radius = style::radius(ctx, 10);
+    let radius = style::panel_radius(ctx);
     let mut shapes = vec![
         shadow.as_shape(rect, radius).into(),
-        egui::Shape::rect_filled(rect, radius, fill),
+        egui::Shape::rect_filled(rect, radius, style::glazed(ctx, fill)),
         egui::Shape::rect_stroke(
             rect,
             radius,

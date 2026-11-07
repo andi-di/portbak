@@ -1,12 +1,18 @@
 //! Registry of available skins. A new look is one more `Skin` value listed in `ALL`.
 
 mod dark_fantasy;
+mod frutiger_aero;
 mod modern;
 mod retro;
 
 use super::style::Skin;
 
-pub static ALL: &[&Skin] = &[&retro::RETRO, &dark_fantasy::DARK_FANTASY, &modern::MODERN];
+pub static ALL: &[&Skin] = &[
+    &retro::RETRO,
+    &dark_fantasy::DARK_FANTASY,
+    &modern::MODERN,
+    &frutiger_aero::FRUTIGER_AERO,
+];
 
 pub fn default() -> &'static Skin {
     ALL[0]
@@ -31,5 +37,14 @@ mod tests {
             assert!(std::ptr::eq(find(skin.id), *skin));
         }
         assert!(std::ptr::eq(find("no-such-skin"), default()));
+    }
+
+    #[test]
+    fn translucent_skins_paint_a_wallpaper_behind_their_panels() {
+        for skin in ALL {
+            let opacity = skin.effects.opacity;
+            assert!((0.0..=1.0).contains(&opacity), "skin {}", skin.id);
+            assert!(opacity == 1.0 || skin.effects.wallpaper, "skin {}", skin.id);
+        }
     }
 }

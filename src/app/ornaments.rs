@@ -150,12 +150,12 @@ fn diamond(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
 }
 
 /// `color` with its opacity scaled by `strength` in 0..=1.
-fn fade(color: Color32, strength: f32) -> Color32 {
+pub fn fade(color: Color32, strength: f32) -> Color32 {
     color.gamma_multiply(strength.clamp(0.0, 1.0))
 }
 
-/// A stable pseudo-random value in 0..1, so every ember keeps its own path between frames.
-fn noise(index: u32, salt: u32) -> f32 {
+/// A stable pseudo-random value in 0..1, so every particle keeps its own path between frames.
+pub fn noise(index: u32, salt: u32) -> f32 {
     let mut value = index.wrapping_mul(0x9e37_79b9) ^ salt.wrapping_mul(0x85eb_ca6b);
     value ^= value >> 15;
     value = value.wrapping_mul(0x2c1b_3c6d);

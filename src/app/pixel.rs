@@ -1,6 +1,8 @@
 //! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
 
+use super::aurora;
 use super::forge;
+use super::glass::{self, Glaze};
 use super::ornaments;
 use super::sprites::{self, Sprite};
 use super::style::{self, label_font, Finish, Palette, Skin, TitleBar};
@@ -19,6 +21,18 @@ pub enum Tone {
     Accent,
     Good,
     Danger,
+}
+
+/// How a button face should look in its current interaction state.
+pub struct FaceLook {
+    pub fill: Color32,
+    pub enabled: bool,
+    pub pressed: bool,
+    /// Hover glow from 0 (none) to 1 (full).
+    pub glow: f32,
+    pub focused: bool,
+    /// A plain face, which the glass finish renders as clear glass instead of a colored gel.
+    pub clear: bool,
 }
 
 /// A chunky beveled push button; `selected` renders it latched down like a toggle key.
@@ -79,11 +93,7 @@ impl Widget for PixelButton {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
         let modern = Skin::of(ui.ctx()).finish == Finish::Modern;
-        let text = if modern {
-            self.label.clone()
-        } else {
-            self.label.to_uppercase()
-        };
+        let text = style::cased(ui.ctx(), &self.label);
         let font = TextStyle::Button.resolve(ui.style());
         let galley = ui
             .painter()
@@ -98,12 +108,12 @@ impl Widget for PixelButton {
         };
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
         let padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
-        let engraved = Skin::of(ui.ctx()).finish == Finish::Engraved;
-        // Engraved plates press straight down, so they only need room below.
-        let margin = if engraved {
-            Vec2::new(0.0, m.lift)
-        } else {
+        let finish = Skin::of(ui.ctx()).finish;
+        // Plates and gels press straight down, so they only need room below.
+        let margin = if finish == Finish::Pixel {
             Vec2::splat(m.lift)
+        } else {
+            Vec2::new(0.0, m.lift)
         };
         // `min_size` bounds the whole footprint, so a full-width button cannot widen its panel.
         let face_size = (content + padding * 2.0).max(self.min_size - margin);
@@ -143,19 +153,7 @@ impl Widget for PixelButton {
             let face = Rect::from_min_size(rect.min, face_size);
             super::modern::control(painter, face, fill, response.has_focus(), enabled);
             face
-        } else if engraved {
-            let press = Vec2::new(0.0, if sunk { 1.0 } else { 0.0 });
-            let face = Rect::from_min_size(rect.min + press, face_size);
-            let look = forge::PlateLook {
-                fill,
-                enabled,
-                pressed: sunk,
-                glow,
-                focused: response.has_focus(),
-            };
-            forge::plate(painter, face, &look);
-            face
-        } else {
+        } else if finish == Finish::Pixel {
             let offset = if sunk {
                 Vec2::splat(m.lift)
             } else {
@@ -163,6 +161,23 @@ impl Widget for PixelButton {
             };
             let face = Rect::from_min_size(rect.min + offset, face_size);
             pixel_face(painter, face, fill, sunk, enabled, response.has_focus());
+            face
+        } else {
+            let press = Vec2::new(0.0, if sunk { 1.0 } else { 0.0 });
+            let face = Rect::from_min_size(rect.min + press, face_size);
+            let look = FaceLook {
+                fill,
+                enabled,
+                pressed: sunk,
+                glow,
+                focused: response.has_focus(),
+                clear: self.tone == Tone::Plain && !self.selected,
+            };
+            if finish == Finish::Glass {
+                glass::gel_button(painter, face, &look);
+            } else {
+                forge::plate(painter, face, &look);
+            }
             face
         };
         let ink = if modern && self.tone == Tone::Plain && !self.selected {
@@ -286,30 +301,33 @@ impl Widget for PixelCheckbox<'_> {
             (true, true) => palette.accent,
             (true, false) => palette.outline,
         };
-        if Skin::of(ui.ctx()).finish == Finish::Modern {
-            let fill = if checked {
-                palette.accent
-            } else {
-                palette.sunken
-            };
-            super::modern::control(painter, square, fill, response.has_focus(), enabled);
-        } else if Skin::of(ui.ctx()).finish == Finish::Engraved {
-            forge::spiked_socket(painter, square, border);
-        } else {
-            painter.rect_filled(square, 0.0, palette.sunken);
-            bevel(
-                painter,
-                square.shrink(m.border),
-                palette.sunken,
-                true,
-                m.border,
-            );
-            painter.rect_stroke(
-                square,
-                0.0,
-                Stroke::new(m.border, border),
-                StrokeKind::Inside,
-            );
+        match Skin::of(ui.ctx()).finish {
+            Finish::Pixel => {
+                painter.rect_filled(square, 0.0, palette.sunken);
+                bevel(
+                    painter,
+                    square.shrink(m.border),
+                    palette.sunken,
+                    true,
+                    m.border,
+                );
+                painter.rect_stroke(
+                    square,
+                    0.0,
+                    Stroke::new(m.border, border),
+                    StrokeKind::Inside,
+                );
+            }
+            Finish::Modern => {
+                let fill = if checked {
+                    palette.accent
+                } else {
+                    palette.sunken
+                };
+                super::modern::control(painter, square, fill, response.has_focus(), enabled);
+            }
+            Finish::Engraved => forge::spiked_socket(painter, square, border),
+            Finish::Glass => glass::check_socket(painter, square, border),
         }
         if checked {
             let tint = if Skin::of(ui.ctx()).finish == Finish::Modern && enabled {
@@ -371,32 +389,42 @@ pub fn section<R>(
 ) -> R {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
-    let shadow = style::drop_shadow(m, palette, m.shadow);
-    egui::Frame::new()
-        .fill(palette.surface)
-        .corner_radius(style::radius(ui.ctx(), 10))
-        .stroke(Stroke::new(m.border, palette.outline))
-        .shadow(shadow)
-        .outer_margin(egui::Margin {
-            left: 0,
-            top: 0,
-            right: m.shadow,
-            bottom: m.shadow + 6,
-        })
-        .show(ui, |ui| {
-            ui.set_min_width(ui.available_width());
-            ui.spacing_mut().item_spacing.y = 0.0;
-            title_bar(ui, title, sprite, band);
-            egui::Frame::new()
-                .inner_margin(egui::Margin::symmetric(16, 12))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 7.0;
-                    ui.set_min_width(ui.available_width());
-                    contents(ui)
-                })
-                .inner
-        })
-        .inner
+    let glassy = Skin::of(ui.ctx()).finish == Finish::Glass;
+    let margin = egui::Margin {
+        left: 0,
+        top: 0,
+        right: m.shadow,
+        bottom: m.shadow + 6,
+    };
+    let backing = ui.painter().add(egui::Shape::Noop);
+    let mut frame = egui::Frame::new()
+        .corner_radius(style::panel_radius(ui.ctx()))
+        .outer_margin(margin);
+    if !glassy {
+        frame = frame
+            .fill(style::glazed(ui.ctx(), palette.surface))
+            .stroke(Stroke::new(m.border, palette.outline))
+            .shadow(style::drop_shadow(m, palette, m.shadow));
+    }
+    let framed = frame.show(ui, |ui| {
+        ui.set_min_width(ui.available_width());
+        ui.spacing_mut().item_spacing.y = 0.0;
+        title_bar(ui, title, sprite, band);
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(16, 12))
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 7.0;
+                ui.set_min_width(ui.available_width());
+                contents(ui)
+            })
+            .inner
+    });
+    if glassy {
+        let rect = framed.response.rect - egui::epaint::MarginF32::from(margin);
+        let pane = glass::pane(ui.ctx(), rect, m.radius as f32, &Glaze::clear(ui.ctx()));
+        ui.painter().set(backing, pane);
+    }
+    framed.inner
 }
 
 pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
@@ -404,6 +432,7 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
         TitleBar::Modern => super::modern::title_bar(ui, title, sprite),
         TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
         TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
+        TitleBar::Glass => aurora::glass_title_bar(ui, title, sprite, band),
     }
 }
 
@@ -459,32 +488,66 @@ fn striped_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color
     }
 }
 
-/// Text in the display face with a hard drop shadow; `size` is scaled by the skin.
+/// Text in the display face with the skin's drop shadow or halo; `size` is scaled by the skin.
 pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
     let typography = &Skin::of(ui.ctx()).typography;
     let size = size * typography.display_scale;
-    let galley =
-        ui.painter()
-            .layout_no_wrap(text.to_owned(), style::face_font(ui.ctx(), size), color);
+    let font = style::face_font(ui.ctx(), size);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_owned(), font.clone(), color);
     let drop = (size * typography.display_drop).round();
-    let (rect, response) =
-        ui.allocate_exact_size(galley.size() + Vec2::splat(drop), Sense::hover());
+    let glow = typography.display_glow;
+    let (rect, response) = ui.allocate_exact_size(
+        galley.size() + Vec2::splat(drop + glow * 2.0),
+        Sense::hover(),
+    );
     let painter = ui.painter();
+    let origin = (rect.min + Vec2::splat(glow)).round();
     if drop > 0.0 {
-        let shadow = painter.layout_no_wrap(
-            text.to_owned(),
-            style::face_font(ui.ctx(), size),
-            palette.outline,
-        );
-        painter.galley(
-            rect.min.round() + Vec2::splat(drop),
-            shadow,
-            palette.outline,
-        );
+        let shadow = painter.layout_no_wrap(text.to_owned(), font.clone(), palette.outline);
+        painter.galley(origin + Vec2::splat(drop), shadow, palette.outline);
     }
-    painter.galley(rect.min.round(), galley, color);
+    halo(painter, origin, text, &font, glow);
+    painter.galley(origin, galley, color);
     response
+}
+
+/// Body text with the skin's halo behind it, like captions glowing on Aero glass.
+pub fn glowing_label(ui: &mut egui::Ui, text: &str, color: Color32) -> Response {
+    let glow = Skin::of(ui.ctx()).typography.display_glow;
+    let font = TextStyle::Body.resolve(ui.style());
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_owned(), font.clone(), color);
+    let (rect, response) = ui.allocate_exact_size(galley.size(), Sense::hover());
+    let origin = rect.min.round();
+    halo(ui.painter(), origin, text, &font, glow);
+    ui.painter().galley(origin, galley, color);
+    response
+}
+
+/// A soft halo of `radius` pixels around text, lifting it off a busy backdrop: light behind the
+/// dark ink of light palettes, dark behind the light ink of dark ones. 0 paints nothing.
+pub fn halo(painter: &egui::Painter, origin: Pos2, text: &str, font: &egui::FontId, radius: f32) {
+    const RAYS: usize = 8;
+    if radius <= 0.0 {
+        return;
+    }
+    let palette = Palette::of_ctx(painter.ctx());
+    let glow = if luma(palette.ink) > 140.0 {
+        palette.outline
+    } else {
+        Color32::WHITE
+    };
+    let galley = painter.layout_no_wrap(text.to_owned(), font.clone(), glow.gamma_multiply(0.2));
+    for ring in [radius, radius * 0.5] {
+        for ray in 0..RAYS {
+            let offset = Vec2::angled(ray as f32 * std::f32::consts::TAU / RAYS as f32) * ring;
+            painter.galley(origin + offset, galley.clone(), glow);
+        }
+    }
 }
 
 /// A small framed tag such as QUEUED or PROTECTED.
@@ -497,17 +560,25 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
         readable_on(fill, palette)
     };
     let font = TextStyle::Small.resolve(ui.style());
-    let galley = ui.painter().layout_no_wrap(text.to_uppercase(), font, ink);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(style::cased(ui.ctx(), text), font, ink);
     let padding = egui::vec2(6.0, 0.0);
     let (rect, response) = ui.allocate_exact_size(
         galley.size() + padding * 2.0 + Vec2::splat(m.border * 2.0),
         Sense::hover(),
     );
     let painter = ui.painter();
-    painter.rect_filled(rect, style::radius(ui.ctx(), 6), fill);
+    if Skin::of(ui.ctx()).finish == Finish::Glass {
+        glass::pill(painter, rect, fill);
+        painter.galley(rect.min + padding + Vec2::splat(m.border), galley, ink);
+        return response;
+    }
+    let radius = style::control_radius(ui.ctx());
+    painter.rect_filled(rect, radius, fill);
     painter.rect_stroke(
         rect,
-        style::radius(ui.ctx(), 6),
+        radius,
         Stroke::new(m.border, palette.outline),
         StrokeKind::Inside,
     );
@@ -526,13 +597,20 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     } else {
         mix(color, palette.outline, 0.7)
     };
-    if Skin::of(ui.ctx()).finish == Finish::Modern {
-        painter.circle_filled(rect.center(), 4.0, fill);
-        return response;
-    }
-    if Skin::of(ui.ctx()).finish == Finish::Engraved {
-        ornaments::diamond_lamp(painter, rect, fill, lit);
-        return response;
+    match Skin::of(ui.ctx()).finish {
+        Finish::Pixel => {}
+        Finish::Modern => {
+            painter.circle_filled(rect.center(), 4.0, fill);
+            return response;
+        }
+        Finish::Engraved => {
+            ornaments::diamond_lamp(painter, rect, fill, lit);
+            return response;
+        }
+        Finish::Glass => {
+            glass::orb(painter, rect.center(), rect.width() / 2.0 - 0.5, fill, lit);
+            return response;
+        }
     }
     painter.rect_filled(rect, 0.0, fill);
     painter.rect_stroke(
@@ -560,6 +638,11 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 18.0), Sense::hover());
     let painter = ui.painter();
+    ui.ctx().request_repaint_after(MARQUEE_FRAME);
+    if Skin::of(ui.ctx()).finish == Finish::Glass {
+        glass::progress(painter, rect, color, ui.input(|input| input.time));
+        return response;
+    }
     painter.rect_filled(rect, 0.0, palette.sunken);
     painter.rect_stroke(
         rect,
@@ -583,7 +666,6 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
             fill,
         );
     }
-    ui.ctx().request_repaint_after(MARQUEE_FRAME);
     response
 }
 
@@ -608,6 +690,45 @@ pub fn stripes(painter: &egui::Painter, rect: Rect, palette: &Palette) {
             egui::pos2(rect.right(), top + band),
         );
         painter.rect_filled(strip, 0.0, color);
+    }
+}
+
+/// The frame of a side, top or bottom panel; glass skins paint their own pane instead of a fill.
+pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
+    if Skin::of(ctx).finish == Finish::Glass {
+        egui::Frame::new()
+    } else {
+        egui::Frame::new().fill(style::glazed(ctx, fill))
+    }
+}
+
+/// A floating glass slab behind a panel's contents in glass skins; call first inside the panel.
+/// `density` scales the skin's panel opacity, e.g. to keep text legible over a dark sky.
+pub fn panel_glass(ui: &egui::Ui, density: f32) {
+    const INSET: f32 = 6.0;
+    let ctx = ui.ctx();
+    if Skin::of(ctx).finish != Finish::Glass {
+        return;
+    }
+    let rect = ui.clip_rect().shrink(INSET);
+    let radius = style::metrics(ctx).radius as f32 + 4.0;
+    let clear = Glaze::clear(ctx);
+    let glaze = Glaze {
+        opacity: (clear.opacity * density).min(1.0),
+        ..clear
+    };
+    ui.painter().extend(glass::pane(ctx, rect, radius, &glaze));
+}
+
+/// The skin's backdrop behind every panel; call before showing any panel.
+pub fn paint_underlay(ctx: &egui::Context) {
+    let effects = &Skin::of(ctx).effects;
+    let palette = Palette::of_ctx(ctx);
+    if effects.wallpaper {
+        aurora::paint_wallpaper(ctx, palette);
+    }
+    if effects.bubbles {
+        aurora::paint_bubbles(ctx, palette);
     }
 }
 
@@ -679,32 +800,113 @@ pub fn dialog<R>(
     contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> Option<R> {
     paint_backdrop(ctx);
-    let frame = egui::Frame::window(&ctx.global_style()).inner_margin(0);
+    let glassy = Skin::of(ctx).finish == Finish::Glass;
+    let mut frame = egui::Frame::window(&ctx.global_style()).inner_margin(0);
+    if glassy {
+        // The pane is painted inside the window so it can carry reflections and a halo.
+        frame = frame.fill(Color32::TRANSPARENT).stroke(Stroke::NONE);
+    }
     window
         .title_bar(false)
         .frame(frame)
         .show(ctx, |ui| {
+            let backing = ui.painter().add(egui::Shape::Noop);
             ui.spacing_mut().item_spacing.y = 0.0;
             title_bar(ui, title, sprite, band);
-            egui::Frame::new()
+            let inner = egui::Frame::new()
                 .inner_margin(egui::Margin::same(18))
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
                     contents(ui)
                 })
-                .inner
+                .inner;
+            if glassy {
+                let rect = ui.min_rect();
+                ui.painter().set(backing, dialog_pane(ctx, rect));
+            }
+            inner
         })
         .and_then(|response| response.inner)
 }
 
+/// A row of status text; glass skins set it on a small frosted capsule so it reads over the sky.
+pub fn status_row<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let ctx = ui.ctx().clone();
+    if Skin::of(&ctx).finish != Finish::Glass {
+        return ui.horizontal(contents).inner;
+    }
+    let backing = ui.painter().add(egui::Shape::Noop);
+    let framed = egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(10, 3))
+        .show(ui, |ui| ui.horizontal(contents).inner);
+    let rect = framed.response.rect;
+    let clear = Glaze::clear(&ctx);
+    // Mostly frost: a light tint calms the sky behind the text without hiding it.
+    let glaze = Glaze {
+        opacity: (clear.opacity * 1.5).min(1.0),
+        ..clear
+    };
+    ui.painter().set(
+        backing,
+        glass::pane(&ctx, rect, rect.height() / 2.0, &glaze),
+    );
+    framed.inner
+}
+
+/// A tooltip with `text` while the pointer rests on `rect`. Its hover zone is registered when
+/// this is called, so call it after a clickable card or row laid over the same spot, which would
+/// otherwise take the hover; the zone senses no clicks, so the card stays clickable.
+pub fn tooltip(ui: &egui::Ui, rect: Rect, id: egui::Id, text: &str) {
+    ui.interact(rect, id, Sense::hover()).on_hover_ui(|ui| {
+        popup(ui, |ui| ui.label(text));
+    });
+}
+
+/// The contents of a dropdown, menu or tooltip; glass skins frost the popup behind them.
+pub fn popup<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let ctx = ui.ctx().clone();
+    if Skin::of(&ctx).finish != Finish::Glass {
+        return contents(ui);
+    }
+    // Popups may scroll or clip their contents, so the pane goes on a painter reaching the margin.
+    let painter = ui.painter().with_clip_rect(ctx.content_rect());
+    let backing = painter.add(egui::Shape::Noop);
+    let inner = contents(ui);
+    let rect = ui.min_rect() + egui::epaint::MarginF32::from(ui.spacing().menu_margin);
+    let clear = Glaze::clear(&ctx);
+    let glaze = Glaze {
+        opacity: (clear.opacity * 1.6).min(1.0),
+        ..clear
+    };
+    let radius = f32::from(ui.visuals().menu_corner_radius.nw);
+    painter.set(backing, glass::pane(&ctx, rect, radius, &glaze));
+    inner
+}
+
+/// A dialog's glass: denser than panels so its text reads over the scene, with an aqua halo.
+fn dialog_pane(ctx: &egui::Context, rect: Rect) -> Vec<egui::Shape> {
+    let palette = Palette::of_ctx(ctx);
+    let clear = Glaze::clear(ctx);
+    let glaze = Glaze {
+        opacity: (clear.opacity * 1.6).min(1.0),
+        glow: Some(palette.hot.gamma_multiply(0.7)),
+        ..clear
+    };
+    glass::pane(ctx, rect, style::metrics(ctx).radius as f32, &glaze)
+}
+
 /// Dims the panels behind an open dialog without blocking them; call after all panels.
 pub fn paint_backdrop(ctx: &egui::Context) {
+    let palette = Palette::of_ctx(ctx);
+    // Glass skins wash the scene in a bright haze instead of darkening it.
+    let veil = if Skin::of(ctx).finish == Finish::Glass {
+        palette.background.gamma_multiply(0.35)
+    } else {
+        Color32::from_black_alpha(140)
+    };
     // Panels share the background layer; painting last there covers them but stays below windows.
-    ctx.layer_painter(egui::LayerId::background()).rect_filled(
-        ctx.content_rect(),
-        0.0,
-        Color32::from_black_alpha(140),
-    );
+    ctx.layer_painter(egui::LayerId::background())
+        .rect_filled(ctx.content_rect(), 0.0, veil);
 }
 
 /// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.
@@ -724,12 +926,42 @@ fn bevel(painter: &egui::Painter, rect: Rect, fill: Color32, inset: bool, edge: 
 
 /// Dark ink on light fills, paper on dark ones.
 pub fn readable_on(fill: Color32, palette: &Palette) -> Color32 {
-    let luma = 0.299 * fill.r() as f32 + 0.587 * fill.g() as f32 + 0.114 * fill.b() as f32;
-    if luma > 140.0 {
+    if luma(fill) > 140.0 {
         Color32::from_rgb(0x1a, 0x10, 0x2a)
     } else {
         palette.paper
     }
+}
+
+/// Perceived brightness of an opaque color from 0 to 255.
+fn luma(color: Color32) -> f32 {
+    0.299 * color.r() as f32 + 0.587 * color.g() as f32 + 0.114 * color.b() as f32
+}
+
+/// A convex polygon filled with a color picked per corner, e.g. for gradients.
+pub fn shaded_polygon(points: &[Pos2], shade: impl Fn(Pos2) -> Color32) -> egui::Shape {
+    let sum = points
+        .iter()
+        .fold(Vec2::ZERO, |sum, point| sum + point.to_vec2());
+    let center = (sum / points.len().max(1) as f32).to_pos2();
+    shaded_fan(center, points, shade)
+}
+
+/// Like `shaded_polygon`, fanning out from `center`, which must lie inside the polygon.
+pub fn shaded_fan(center: Pos2, points: &[Pos2], shade: impl Fn(Pos2) -> Color32) -> egui::Shape {
+    let mut mesh = egui::Mesh::default();
+    if points.len() < 3 {
+        return mesh.into();
+    }
+    mesh.colored_vertex(center, shade(center));
+    for point in points {
+        mesh.colored_vertex(*point, shade(*point));
+    }
+    let count = points.len() as u32;
+    for index in 0..count {
+        mesh.add_triangle(0, index + 1, (index + 1) % count + 1);
+    }
+    mesh.into()
 }
 
 pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
@@ -779,6 +1011,60 @@ mod tests {
                         .sprite(Sprite::Plus)
                         .min_size(size);
                     assert_eq!(ui.add(button).rect.size(), size, "skin {}", skin.id);
+                });
+            });
+        }
+    }
+
+    #[test]
+    fn tooltips_show_over_spots_inside_a_clickable_card() {
+        let context = egui::Context::default();
+        let spot = Rect::from_min_size(egui::pos2(40.0, 40.0), Vec2::splat(14.0));
+        let mut zone_hovered = false;
+        let mut card_clickable = false;
+        for frame in 0..3 {
+            let input = egui::RawInput {
+                events: vec![egui::Event::PointerMoved(spot.center())],
+                time: Some(frame as f64),
+                ..Default::default()
+            };
+            let _ = context.run_ui(input, |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    let card = Rect::from_min_size(egui::pos2(20.0, 20.0), Vec2::splat(120.0));
+                    let response = ui.interact(card, egui::Id::new("card"), Sense::click());
+                    tooltip(ui, spot, egui::Id::new("spot"), "Exactly 7 bytes");
+                    zone_hovered = ui
+                        .ctx()
+                        .read_response(egui::Id::new("spot"))
+                        .is_some_and(|zone| zone.hovered());
+                    card_clickable = response.contains_pointer() && response.sense.senses_click();
+                });
+            });
+        }
+        assert!(zone_hovered && card_clickable);
+    }
+
+    #[test]
+    fn status_rows_return_their_contents_under_every_skin() {
+        let context = egui::Context::default();
+        for skin in skins::ALL {
+            style::install(&context, skin);
+            let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    assert!(status_row(ui, |ui| ui.label("Enabled").rect.height() > 0.0));
+                });
+            });
+        }
+    }
+
+    #[test]
+    fn menus_return_their_contents_under_every_skin() {
+        let context = egui::Context::default();
+        for skin in skins::ALL {
+            style::install(&context, skin);
+            let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    assert!(popup(ui, |ui| ui.label("Hours").rect.height() > 0.0));
                 });
             });
         }

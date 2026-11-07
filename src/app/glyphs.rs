@@ -11,7 +11,7 @@ use std::time::Duration;
 
 const FLICKER_FRAME: Duration = Duration::from_millis(50);
 
-type Point = (f32, f32);
+pub(super) type Point = (f32, f32);
 
 /// Grid size in sprite cells, so callers' scales give comparable sizes to the pixel set.
 pub fn grid(sprite: Sprite) -> Vec2 {
@@ -50,14 +50,14 @@ pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32,
 }
 
 /// Maps fractional coordinates into the icon rectangle with a line width matching its size.
-struct Pen<'a> {
-    painter: &'a egui::Painter,
-    rect: Rect,
+pub(super) struct Pen<'a> {
+    pub(super) painter: &'a egui::Painter,
+    pub(super) rect: Rect,
     width: f32,
 }
 
 impl<'a> Pen<'a> {
-    fn new(painter: &'a egui::Painter, rect: Rect) -> Self {
+    pub(super) fn new(painter: &'a egui::Painter, rect: Rect) -> Self {
         let width = (rect.width().min(rect.height()) / 12.0).clamp(1.0, 5.0);
         Self {
             painter,
@@ -66,15 +66,15 @@ impl<'a> Pen<'a> {
         }
     }
 
-    fn at(&self, (x, y): Point) -> Pos2 {
+    pub(super) fn at(&self, (x, y): Point) -> Pos2 {
         self.rect.min + egui::vec2(x * self.rect.width(), y * self.rect.height())
     }
 
-    fn points(&self, points: &[Point]) -> Vec<Pos2> {
+    pub(super) fn points(&self, points: &[Point]) -> Vec<Pos2> {
         points.iter().map(|point| self.at(*point)).collect()
     }
 
-    fn stroke(&self, color: Color32, weight: f32) -> Stroke {
+    pub(super) fn stroke(&self, color: Color32, weight: f32) -> Stroke {
         Stroke::new(self.width * weight, color)
     }
 
@@ -88,7 +88,7 @@ impl<'a> Pen<'a> {
         self.painter.add(shape);
     }
 
-    fn line(&self, points: &[Point], color: Color32, weight: f32) {
+    pub(super) fn line(&self, points: &[Point], color: Color32, weight: f32) {
         let stroke = self.stroke(color, weight);
         self.painter.add(Shape::line(self.points(points), stroke));
     }
@@ -106,7 +106,7 @@ impl<'a> Pen<'a> {
     }
 
     /// A circle whose radius is a fraction of the icon width.
-    fn circle(&self, center: Point, radius: f32, fill: Color32, edge: Option<Color32>) {
+    pub(super) fn circle(&self, center: Point, radius: f32, fill: Color32, edge: Option<Color32>) {
         let stroke = edge.map_or(Stroke::NONE, |edge| self.stroke(edge, 1.0));
         let radius = radius * self.rect.width();
         self.painter
@@ -117,7 +117,7 @@ impl<'a> Pen<'a> {
     }
 }
 
-fn polar(center: Point, radius: f32, angle: f32) -> Point {
+pub(super) fn polar(center: Point, radius: f32, angle: f32) -> Point {
     (
         center.0 + radius * angle.cos(),
         center.1 + radius * angle.sin(),

@@ -21,12 +21,16 @@ pub static MODERN: Skin = Skin {
         label: 14.0,
         display_scale: 1.4,
         display_drop: 0.0,
+        display_glow: 0.0,
+        capitals: false,
     },
     metrics: Metrics {
         border: 1.0,
         lift: 0.0,
         shadow: 2,
         shadow_blur: 10,
+        // Cards round by 12 and controls by half of it.
+        radius: 12,
     },
     effects: Effects {
         scanlines: false,
@@ -34,6 +38,9 @@ pub static MODERN: Skin = Skin {
         stripes: false,
         embers: false,
         vignette: false,
+        wallpaper: false,
+        bubbles: false,
+        opacity: 1.0,
         title_bar: TitleBar::Modern,
     },
     finish: Finish::Modern,
@@ -67,6 +74,7 @@ const DARK: Palette = Palette {
     metal: Color32::from_rgb(0xa1, 0xa1, 0xaa),
     paper: Color32::from_rgb(0xff, 0xff, 0xff),
     scanline: Color32::TRANSPARENT,
+    sky: Color32::TRANSPARENT,
     vignette: Color32::TRANSPARENT,
 };
 const LIGHT: Palette = Palette {
@@ -89,5 +97,6 @@ const LIGHT: Palette = Palette {
     metal: Color32::from_rgb(0x71, 0x71, 0x7a),
     paper: Color32::from_rgb(0xff, 0xff, 0xff),
     scanline: Color32::TRANSPARENT,
+    sky: Color32::TRANSPARENT,
     vignette: Color32::TRANSPARENT,
 };
