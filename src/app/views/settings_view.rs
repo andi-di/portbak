@@ -105,11 +105,6 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
             "Enable rolling retention",
         ));
         ui.add_enabled_ui(defaults.rolling, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.count_protected,
-                "Count protected backups toward retention limits",
-            ))
-            .on_hover_text("Protected backups are never deleted by retention");
             ui.horizontal(|ui| {
                 ui.add(PixelCheckbox::new(&mut defaults.count_enabled, "Max count"));
                 ui.add_enabled(
@@ -136,6 +131,11 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
                     defaults.max_bytes = (gib * 1_073_741_824.0) as u64;
                 }
             });
+            ui.add(PixelCheckbox::new(
+                &mut defaults.count_protected,
+                "Count protected backups toward retention limits",
+            ))
+            .on_hover_text("Protected backups are never deleted by retention");
         });
     });
 }

@@ -433,11 +433,6 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
         "Enable rolling retention – delete oldest backups automatically",
     ));
     ui.add_enabled_ui(job.rolling, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.count_protected,
-            "Count protected backups toward retention limits",
-        ))
-        .on_hover_text("Protected backups are never deleted by retention");
         ui.indent("limits", |ui| {
             optional_limit(
                 ui,
@@ -464,6 +459,11 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     }
                 },
             );
+            ui.add(PixelCheckbox::new(
+                &mut job.count_protected,
+                "Count protected backups toward retention limits",
+            ))
+            .on_hover_text("Protected backups are never deleted by retention");
         });
     });
     ui.horizontal(|ui| {
