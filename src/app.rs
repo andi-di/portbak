@@ -122,6 +122,7 @@ pub struct App {
     restoring: bool,
     history_dialog: Option<HistoryDialog>,
     settings_open: bool,
+    settings_tab: views::settings_view::SettingsTab,
     history_cache: HashMap<Uuid, CachedHistory>,
     history_requests: HashMap<Uuid, PendingSummary>,
     tx: mpsc::Sender<Event>,
@@ -135,7 +136,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: Config, path: PathBuf, lock: File) -> Self {
+    pub fn new(mut config: Config, path: PathBuf, lock: File) -> Self {
+        if let Some(app_dir) = path.parent() {
+            config.resolve_destinations(app_dir);
+        }
         let (tx, rx) = mpsc::channel();
         Self {
             selected: config.jobs.first().map(|job| job.id),
@@ -146,6 +150,7 @@ impl App {
             restoring: false,
             history_dialog: None,
             settings_open: false,
+            settings_tab: views::settings_view::SettingsTab::default(),
             history_cache: HashMap::new(),
             history_requests: HashMap::new(),
             tx,
@@ -183,7 +188,7 @@ impl App {
     /// Returns whether the configuration is now saved; failures stay dirty and are retried.
     fn persist(&mut self) -> bool {
         self.last_save = Instant::now();
-        match engine::save(&self.path, &self.config) {
+        match engine::save(&self.path, &self.config.for_storage()) {
             Ok(()) => {
                 self.dirty = false;
                 self.error.clear();
@@ -198,7 +203,7 @@ impl App {
     }
 
     fn add_job(&mut self) {
-        let job = Job::default();
+        let job = self.config.job_defaults.new_job();
         self.selected = Some(job.id);
         self.settings_open = false;
         self.config.jobs.push(job);
@@ -214,6 +219,17 @@ impl App {
     fn enqueue(&mut self, id: Uuid) {
         if !self.scheduling_paused() && self.active != Some(id) && !self.queue.contains(&id) {
             self.queue.push_back(id);
+        }
+    }
+
+    fn job_activation_changed(&mut self, id: Uuid, was_enabled: bool) {
+        let Some(job) = self.job(id) else {
+            return;
+        };
+        if was_enabled && !job.enabled {
+            self.remove_pending(id);
+        } else if !was_enabled && job.enabled && job.check_on_enable {
+            self.enqueue(id);
         }
     }
 
@@ -576,6 +592,143 @@ mod tests {
 
     fn app_with(config: Config, path: PathBuf) -> App {
         App::new(config, path, tempfile::tempfile().unwrap())
+    }
+
+    #[test]
+    fn add_job_copies_current_defaults_and_selects_a_fresh_job() {
+        let mut app = app_with(Config::default(), PathBuf::new());
+        app.add_job();
+        let first = app.config.jobs[0].clone();
+        assert!(first.zip && first.auto_destination && first.rolling);
+        app.config.job_defaults.zip = false;
+        app.config.job_defaults.interval_value = 15;
+        app.add_job();
+        assert!(app.config.jobs[0] == first);
+        let second = &app.config.jobs[1];
+        assert!(!second.zip);
+        assert_eq!(second.interval_value, 15);
+        assert_eq!(app.selected, Some(second.id));
+        assert_ne!(first.id, second.id);
+    }
+
+    #[test]
+    fn job_check_on_enable_is_independent_of_template_changes() {
+        let mut config = Config::default();
+        config.job_defaults.check_on_enable = true;
+        let mut app = app_with(config, PathBuf::new());
+        app.add_job();
+        let id = app.selected.unwrap();
+        app.config.job_defaults.check_on_enable = false;
+        let job = app.job_mut(id).unwrap();
+        assert!(job.check_on_enable);
+        let saved: Job = serde_json::from_str(&serde_json::to_string(job).unwrap()).unwrap();
+        assert!(saved.check_on_enable && saved.auto_destination);
+        job.enabled = true;
+        job.reschedule(Utc::now());
+        app.job_activation_changed(id, false);
+        assert_eq!(app.queue, VecDeque::from([id]));
+        app.queue.clear();
+        app.job_mut(id).unwrap().check_on_enable = false;
+        app.config.job_defaults.check_on_enable = true;
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
+    }
+
+    #[test]
+    fn enabling_can_queue_one_immediate_check_without_changing_future_due_time() {
+        let mut config = Config::default();
+        config.job_defaults.check_on_enable = true;
+        let config: Config =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        let mut app = app_with(config, PathBuf::new());
+        app.add_job();
+        let id = app.selected.unwrap();
+        let job = app.job_mut(id).unwrap();
+        job.enabled = true;
+        job.reschedule(Utc::now());
+        let next = job.next_run;
+        app.job_activation_changed(id, false);
+        app.job_activation_changed(id, false);
+        assert_eq!(app.queue, VecDeque::from([id]));
+        assert_eq!(app.job(id).unwrap().next_run, next);
+        app.queue.clear();
+        app.job_activation_changed(id, true);
+        assert!(app.queue.is_empty());
+        app.active = Some(id);
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
+        app.active = None;
+        app.job_mut(id).unwrap().check_on_enable = false;
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
+        app.queue.push_back(id);
+        app.job_mut(id).unwrap().enabled = false;
+        app.job_activation_changed(id, true);
+        assert!(app.queue.is_empty());
+    }
+
+    #[test]
+    fn moving_app_and_backups_preserves_backup_history_and_restore() {
+        let root = tempfile::tempdir().unwrap();
+        let original = root.path().join("original");
+        let moved = root.path().join("moved");
+        let source = root.path().join("source");
+        std::fs::create_dir(&original).unwrap();
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file"), "original contents").unwrap();
+        let mut job = Job {
+            source: source.clone(),
+            ..crate::model::JobDefaults::default().new_job()
+        };
+        job.set_auto_destination(&original).unwrap();
+        engine::run(&job, &mpsc::channel().0).unwrap();
+        let manual = Job {
+            target: root.path().join("manual"),
+            ..Job::default()
+        };
+        let manual_target = manual.target.clone();
+        let config = Config {
+            jobs: vec![job.clone(), manual],
+            ..Config::default()
+        };
+        let mut app = app_with(config, original.join("portbak.json"));
+        assert!(app.persist());
+        let saved: Config = engine::load(&app.path).unwrap();
+        assert_eq!(
+            saved.jobs[0].target,
+            PathBuf::from("backups").join(job.target.file_name().unwrap())
+        );
+        assert_eq!(saved.jobs[1].target, manual_target);
+        drop(app);
+        std::fs::rename(&original, &moved).unwrap();
+        let path = moved.join("portbak.json");
+        let config = engine::load(&path).unwrap();
+        let app = app_with(config, path);
+        let job = &app.config.jobs[0];
+        assert!(job
+            .target
+            .starts_with(std::fs::canonicalize(&moved).unwrap()));
+        let backups = engine::history::list(job).unwrap();
+        assert_eq!(backups.len(), 1);
+        assert!(!engine::run(job, &mpsc::channel().0).unwrap().created);
+        std::fs::write(source.join("file"), "changed").unwrap();
+        engine::restore::run(job, &backups[0].record.name, &mpsc::channel().0).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(source.join("file")).unwrap(),
+            "original contents"
+        );
+        assert_eq!(app.config.jobs[1].target, manual_target);
+        let mut legacy = Config {
+            jobs: vec![Job {
+                target: original
+                    .join("backups")
+                    .join(job.target.file_name().unwrap()),
+                ..job.clone()
+            }],
+            ..Config::default()
+        };
+        legacy.resolve_destinations(&moved);
+        assert_eq!(legacy.jobs[0].target, job.target);
     }
 
     /// Ticks until `done` holds or five seconds pass.

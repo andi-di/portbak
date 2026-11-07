@@ -34,7 +34,8 @@ Provide:
 
 - A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result. Its divider remains at the selected width after dragging and is restored after restarting.
 - An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
-- A global theme selector: **System**, **Light**, **Dark**. Default: **System**. Persist the selection.
+- Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
+- A **Light/Dark** toggle in the top toolbar next to **Settings**. On first launch without `portbak.json`, resolve the system appearance and persist **Light** or **Dark**; later launches use the saved choice. Resolve legacy **System** settings once, then persist the result.
 - A look selector in the settings view: **Retro** (pixel fonts and arcade colors), **Dark Fantasy** (serif capitals, engraved icons, forged plate buttons, crimson on black, drifting embers), **Modern** (neutral Zinc surfaces, blue accents, sans-serif typography, rounded controls and simple line icons; job counts, ZIP icons, last-backup readouts and job icons use neutral text colors) and **Frutiger Aero** (glossy icons, clear glass and gel buttons on frosted glass panes, dialogs, menus and tooltips that blur what lies behind them (with OpenGL 3; tinted see-through glass otherwise), with bevelled edges, reflections and shimmer, over an animated scene: sunburst and lens flare or stars and aurora by night, clouds, a spinning glass globe, gulls, schooling fish in five shapes and two colors each that chase and gulp bubbles, breathe bubbles and flee the pointer (pufferfish blow up), falling leaves, hills, a rolling sea and rising bubbles that pop under the pointer; clicks send a refracting shockwave (plain ripples without OpenGL 3) and the pointer trails bubbles), and **Midnight Neko** (opaque matte charcoal/crimson panels in Dark mode and pale-stone panels in Light mode, silver lace-like corner filigree, thorn-and-diamond borders, crescent motifs, subtly patterned panels, flat controls, serif headings, and a matching pixel-art black-haired catgirl face icon. One adult black-haired, green-eyed gothic catgirl uses her upper-body avatar only in the spacious welcome view; use close-up portraits in the sidebar when space permits. Use fresh transparent, equal-cell sprite atlases with consistent character framing. Jobs use only expression portraits; welcome-screen reactions always remain upper-body. Do not draw a portrait frame or backdrop. Clicking her selects one of fourteen illustrated reactions/poses without repeating the previous selection: angry, annoyed puffed-cheek pout, cat-smug `:3`, excited, happy, surprised, superior, heart eyes, cold stare, sleepy with drool, bored, cheek resting on a hand with a sideways glance, wide-eyed yandere with tiny pupils, or shy. Each lasts four seconds before returning to the neutral default. Preserve the detailed illustrated eyes; no cursor-tracking overlays. Small muted ash motes and garnet/silver diamond sparks drift slowly; forty-five may pass in front of panels, fading near the pointer. A moderately dense diamond-and-spark cursor trail fades over 0.7 seconds and adds small click bursts. Decorations do not intercept input; only the companion portrait accepts clicks). Default: **Retro**. Each look has a light and a dark variant that follows the theme selector. Persist the selection; an unknown saved look falls back to the default.
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
@@ -64,22 +65,32 @@ Minimizing keeps the application and scheduler running. Closing the window immed
 
 ## 4. Job configuration and defaults
 
-Each job is independent and has a persistent unique identifier. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
+Each job is independent and has a persistent UUID. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
+
+- Settings has **Job settings** and **Theme** tabs. Automatic destination and immediate-check options appear in both the settings template and individual jobs; new jobs inherit the template, then retain independent choices.
+- Display Windows drive and network paths without extended-length prefixes in path fields, the settings-file location, and restore details; preserve internal paths for file operations.
+- Persist editable new-job defaults for automatic destination, compression, scheduling, and retention in `portbak.json`; changes affect future jobs only.
+- On source selection, create `<app-dir>/backups/<job UUID>-<job name>`. An empty job name uses only the UUID, without a suffix. Replace characters unsafe in filenames with underscores; reject destinations within the source.
+- Save automatic destination paths relative to the app directory; resolve them against the executable directory for all backup, history, protection, retention, and restore operations. Moving the app, configuration, and backups together preserves functionality. Convert legacy absolute automatic paths to relative paths; keep manual destinations absolute.
+- Automatic destinations always use the job name and follow job renames; move the existing destination with its backups, refuse collisions, and report failures.
+- Each job has an **Auto destination folder** checkbox. Checking it restores automatic destination updates without moving manual-folder contents.
+- Choosing or typing a manual destination unchecks **Auto destination folder**, including choosing the same folder. Older source-named automatic destinations migrate to job-name paths when opened for editing while idle, preserving backups. Ignore obsolete naming-choice fields.
+- Existing jobs retain their saved values when loading older configurations.
 
 | Setting | Behavior and default |
 | --- | --- |
-| Name | Editable display name; default **New job** |
+| Name | Editable display name, limited to 50 characters; default **New job** |
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
-| Destination folder | Existing folder selected through a folder picker or editable path; initially empty |
+| Destination folder | Automatic destination enabled by default; generated on source selection; manually editable |
 | Automatic scheduling | Disabled by default |
 | Schedule mode | Interval by default; display choices in order: Interval, Daily, Weekdays |
 | Local time | 18:00 by default; hours 0–23, minutes 0–59 |
 | Selected weekdays | All seven selected by default; used only in weekday mode |
-| Interval | 60 Minutes by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
-| Compress as ZIP | Checkbox; disabled by default |
-| Rolling retention | Disabled by default |
-| Maximum count | Independently enabled; initial value when enabled: 10; positive whole number, supporting at least 1–100,000 |
-| Maximum total size | Independently enabled; initial value when enabled: 10 GiB; positive value, supporting at least 0.001–100,000 GiB |
+| Interval | 00:10:00 by default; editable hours:minutes:seconds, from 00:00:01 to 8760:00:00 |
+| Compress as ZIP | Checkbox; checked by default |
+| Rolling retention | Enabled by default |
+| Maximum count | Checked by default at 20; positive whole number, supporting at least 1–100,000 |
+| Maximum total size | Unchecked by default at 10 GiB; positive value, supporting at least 0.001–100,000 GiB |
 
 A GiB is 1,073,741,824 bytes. Count and size limits are remembered while rolling retention is disabled, but are not enforced. Enabling rolling retention without an active limit does not delete anything.
 
@@ -89,7 +100,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 ### Modes
 
-1. **Interval:** check every configured number of seconds, minutes, or hours. Changing the unit preserves the numeric value, clamped to the new unit’s supported range. Store the value and selected unit independently.
+1. **Interval:** enter a duration as hours:minutes:seconds in jobs and new-job defaults. Minutes and seconds range from 00 to 59; allow hours above 23. Clamp the total to one second through 365 days. Preserve the duration of older saved value/unit settings.
 2. **Daily:** check once per day at the configured local time.
 3. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
 
@@ -98,7 +109,8 @@ Also persist the next scheduled check, last successful backup time, and latest j
 - Scheduling works only while the application is running, including when minimized. Do not register system tasks, install services, or wake an off computer.
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
 - Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
-- On first enabling a schedule, plan the next future occurrence; do not immediately run a backup solely because scheduling was enabled.
+- On enabling a schedule, plan its next future occurrence.
+- The per-job **Check immediately when enabled** option inherits the settings template when created; the template starts unchecked. Later template changes do not affect existing jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.
 - Persist scheduled due times across normal restarts.
 - If the saved due time is overdue after startup or resume, queue exactly one catch-up check. Do not queue one check for every missed occurrence.
@@ -199,12 +211,13 @@ After a crash, forced termination, or power loss, temporary output or a publishe
 
 ## 10. Rolling retention
 
-Rolling retention is configured per job and disabled by default. Maximum count and maximum total size can be enabled separately or together.
+Rolling retention is configured per job and enabled by default for new jobs, with a maximum count of 20. Maximum count and maximum total size can be enabled separately or together.
 
 After a newly successful backup:
 
 - Count only successful backups owned by this job and recorded in its manifest.
-- Evaluate both active limits, counting protected versions as well. If either is exceeded, delete the oldest unprotected managed successful backup other than the newest version, repeating until the limits are satisfied or no eligible version remains.
+- The per-job and template checkbox **Count protected backups toward retention limits** defaults to unchecked. Unchecked, exclude protected versions from both budgets; checked, include them. Protected backups are never eligible for deletion.
+- Evaluate both active limits using the counted versions. If either is exceeded, delete the oldest unprotected managed successful backup other than the newest version, repeating until the limits are satisfied or no eligible version remains.
 - Use successful creation order to determine the oldest backup.
 - For folder backups, total size means the sum of regular file lengths. For ZIP backups, use archive file length. Do not use source size, allocated disk blocks, settings, or unrelated files.
 - Always keep the newest successful backup. If it alone exceeds the size limit, retain it and show a notice.
@@ -213,7 +226,7 @@ After a newly successful backup:
 
 Each saved version has a persistent protection flag, false by default (including records that predate the flag). Changing this flag must preserve all other metadata and must not trigger immediate cleanup. Use destination locking and atomic manifest replacement for protection changes.
 
-When rolling retention is enabled and at least one version is protected, warn if the count limit minus the protected count is at most three places, or if at most 20% of the size limit remains after subtracting protected backup sizes. Show concrete remaining values, clamp negative values to zero, and separately report exceeded limits. These are retention budgets, not free disk space; warnings do not block new backups. Protected versions and the newest backup can cause limits to remain exceeded.
+When rolling retention and counting protected backups are enabled and at least one version is protected, warn if the count limit minus the protected count is at most three places, or if at most 20% of the size limit remains after subtracting protected backup sizes. Show concrete remaining values, clamp negative values to zero, and separately report exceeded limits. These are retention budgets, not free disk space; warnings do not block new backups. Counted protected versions and the newest backup can cause limits to remain exceeded.
 
 Do not delete old backups in advance to make room for a new one. If there is not enough space to create the new backup first, report failure and retain previous backups.
 
@@ -237,7 +250,7 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 
 | Scenario | Expected result |
 | --- | --- |
-| First launch | No jobs; System theme; clear empty state |
+| First launch | No jobs; system appearance saved as Light or Dark; clear empty state |
 | New job | Defaults match section 4; ZIP, scheduling, and retention are off |
 | First manual check | One full backup with timestamp prefix and correct contents |
 | Unchanged second check | No additional backup; Unchanged result; last backup time unchanged |

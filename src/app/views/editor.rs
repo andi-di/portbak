@@ -2,11 +2,11 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
-    DATE_MINUTE, DATE_TIME,
+    alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_MINUTE,
+    DATE_TIME,
 };
 use crate::app::{App, CachedHistory, HistoryMode};
-use crate::model::{IntervalUnit, Job, Schedule};
+use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
 use uuid::Uuid;
@@ -51,9 +51,13 @@ impl App {
         let can_add = !self.scheduling_paused();
         let selected = self.selected;
         let summaries = &self.history_cache;
+        let app_dir = self
+            .path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
         let jobs = &mut self.config.jobs;
         let mut action = None;
-        let mut disabled = false;
+        let mut activation = None;
         let mut add = false;
         let frame =
             egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
@@ -68,19 +72,28 @@ impl App {
                         return;
                     };
                     let was_enabled = job.enabled;
+                    let previous = job.clone();
                     let summary = summaries
                         .get(&job.id)
                         .filter(|summary| summary.target == job.target);
                     action =
                         job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
-                    disabled = was_enabled && !job.enabled;
+                    if !permissions.busy {
+                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                            self.error =
+                                format!("Could not update automatic destination: {error:#}");
+                        }
+                    }
+                    if was_enabled != job.enabled {
+                        activation = Some((job.id, was_enabled));
+                    }
                 });
             });
         if add {
             self.add_job();
         }
-        if let (true, Some(id)) = (disabled, selected) {
-            self.remove_pending(id);
+        if let Some((id, was_enabled)) = activation {
+            self.job_activation_changed(id, was_enabled);
         }
         if let Some((id, action)) = action {
             self.apply(id, action, &ctx);
@@ -177,7 +190,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     } else {
         ui.horizontal(|ui| {
             ui.allocate_ui(
-                egui::vec2((ui.available_width() - 320.0).max(0.0), 60.0),
+                egui::vec2((ui.available_width() - 72.0).max(0.0), 60.0),
                 |ui| {
                     ui.horizontal(|ui| job_identity(ui, job));
                 },
@@ -220,11 +233,24 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         ("Enable automatic backups", Tone::Good)
     };
     let button = PixelButton::new(label)
+        .icon_only()
         .sprite(Sprite::Power)
         .tone(tone)
-        .min_size(egui::vec2(300.0, 52.0));
+        .min_size(egui::vec2(52.0, 52.0));
     let can_toggle = (job.enabled || job.has_runnable_schedule()) && !locked;
-    if ui.add_enabled(can_toggle, button).clicked() {
+    let tooltip = if locked {
+        "Automatic backups cannot be changed during restore or while backup history is open"
+    } else if !job.enabled && !job.has_runnable_schedule() {
+        "Select at least one weekday to enable automatic backups"
+    } else {
+        label
+    };
+    if ui
+        .add_enabled(can_toggle, button)
+        .on_hover_text(tooltip)
+        .on_disabled_hover_text(tooltip)
+        .clicked()
+    {
         job.enabled = !job.enabled;
         job.reschedule(Utc::now());
     }
@@ -234,15 +260,24 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
+            .char_limit(MAX_JOB_NAME_LENGTH)
             .desired_width(ui.available_width().min(420.0))
             .margin(egui::vec2(8.0, 4.0)),
     );
-    ui.add_space(6.0);
+    ui.add_space(ui.spacing().item_spacing.y);
     path_picker(ui, "Source folder", &mut job.source);
-    ui.add_space(6.0);
-    path_picker(ui, "Destination folder", &mut job.target);
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
+    ui.add_space(ui.spacing().item_spacing.y);
+    centered_row(ui, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut job.auto_destination,
+            "Auto destination folder",
+        ));
+    });
+    if path_picker(ui, "Destination folder", &mut job.target) {
+        job.auto_destination = false;
+    }
+    ui.add_space(ui.spacing().item_spacing.y);
+    centered_row(ui, |ui| {
         ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
         let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
         sprites::show(ui, Sprite::Package, 2.0, tint);
@@ -265,23 +300,12 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let palette = Palette::of(ui);
     let before = schedule_key(job);
     centered_row(ui, |ui| {
-        let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Rewind),
-            (Schedule::Daily, "Daily", Sprite::Sun),
-            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
-        ];
-        for (schedule, label, sprite) in modes {
-            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
-        }
+        ui.add(PixelCheckbox::new(
+            &mut job.check_on_enable,
+            "Check immediately when enabled",
+        ));
     });
-    match job.schedule {
-        Schedule::Interval => interval_row(ui, job),
-        Schedule::Daily => time_row(ui, job),
-        Schedule::Weekdays => {
-            time_row(ui, job);
-            weekday_row(ui, job);
-        }
-    }
+    schedule_controls(ui, job);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
@@ -308,6 +332,27 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     });
 }
 
+pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
+    centered_row(ui, |ui| {
+        let modes: [(Schedule, &str, Sprite); 3] = [
+            (Schedule::Interval, "Interval", Sprite::Rewind),
+            (Schedule::Daily, "Daily", Sprite::Sun),
+            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
+        ];
+        for (schedule, label, sprite) in modes {
+            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
+        }
+    });
+    match job.schedule {
+        Schedule::Interval => interval_row(ui, job),
+        Schedule::Daily => time_row(ui, job),
+        Schedule::Weekdays => {
+            time_row(ui, job);
+            weekday_row(ui, job);
+        }
+    }
+}
+
 /// A captioned value in the display face, like a digital readout.
 fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
     ui.vertical(|ui| {
@@ -323,29 +368,32 @@ fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
 }
 
 fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
+    let total = job.interval_seconds();
+    let mut hours = total / 3600;
+    let mut minutes = total / 60 % 60;
+    let mut seconds = total % 60;
     centered_row(ui, |ui| {
         ui.label("Every");
-        ui.add(
-            egui::DragValue::new(&mut job.interval_value).range(1..=job.interval_unit.maximum()),
-        );
-        centered_combo(ui, |ui| {
-            egui::ComboBox::from_id_salt("interval_unit")
-                .selected_text(job.interval_unit.label())
-                .show_ui(ui, |ui| {
-                    pixel::popup(ui, |ui| {
-                        for unit in [
-                            IntervalUnit::Seconds,
-                            IntervalUnit::Minutes,
-                            IntervalUnit::Hours,
-                        ] {
-                            ui.selectable_value(&mut job.interval_unit, unit, unit.label());
-                        }
-                    })
-                })
-        });
-        // A smaller unit can lower the maximum below the current value.
-        job.interval_value = job.interval_value.clamp(1, job.interval_unit.maximum());
+        let mut changed = duration_field(ui, &mut hours, 8760, "Hours");
+        ui.label(":");
+        changed |= duration_field(ui, &mut minutes, 59, "Minutes");
+        ui.label(":");
+        changed |= duration_field(ui, &mut seconds, 59, "Seconds");
+        ui.label("(hh:mm:ss)");
+        if changed {
+            job.set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
+        }
     });
+}
+
+fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str) -> bool {
+    ui.add(
+        egui::DragValue::new(value)
+            .range(0..=maximum)
+            .custom_formatter(|value, _| format!("{:02}", value as u32)),
+    )
+    .on_hover_text(label)
+    .changed()
 }
 
 fn time_row(ui: &mut egui::Ui, job: &mut Job) {
@@ -384,10 +432,12 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
 
 fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
     let palette = Palette::of(ui);
-    ui.add(PixelCheckbox::new(
-        &mut job.rolling,
-        "Enable rolling retention – delete oldest backups automatically",
-    ));
+    centered_row(ui, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut job.rolling,
+            "Enable rolling retention – delete oldest backups automatically",
+        ));
+    });
     ui.add_enabled_ui(job.rolling, |ui| {
         ui.indent("limits", |ui| {
             optional_limit(
@@ -415,6 +465,13 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     }
                 },
             );
+            centered_row(ui, |ui| {
+                ui.add(PixelCheckbox::new(
+                    &mut job.count_protected,
+                    "Count protected backups toward retention limits",
+                ))
+                .on_hover_text("Protected backups are never deleted by retention");
+            });
         });
     });
     ui.horizontal(|ui| {

@@ -58,7 +58,7 @@ pub fn set_protected(job: &Job, name: &str, protected: bool) -> Result<()> {
 /// Explains how much room protected backups leave for rolling retention.
 pub fn warnings(job: &Job, records: &[Record]) -> Vec<String> {
     let protected: Vec<&Record> = records.iter().filter(|record| record.protected).collect();
-    if !job.rolling || protected.is_empty() {
+    if !job.rolling || !job.count_protected || protected.is_empty() {
         return Vec::new();
     }
     let mut warnings = Vec::new();
@@ -123,6 +123,7 @@ mod tests {
         let job = Job {
             target: directory.path().to_path_buf(),
             rolling: true,
+            count_protected: true,
             max_count: Some(2),
             ..Job::default()
         };
@@ -137,6 +138,33 @@ mod tests {
         let path = manifest_path(&job.target, job.id);
         save(&path, &manifest).unwrap();
         (directory, job, manifest, path)
+    }
+
+    #[test]
+    fn protected_backups_are_optional_in_both_budgets_but_never_deleted() {
+        for count_protected in [false, true] {
+            for size_limit in [false, true] {
+                let (_directory, mut job, mut manifest, path) = fixture(vec![
+                    record(0, true, 10),
+                    record(1, false, 10),
+                    record(2, false, 10),
+                    record(3, false, 10),
+                ]);
+                job.count_protected = count_protected;
+                if size_limit {
+                    job.max_count = None;
+                    job.max_bytes = Some(20);
+                }
+                prune(&job.target, &path, &mut manifest, &job).unwrap();
+                assert!(job.target.join("2026-backup-0").exists());
+                assert!(manifest.records[0].protected);
+                assert_eq!(manifest.records.len(), if count_protected { 2 } else { 3 });
+                assert_eq!(manifest.records.last().unwrap().name, "2026-backup-3");
+                if !count_protected {
+                    assert!(warnings(&job, &manifest.records).is_empty());
+                }
+            }
+        }
     }
 
     #[test]

@@ -3,7 +3,7 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, format_bytes, local_time, retention_warnings, DATE, TIME,
+    alert, caption, display_path, format_bytes, local_time, retention_warnings, DATE, TIME,
 };
 use crate::app::{records_of, App, HistoryDialog, HistoryMode};
 use crate::engine::history::Backup;
@@ -139,7 +139,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
     sunken(ui, |ui| {
         ui.horizontal(|ui| {
             sprites::show(ui, Sprite::Folder, 2.0, palette.gold);
-            ui.add(egui::Label::new(source.display().to_string()).wrap());
+            ui.add(egui::Label::new(display_path(source)).wrap());
         });
     });
     if let Some(name) = &dialog.selected {

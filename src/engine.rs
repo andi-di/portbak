@@ -261,7 +261,11 @@ fn completion_message(
         format!("{entry_count} files/folders"),
         format!("{skipped} skipped"),
     ];
-    let latest = manifest.records.last().map_or(0, |record| record.bytes);
+    let latest = manifest
+        .records
+        .last()
+        .filter(|record| job.count_protected || !record.protected)
+        .map_or(0, |record| record.bytes);
     if job.rolling && job.max_bytes.is_some_and(|limit| latest > limit) {
         parts.push("Latest backup exceeds size limit".into());
     }
@@ -293,9 +297,13 @@ fn prune(root: &Path, manifest_path: &Path, manifest: &mut Manifest, job: &Job) 
 }
 
 fn exceeds_limits(job: &Job, records: &[Record]) -> bool {
-    let total: u128 = records.iter().map(|record| u128::from(record.bytes)).sum();
-    job.max_count
-        .is_some_and(|limit| records.len() > limit.max(1))
+    let counted = records
+        .iter()
+        .filter(|record| job.count_protected || !record.protected);
+    let (count, total) = counted.fold((0usize, 0u128), |(count, total), record| {
+        (count + 1, total + u128::from(record.bytes))
+    });
+    job.max_count.is_some_and(|limit| count > limit.max(1))
         || job.max_bytes.is_some_and(|limit| total > u128::from(limit))
 }
 
