@@ -28,6 +28,8 @@ pub struct Skin {
 pub enum Finish {
     /// Pixel sprites, beveled buttons, square boxes and lamps.
     Pixel,
+    /// Flat rounded controls and simple line icons.
+    Modern,
     /// Vector glyphs, forged plates, spiked sockets and diamond lamps.
     Engraved,
 }
@@ -115,6 +117,8 @@ pub struct Effects {
 pub enum TitleBar {
     /// A solid colored band with stripes and three window lights.
     Striped,
+    /// Plain heading on the card surface.
+    Modern,
     /// A dark band with a tinted icon, a fading colored rule and diamond ornaments.
     Engraved,
 }
@@ -151,7 +155,32 @@ pub fn display_font(size: f32) -> FontId {
 
 /// The display face at the skin's label size, for titles and readouts.
 pub fn label_font(ctx: &egui::Context) -> FontId {
-    display_font(Skin::of(ctx).typography.label)
+    face_font(ctx, Skin::of(ctx).typography.label)
+}
+
+pub fn face_font(ctx: &egui::Context, size: f32) -> FontId {
+    if Skin::of(ctx).finish == Finish::Modern {
+        FontId::proportional(size)
+    } else {
+        display_font(size)
+    }
+}
+
+pub fn radius(ctx: &egui::Context, modern: u8) -> CornerRadius {
+    CornerRadius::same(if Skin::of(ctx).finish == Finish::Modern {
+        modern
+    } else {
+        0
+    })
+}
+
+/// Modern keeps decorative details neutral; status colors retain their meaning.
+pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
+    if Skin::of(ctx).finish == Finish::Modern {
+        Palette::of_ctx(ctx).ink
+    } else {
+        original
+    }
 }
 
 pub fn metrics(ctx: &egui::Context) -> &'static Metrics {
@@ -197,9 +226,16 @@ fn font_definitions(fonts: &Fonts) -> FontDefinitions {
 
 fn apply(style: &mut egui::Style, skin: &Skin, palette: &Palette) {
     let sizes = &skin.typography;
+    let heading_font = |size| {
+        if skin.finish == Finish::Modern {
+            FontId::proportional(size)
+        } else {
+            display_font(size)
+        }
+    };
     for (text_style, font) in [
-        (TextStyle::Heading, display_font(sizes.heading)),
-        (TextStyle::Monospace, display_font(sizes.label)),
+        (TextStyle::Heading, heading_font(sizes.heading)),
+        (TextStyle::Monospace, heading_font(sizes.label)),
         (TextStyle::Body, FontId::proportional(sizes.body)),
         (TextStyle::Button, FontId::proportional(sizes.body)),
         (TextStyle::Small, FontId::proportional(sizes.small)),
@@ -221,6 +257,21 @@ fn apply(style: &mut egui::Style, skin: &Skin, palette: &Palette) {
     spacing.scroll.handle_min_length = 24.0;
     style.interaction.selectable_labels = false;
     apply_visuals(&mut style.visuals, &skin.metrics, palette);
+    if skin.finish == Finish::Modern {
+        style.visuals.window_corner_radius = CornerRadius::same(10);
+        style.visuals.menu_corner_radius = CornerRadius::same(6);
+        style.visuals.window_stroke = Stroke::new(1.0_f32, palette.outline);
+        style.visuals.selection.bg_fill = palette.accent;
+        for state in [
+            &mut style.visuals.widgets.noninteractive,
+            &mut style.visuals.widgets.inactive,
+            &mut style.visuals.widgets.hovered,
+            &mut style.visuals.widgets.active,
+            &mut style.visuals.widgets.open,
+        ] {
+            state.corner_radius = CornerRadius::same(6);
+        }
+    }
 }
 
 fn apply_visuals(visuals: &mut egui::Visuals, metrics: &Metrics, palette: &Palette) {
@@ -282,7 +333,11 @@ pub fn drop_shadow(metrics: &Metrics, palette: &Palette, offset: i8) -> Shadow {
         offset: [0, offset],
         blur: metrics.shadow_blur,
         spread: 0,
-        color: palette.outline.gamma_multiply(0.7),
+        color: if metrics.lift == 0.0 {
+            Color32::from_black_alpha(22)
+        } else {
+            palette.outline.gamma_multiply(0.7)
+        },
     }
 }
 
@@ -295,9 +350,25 @@ mod tests {
         let context = egui::Context::default();
         assert!(installed(&context).is_none());
         assert!(std::ptr::eq(Skin::of(&context), skins::default()));
-        for skin in skins::ALL {
+        for skin in skins::ALL.iter().chain(skins::ALL.iter().rev()) {
             install(&context, skin);
             assert!(std::ptr::eq(Skin::of(&context), *skin));
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let style = context.style_of(theme);
+                let modern = skin.finish == Finish::Modern;
+                assert_eq!(
+                    style.visuals.widgets.inactive.corner_radius,
+                    CornerRadius::same(if modern { 6 } else { 0 })
+                );
+                assert_eq!(
+                    style.text_styles[&TextStyle::Heading].family,
+                    if modern {
+                        FontFamily::Proportional
+                    } else {
+                        FontFamily::Monospace
+                    }
+                );
+            }
         }
     }
 }

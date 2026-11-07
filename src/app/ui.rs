@@ -85,7 +85,11 @@ impl App {
                         egui::pos2(clip.right(), top + 2.0),
                     );
                     ui.allocate_rect(rule, egui::Sense::hover());
-                    ornaments::fading_rule(ui.painter(), rule, palette.accent);
+                    if Skin::of(ui.ctx()).finish == Finish::Modern {
+                        ui.painter().rect_filled(rule, 0, palette.outline);
+                    } else {
+                        ornaments::fading_rule(ui.painter(), rule, palette.accent);
+                    }
                     return;
                 }
                 let band = egui::Rect::from_min_max(
@@ -161,7 +165,8 @@ impl App {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(ui, "JOBS", 16.0, palette.accent);
-                    pixel::badge(ui, &self.config.jobs.len().to_string(), palette.gold);
+                    let color = style::decorative_color(ui.ctx(), palette.gold);
+                    pixel::badge(ui, &self.config.jobs.len().to_string(), color);
                 });
                 ui.add_space(10.0);
                 let new_job = PixelButton::new("New job")
@@ -219,6 +224,7 @@ impl App {
                     } else {
                         palette.metal
                     };
+                    let tint = style::decorative_color(ui.ctx(), tint);
                     sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 2.0;
@@ -305,9 +311,24 @@ fn logo(ui: &mut egui::Ui) {
     ui.add_space(6.0);
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
-        pixel::display_label(ui, "PORTBAK", 24.0, palette.gold);
+        pixel::display_label(
+            ui,
+            "PORTBAK",
+            if skin.finish == Finish::Modern {
+                20.0
+            } else {
+                24.0
+            },
+            if skin.finish == Finish::Modern {
+                palette.ink
+            } else {
+                palette.gold
+            },
+        );
         let tagline = Skin::of(ui.ctx()).wording.tagline;
-        ui.label(egui::RichText::new(tagline).color(palette.accent));
+        if !tagline.is_empty() {
+            ui.label(egui::RichText::new(tagline).color(palette.accent));
+        }
     });
 }
 
@@ -338,17 +359,28 @@ fn card_shapes(
     } else {
         palette.outline
     };
+    let modern = Skin::of(ctx).finish == Finish::Modern;
+    let radius = style::radius(ctx, 10);
     let mut shapes = vec![
-        shadow.as_shape(rect, 0.0).into(),
-        egui::Shape::rect_filled(rect, 0.0, fill),
+        shadow.as_shape(rect, radius).into(),
+        egui::Shape::rect_filled(rect, radius, fill),
         egui::Shape::rect_stroke(
             rect,
-            0.0,
-            egui::Stroke::new(if selected { 3.0_f32 } else { 2.0 }, border),
+            radius,
+            egui::Stroke::new(
+                if modern {
+                    1.0
+                } else if selected {
+                    3.0_f32
+                } else {
+                    2.0
+                },
+                border,
+            ),
             egui::StrokeKind::Inside,
         ),
     ];
-    if selected {
+    if selected && !modern {
         let notch = egui::Rect::from_min_size(rect.min, egui::vec2(6.0, rect.height()));
         shapes.push(egui::Shape::rect_filled(notch, 0.0, palette.accent));
     }
@@ -374,10 +406,13 @@ mod tests {
 
     #[test]
     fn sidebar_width_stays_fixed_across_frames() {
-        for skin in ["retro", "dark-fantasy"] {
+        for (skin, dark) in skins::ALL
+            .iter()
+            .flat_map(|skin| [(*skin, false), (*skin, true)])
+        {
             for with_job in [false, true] {
                 let mut config = Config {
-                    skin: skin.into(),
+                    skin: skin.id.into(),
                     ..Config::default()
                 };
                 if with_job {
@@ -394,6 +429,11 @@ mod tests {
                 );
                 let context = egui::Context::default();
                 app.ensure_skin(&context);
+                context.set_theme(if dark {
+                    egui::Theme::Dark
+                } else {
+                    egui::Theme::Light
+                });
                 let id = egui::Id::new("jobs");
                 context.data_mut(|data| {
                     data.insert_persisted(
@@ -421,7 +461,8 @@ mod tests {
                         .width();
                     assert!(
                         (width - 350.0).abs() < 1.0,
-                        "{skin} with_job={with_job}: {width}"
+                        "{} with_job={with_job}: {width}",
+                        skin.id
                     );
                 }
             }
@@ -503,10 +544,13 @@ mod tests {
 
     #[test]
     fn selected_job_renders_at_minimum_window_width_with_wide_sidebar() {
-        for skin in ["retro", "dark-fantasy"] {
+        for (skin, dark) in skins::ALL
+            .iter()
+            .flat_map(|skin| [(*skin, false), (*skin, true)])
+        {
             for enabled in [false, true] {
                 let config = Config {
-                    skin: skin.into(),
+                    skin: skin.id.into(),
                     sidebar_width: 460.0,
                     jobs: vec![Job {
                         enabled,
@@ -521,6 +565,11 @@ mod tests {
                 );
                 let ctx = egui::Context::default();
                 app.ensure_skin(&ctx);
+                ctx.set_theme(if dark {
+                    egui::Theme::Dark
+                } else {
+                    egui::Theme::Light
+                });
                 for width in [1100.0, 800.0, 750.0] {
                     let input = egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(

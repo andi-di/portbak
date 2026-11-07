@@ -1,11 +1,12 @@
 //! Registry of available skins. A new look is one more `Skin` value listed in `ALL`.
 
 mod dark_fantasy;
+mod modern;
 mod retro;
 
 use super::style::Skin;
 
-pub static ALL: &[&Skin] = &[&retro::RETRO, &dark_fantasy::DARK_FANTASY];
+pub static ALL: &[&Skin] = &[&retro::RETRO, &dark_fantasy::DARK_FANTASY, &modern::MODERN];
 
 pub fn default() -> &'static Skin {
     ALL[0]

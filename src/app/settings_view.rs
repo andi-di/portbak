@@ -109,10 +109,10 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     ui.painter().set(
         background,
         vec![
-            egui::Shape::rect_filled(rect, 0.0, fill),
+            egui::Shape::rect_filled(rect, super::style::radius(ui.ctx(), 10), fill),
             egui::Shape::rect_stroke(
                 rect,
-                0.0,
+                super::style::radius(ui.ctx(), 10),
                 egui::Stroke::new(metrics(ui.ctx()).border, palette.outline),
                 egui::StrokeKind::Inside,
             ),
@@ -137,10 +137,11 @@ fn swatches(ui: &mut egui::Ui, palette: &Palette) {
         ui.spacing_mut().item_spacing.x = 2.0;
         for color in colors {
             let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(SWATCH), egui::Sense::hover());
-            ui.painter().rect_filled(rect, 0.0, color);
+            ui.painter()
+                .rect_filled(rect, super::style::radius(ui.ctx(), 3), color);
             ui.painter().rect_stroke(
                 rect,
-                0.0,
+                super::style::radius(ui.ctx(), 3),
                 egui::Stroke::new(1.0_f32, outline),
                 egui::StrokeKind::Inside,
             );
@@ -159,19 +160,28 @@ fn mode_sprite(theme: Theme) -> Sprite {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Config;
 
     #[test]
     fn settings_page_renders_every_skin_and_keeps_the_choice() {
-        let mut skin = skins::default().id.to_owned();
-        let mut theme = Theme::Dark;
-        let context = egui::Context::default();
-        let _ = context.run(egui::RawInput::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                assert!(!settings_page(ui, &mut skin, &mut theme));
-            });
-        });
-        assert_eq!(skin, Config::default().skin);
-        assert_eq!(theme, Theme::Dark);
+        for candidate in skins::ALL {
+            for mode in Theme::ALL {
+                let mut skin = candidate.id.to_owned();
+                let mut theme = mode;
+                let context = egui::Context::default();
+                super::super::style::install(&context, candidate);
+                context.set_theme(match mode {
+                    Theme::System => egui::ThemePreference::System,
+                    Theme::Light => egui::ThemePreference::Light,
+                    Theme::Dark => egui::ThemePreference::Dark,
+                });
+                let _ = context.run(egui::RawInput::default(), |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        assert!(!settings_page(ui, &mut skin, &mut theme));
+                    });
+                });
+                assert_eq!(skin, candidate.id);
+                assert_eq!(theme, mode);
+            }
+        }
     }
 }

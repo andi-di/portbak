@@ -1,6 +1,6 @@
 use super::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use super::sprites::{self, Sprite};
-use super::style::{label_font, Palette, Skin};
+use super::style::{self, label_font, Finish, Palette, Skin};
 use super::widgets::{
     alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
     DATE_MINUTE, DATE_TIME,
@@ -187,6 +187,7 @@ fn job_identity(ui: &mut egui::Ui, job: &Job) {
     } else {
         palette.metal
     };
+    let tint = style::decorative_color(ui.ctx(), tint);
     sprites::show(ui, Sprite::Floppy, 5.0, tint);
     ui.add_space(6.0);
     ui.vertical(|ui| {
@@ -234,7 +235,8 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
-        sprites::show(ui, Sprite::Package, 2.0, Palette::of(ui).gold);
+        let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
+        sprites::show(ui, Sprite::Package, 2.0, tint);
     });
 }
 
@@ -284,7 +286,12 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     };
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        readout(ui, "Next check", &next, palette.accent);
+        let color = if Skin::of(ui.ctx()).finish == Finish::Modern {
+            palette.hot
+        } else {
+            palette.accent
+        };
+        readout(ui, "Next check", &next, color);
         if let Some(remaining) = job.countdown(Utc::now()) {
             ui.add_space(24.0);
             readout(ui, "Next check in", &remaining, palette.good);
@@ -299,7 +306,15 @@ fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
         let palette = Palette::of(ui);
         egui::Frame::new()
             .fill(palette.sunken)
-            .stroke(egui::Stroke::new(2.0_f32, palette.outline))
+            .corner_radius(style::radius(ui.ctx(), 6))
+            .stroke(egui::Stroke::new(
+                if Skin::of(ui.ctx()).finish == Finish::Modern {
+                    1.0_f32
+                } else {
+                    2.0_f32
+                },
+                palette.outline,
+            ))
             .inner_margin(egui::Margin::symmetric(10, 6))
             .show(ui, |ui| {
                 ui.label(
@@ -451,7 +466,8 @@ fn status_panel(ui: &mut egui::Ui, job: &Job, permissions: &Permissions) -> Opti
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
-    readout(ui, "Last backup", &last_backup, palette.gold);
+    let color = style::decorative_color(ui.ctx(), palette.gold);
+    readout(ui, "Last backup", &last_backup, color);
     ui.add_space(2.0);
     if job.status.starts_with("Error") {
         alert(ui, palette.bad, &job.status);

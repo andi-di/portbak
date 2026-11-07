@@ -3,7 +3,7 @@
 use super::forge;
 use super::ornaments;
 use super::sprites::{self, Sprite};
-use super::style::{self, display_font, label_font, Finish, Palette, Skin, TitleBar};
+use super::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
     WidgetInfo, WidgetType,
@@ -78,7 +78,12 @@ impl Widget for PixelButton {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
-        let text = self.label.to_uppercase();
+        let modern = Skin::of(ui.ctx()).finish == Finish::Modern;
+        let text = if modern {
+            self.label.clone()
+        } else {
+            self.label.to_uppercase()
+        };
         let font = TextStyle::Button.resolve(ui.style());
         let galley = ui
             .painter()
@@ -116,13 +121,29 @@ impl Widget for PixelButton {
             .ctx()
             .animate_bool_with_time(response.id.with("glow"), hovered, 0.15);
         let base = self.base_fill(palette);
-        let fill = match (enabled, hovered) {
-            (false, _) => palette.surface,
-            (true, true) => mix(base, Color32::WHITE, 0.18),
-            (true, false) => base,
+        let fill = if modern && self.tone == Tone::Plain && !self.selected {
+            if !enabled {
+                palette.surface
+            } else if hovered {
+                palette.highlight
+            } else {
+                palette.raised
+            }
+        } else if modern && sunk && enabled {
+            mix(base, Color32::BLACK, 0.12)
+        } else {
+            match (enabled, hovered) {
+                (false, _) => palette.surface,
+                (true, true) => mix(base, Color32::WHITE, 0.18),
+                (true, false) => base,
+            }
         };
         let painter = ui.painter();
-        let face = if engraved {
+        let face = if modern {
+            let face = Rect::from_min_size(rect.min, face_size);
+            super::modern::control(painter, face, fill, response.has_focus(), enabled);
+            face
+        } else if engraved {
             let press = Vec2::new(0.0, if sunk { 1.0 } else { 0.0 });
             let face = Rect::from_min_size(rect.min + press, face_size);
             let look = forge::PlateLook {
@@ -144,7 +165,15 @@ impl Widget for PixelButton {
             pixel_face(painter, face, fill, sunk, enabled, response.has_focus());
             face
         };
-        let ink = if enabled {
+        let ink = if modern && self.tone == Tone::Plain && !self.selected {
+            if enabled {
+                palette.ink
+            } else {
+                palette.dim
+            }
+        } else if modern && enabled {
+            super::modern::foreground(fill)
+        } else if enabled {
             readable_on(fill, palette)
         } else {
             palette.dim
@@ -257,7 +286,14 @@ impl Widget for PixelCheckbox<'_> {
             (true, true) => palette.accent,
             (true, false) => palette.outline,
         };
-        if Skin::of(ui.ctx()).finish == Finish::Engraved {
+        if Skin::of(ui.ctx()).finish == Finish::Modern {
+            let fill = if checked {
+                palette.accent
+            } else {
+                palette.sunken
+            };
+            super::modern::control(painter, square, fill, response.has_focus(), enabled);
+        } else if Skin::of(ui.ctx()).finish == Finish::Engraved {
             forge::spiked_socket(painter, square, border);
         } else {
             painter.rect_filled(square, 0.0, palette.sunken);
@@ -276,7 +312,13 @@ impl Widget for PixelCheckbox<'_> {
             );
         }
         if checked {
-            let tint = if enabled { palette.good } else { palette.dim };
+            let tint = if Skin::of(ui.ctx()).finish == Finish::Modern && enabled {
+                palette.accent_ink
+            } else if enabled {
+                palette.good
+            } else {
+                palette.dim
+            };
             sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
         }
         let ink = if enabled { palette.ink } else { palette.dim };
@@ -332,6 +374,7 @@ pub fn section<R>(
     let shadow = style::drop_shadow(m, palette, m.shadow);
     egui::Frame::new()
         .fill(palette.surface)
+        .corner_radius(style::radius(ui.ctx(), 10))
         .stroke(Stroke::new(m.border, palette.outline))
         .shadow(shadow)
         .outer_margin(egui::Margin {
@@ -358,6 +401,7 @@ pub fn section<R>(
 
 pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) {
     match Skin::of(ui.ctx()).effects.title_bar {
+        TitleBar::Modern => super::modern::title_bar(ui, title, sprite),
         TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
         TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
     }
@@ -420,15 +464,19 @@ pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -
     let palette = Palette::of(ui);
     let typography = &Skin::of(ui.ctx()).typography;
     let size = size * typography.display_scale;
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text.to_owned(), display_font(size), color);
+    let galley =
+        ui.painter()
+            .layout_no_wrap(text.to_owned(), style::face_font(ui.ctx(), size), color);
     let drop = (size * typography.display_drop).round();
     let (rect, response) =
         ui.allocate_exact_size(galley.size() + Vec2::splat(drop), Sense::hover());
     let painter = ui.painter();
     if drop > 0.0 {
-        let shadow = painter.layout_no_wrap(text.to_owned(), display_font(size), palette.outline);
+        let shadow = painter.layout_no_wrap(
+            text.to_owned(),
+            style::face_font(ui.ctx(), size),
+            palette.outline,
+        );
         painter.galley(
             rect.min.round() + Vec2::splat(drop),
             shadow,
@@ -443,7 +491,11 @@ pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -
 pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
-    let ink = readable_on(fill, palette);
+    let ink = if Skin::of(ui.ctx()).finish == Finish::Modern {
+        super::modern::foreground(fill)
+    } else {
+        readable_on(fill, palette)
+    };
     let font = TextStyle::Small.resolve(ui.style());
     let galley = ui.painter().layout_no_wrap(text.to_uppercase(), font, ink);
     let padding = egui::vec2(6.0, 0.0);
@@ -452,10 +504,10 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
         Sense::hover(),
     );
     let painter = ui.painter();
-    painter.rect_filled(rect, 0.0, fill);
+    painter.rect_filled(rect, style::radius(ui.ctx(), 6), fill);
     painter.rect_stroke(
         rect,
-        0.0,
+        style::radius(ui.ctx(), 6),
         Stroke::new(m.border, palette.outline),
         StrokeKind::Inside,
     );
@@ -474,6 +526,10 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     } else {
         mix(color, palette.outline, 0.7)
     };
+    if Skin::of(ui.ctx()).finish == Finish::Modern {
+        painter.circle_filled(rect.center(), 4.0, fill);
+        return response;
+    }
     if Skin::of(ui.ctx()).finish == Finish::Engraved {
         ornaments::diamond_lamp(painter, rect, fill, lit);
         return response;
@@ -495,6 +551,9 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
 /// An indeterminate progress bar: a comet of lit cells sweeping through a sunken track.
 pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let m = style::metrics(ui.ctx());
+    if Skin::of(ui.ctx()).finish == Finish::Modern {
+        return super::modern::progress(ui, width, color);
+    }
     const CELL: f32 = 8.0;
     const GAP: f32 = 2.0;
     const TRAIL: usize = 6;
@@ -689,7 +748,11 @@ mod tests {
 
     #[test]
     fn text_on_fills_stays_readable_in_both_palettes() {
-        for palette in skins::ALL.iter().flat_map(|skin| [&skin.dark, &skin.light]) {
+        for palette in skins::ALL
+            .iter()
+            .filter(|skin| skin.finish != Finish::Modern)
+            .flat_map(|skin| [&skin.dark, &skin.light])
+        {
             assert_eq!(readable_on(palette.gold, palette).r(), 0x1a);
             assert_eq!(readable_on(palette.outline, palette), palette.paper);
             assert_eq!(readable_on(palette.bad, palette), palette.paper);
@@ -699,8 +762,16 @@ mod tests {
     #[test]
     fn buttons_stay_within_their_minimum_footprint_in_every_skin() {
         let context = egui::Context::default();
-        for skin in skins::ALL {
+        for (skin, dark) in skins::ALL
+            .iter()
+            .flat_map(|skin| [(*skin, false), (*skin, true)])
+        {
             style::install(&context, skin);
+            context.set_theme(if dark {
+                egui::Theme::Dark
+            } else {
+                egui::Theme::Light
+            });
             let _ = context.run(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     let size = egui::vec2(260.0, 52.0);

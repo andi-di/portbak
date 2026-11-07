@@ -8,7 +8,8 @@ use chrono::{Local, TimeZone};
 use eframe::egui;
 
 const LIST_HEIGHT: f32 = 300.0;
-const DIALOG_HEIGHT: f32 = 620.0;
+const DIALOG_WIDTH: f32 = 840.0;
+const DIALOG_HEIGHT: f32 = 800.0;
 
 /// What the user asked for in this frame; applied once the dialog is no longer borrowed.
 #[derive(Default)]
@@ -23,24 +24,9 @@ impl App {
         let Some(dialog) = &mut self.history_dialog else {
             return;
         };
-        let palette = Palette::of_ctx(ctx);
-        let app_error = &self.error;
-        let (title, sprite, band) = match dialog.mode {
-            HistoryMode::Manage => ("Manage backups", Sprite::Chest, palette.accent),
-            HistoryMode::Restore => ("Restore backup", Sprite::Rewind, palette.hot),
-        };
-        let window = egui::Window::new(title)
-            .collapsible(false)
-            .resizable(true)
-            .default_size([680.0, DIALOG_HEIGHT])
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]);
-        let response = pixel::dialog(ctx, window, title, sprite, band, |ui| {
-            egui::ScrollArea::vertical()
-                .max_height(DIALOG_HEIGHT)
-                .show(ui, |ui| dialog_contents(ui, dialog, app_error))
-                .inner
-        })
-        .unwrap_or_default();
+        let response = history_window(ctx, dialog, &self.error)
+            .map(|output| output.inner)
+            .unwrap_or_default();
         if response.close {
             self.history_dialog = None;
         }
@@ -51,6 +37,28 @@ impl App {
             self.confirm_restore(ctx);
         }
     }
+}
+
+fn history_window(
+    ctx: &egui::Context,
+    dialog: &mut HistoryDialog,
+    app_error: &str,
+) -> Option<egui::scroll_area::ScrollAreaOutput<DialogResponse>> {
+    let palette = Palette::of_ctx(ctx);
+    let (title, sprite, band) = match dialog.mode {
+        HistoryMode::Manage => ("Manage backups", Sprite::Chest, palette.accent),
+        HistoryMode::Restore => ("Restore backup", Sprite::Rewind, palette.hot),
+    };
+    let window = egui::Window::new(title)
+        .collapsible(false)
+        .resizable(true)
+        .default_size([DIALOG_WIDTH, DIALOG_HEIGHT])
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]);
+    pixel::dialog(ctx, window, title, sprite, band, |ui| {
+        egui::ScrollArea::vertical()
+            .max_height(ui.available_height())
+            .show(ui, |ui| dialog_contents(ui, dialog, app_error))
+    })
 }
 
 fn dialog_contents(
@@ -135,6 +143,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
         ui.label(format!("Selected backup: {name}"));
     }
     egui::Frame::new()
+        .corner_radius(super::style::radius(ui.ctx(), 6))
         .fill(pixel::mix(palette.bad, palette.surface, 0.8))
         .stroke(egui::Stroke::new(2.0_f32, palette.bad))
         .inner_margin(egui::Margin::same(10))
@@ -162,6 +171,7 @@ fn sunken<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R 
     let palette = Palette::of(ui);
     egui::Frame::new()
         .fill(palette.sunken)
+        .corner_radius(super::style::radius(ui.ctx(), 6))
         .stroke(egui::Stroke::new(2.0_f32, palette.outline))
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
@@ -272,8 +282,10 @@ fn backup_row<R>(
         (false, true) => palette.raised,
         (false, false) => egui::Color32::TRANSPARENT,
     };
-    ui.painter()
-        .set(background, egui::Shape::rect_filled(rect, 0.0, fill));
+    ui.painter().set(
+        background,
+        egui::Shape::rect_filled(rect, super::style::radius(ui.ctx(), 6), fill),
+    );
     (response, frame.inner)
 }
 
@@ -344,6 +356,76 @@ mod tests {
     use super::*;
     use crate::model::Record;
     use chrono::Utc;
+
+    #[test]
+    fn restore_fits_without_outer_scrolling_before_and_after_selection() {
+        for skin in crate::app::skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                crate::app::style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let job = crate::model::Job {
+                    name: "My documents".into(),
+                    source: "/home/user/Documents/Projects/Important documents".into(),
+                    ..Default::default()
+                };
+                let name = "2026-11-07_18-30-00_My documents and important project files";
+                let backups = (0..100)
+                    .map(|index| Backup {
+                        record: Record {
+                            name: format!("{name}_{index}"),
+                            hash: String::new(),
+                            bytes: 1024,
+                            created: Utc::now(),
+                            protected: false,
+                        },
+                        available: true,
+                        zip: false,
+                    })
+                    .collect();
+                let mut dialog = HistoryDialog::new(job, HistoryMode::Restore);
+                dialog.backups = Some(Ok(backups));
+                let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1100.0, 960.0));
+                for frame in 0..8 {
+                    if frame == 4 {
+                        dialog.selected = Some(format!("{name}_0"));
+                    }
+                    let input = egui::RawInput {
+                        screen_rect: Some(screen),
+                        ..Default::default()
+                    };
+                    let mut sizes = None;
+                    let _ = ctx.run(input, |ctx| {
+                        let output = history_window(ctx, &mut dialog, "").unwrap();
+                        sizes = Some((output.content_size, output.inner_rect));
+                    });
+                    if frame < 2 {
+                        continue;
+                    }
+                    let (content, viewport) = sizes.unwrap();
+                    assert!(
+                        content.y <= viewport.height() + 1.0,
+                        "{} {theme:?} selected={}: content={content:?}, viewport={viewport:?}",
+                        skin.id,
+                        dialog.selected.is_some()
+                    );
+                    assert!(
+                        content.x <= viewport.width() + 1.0,
+                        "{} {theme:?}: horizontal overflow",
+                        skin.id
+                    );
+                    let window = ctx
+                        .memory(|memory| memory.area_rect(egui::Id::new("Restore backup")))
+                        .unwrap();
+                    assert!(
+                        screen.contains_rect(window),
+                        "{} {theme:?}: window={window:?}",
+                        skin.id
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn day_markers_use_first_list_entry_and_local_calendar_date() {
