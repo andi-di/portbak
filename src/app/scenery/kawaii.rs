@@ -1,4 +1,4 @@
-//! Candy-cloud wallpaper, catgirl companions, floating hearts and pointer stardust.
+//! Candy-cloud wallpaper, glossy red hearts and a light dusting of pointer stardust.
 
 use crate::app::rendering::ornaments::noise;
 use crate::app::rendering::pixel::mix;
@@ -9,9 +9,8 @@ use std::f32::consts::TAU;
 use std::time::Duration;
 
 const HEARTS: u32 = 28;
-const PARTICLE_LIMIT: usize = 160;
-const LIFETIME: f32 = 0.85;
-const PORTRAIT: &[u8] = include_bytes!("../../../assets/themes/kawaii/companions.png");
+const PARTICLE_LIMIT: usize = 32;
+const LIFETIME: f32 = 0.55;
 
 #[derive(Clone, Default)]
 struct Magic {
@@ -31,37 +30,6 @@ struct Particle {
 
 fn state_id() -> egui::Id {
     egui::Id::new("kawaii_magic")
-}
-
-fn portrait(ctx: &egui::Context) -> Result<egui::TextureHandle, String> {
-    let id = egui::Id::new("kawaii_companions");
-    if let Some(cached) = ctx.data_mut(|data| data.get_temp(id)) {
-        return cached;
-    }
-    let loaded = image::load_from_memory(PORTRAIT)
-        .map(|image| {
-            let rgba = image.to_rgba8();
-            let size = [rgba.width() as usize, rgba.height() as usize];
-            ctx.load_texture(
-                "Kawaii companions",
-                egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw()),
-                egui::TextureOptions::LINEAR,
-            )
-        })
-        .map_err(|error| format!("Could not load Kawaii companion artwork: {error}"));
-    if let Err(error) = &loaded {
-        eprintln!("{error}");
-    }
-    ctx.data_mut(|data| data.insert_temp(id, loaded.clone()));
-    loaded
-}
-
-pub fn companions(ui: &mut egui::Ui) {
-    if let Ok(texture) = portrait(ui.ctx()) {
-        let width = ui.available_width().min(340.0);
-        let height = width / texture.aspect_ratio();
-        ui.add(egui::Image::new(&texture).fit_to_exact_size(egui::vec2(width, height)));
-    }
 }
 
 pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
@@ -92,28 +60,11 @@ pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
             palette.hot.gamma_multiply(0.035),
         );
     }
-    if let Ok(texture) = portrait(ctx) {
-        let width = (screen.width() * 0.54).min(640.0);
-        let size = egui::vec2(width, width / texture.aspect_ratio());
-        let rect = Rect::from_min_size(screen.right_bottom() - size, size);
-        painter.image(
-            texture.id(),
-            rect,
-            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
-            Color32::WHITE.gamma_multiply(0.65),
-        );
-    }
-    floating_hearts(ctx, &painter, screen, time, palette);
+    floating_hearts(ctx, &painter, screen, time);
     ctx.request_repaint_after(Duration::from_millis(50));
 }
 
-fn floating_hearts(
-    ctx: &egui::Context,
-    behind: &egui::Painter,
-    screen: Rect,
-    time: f32,
-    palette: &Palette,
-) {
+fn floating_hearts(ctx: &egui::Context, behind: &egui::Painter, screen: Rect, time: f32) {
     let front = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Foreground,
         egui::Id::new("kawaii_hearts"),
@@ -133,7 +84,11 @@ fn floating_hearts(
             screen.bottom() + radius * 2.0 - progress.fract() * travel,
         );
         let painter = if index % 5 == 0 { &front } else { behind };
-        let color = mix(palette.hot, palette.gold, noise(index, 14) * 0.4);
+        let color = mix(
+            Color32::from_rgb(0xd4, 0x12, 0x3b),
+            Color32::from_rgb(0xff, 0x45, 0x58),
+            noise(index, 14),
+        );
         if let Some((popped_trip, born)) = state.popped.get(&index) {
             if *popped_trip == trip {
                 burst(painter, center, radius, time - born, color);
@@ -142,17 +97,11 @@ fn floating_hearts(
         }
         if pointer.is_some_and(|point| point.distance(center) < radius) {
             state.popped.insert(index, (trip, time));
-            release(&mut state, center, time, 10);
+            release(&mut state, center, time, 2);
             continue;
         }
         let fade = (progress.fract() * 12.0).min(1.0) * ((1.0 - progress.fract()) * 12.0).min(1.0);
-        heart(painter, center, radius, color.gamma_multiply(fade * 0.45));
-        sparkle(
-            painter,
-            center + egui::vec2(-radius * 0.35, -radius * 0.35),
-            radius * 0.2,
-            palette.paper.gamma_multiply(fade * 0.8),
-        );
+        glossy_heart(painter, center, radius, color, fade * 0.8);
     }
     ctx.data_mut(|data| data.insert_temp(state_id(), state));
 }
@@ -174,6 +123,51 @@ fn heart(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
         }
     }
     painter.add(mesh);
+}
+
+fn glossy_heart(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32, opacity: f32) {
+    let depth = Vec2::new(radius * 0.05, radius * 0.12);
+    heart(
+        painter,
+        center + depth * 1.5,
+        radius * 1.03,
+        Color32::from_black_alpha((opacity * 36.0) as u8),
+    );
+    heart(
+        painter,
+        center + depth,
+        radius,
+        Color32::from_rgb(0x79, 0x08, 0x25).gamma_multiply(opacity),
+    );
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(
+        center + egui::vec2(-0.22, -0.22) * radius,
+        mix(color, Color32::from_rgb(255, 154, 159), 0.6).gamma_multiply(opacity),
+    );
+    for step in 0..=48 {
+        let angle = step as f32 / 48.0 * TAU;
+        let x = angle.sin().powi(3);
+        let y = -(13.0 * angle.cos()
+            - 5.0 * (2.0 * angle).cos()
+            - 2.0 * (3.0 * angle).cos()
+            - (4.0 * angle).cos())
+            / 16.0;
+        let shade = ((x + y) * 0.3 + 0.5).clamp(0.0, 1.0);
+        let edge = mix(color, Color32::from_rgb(0x74, 0x06, 0x23), shade);
+        mesh.colored_vertex(
+            center + egui::vec2(x, y) * radius,
+            edge.gamma_multiply(opacity),
+        );
+        if step > 0 {
+            mesh.add_triangle(0, step, step + 1);
+        }
+    }
+    painter.add(mesh);
+    painter.add(egui::Shape::ellipse_filled(
+        center + egui::vec2(-0.42, -0.49) * radius,
+        egui::vec2(0.23, 0.12) * radius,
+        Color32::WHITE.gamma_multiply(opacity * 0.8),
+    ));
 }
 
 fn sparkle(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
@@ -232,14 +226,14 @@ fn record_pointer(state: &mut Magic, pointer: Option<Pos2>, pressed: bool, time:
     };
     if let Some(previous) = state.last_pointer {
         let distance = previous.distance(pointer);
-        if distance >= 5.0 {
-            let steps = (distance / 5.0).ceil().min(24.0) as u32;
+        if distance >= 22.0 {
+            let steps = (distance / 22.0).floor().min(4.0) as u32;
             for step in 1..=steps {
                 release(
                     state,
                     previous.lerp(pointer, step as f32 / steps as f32),
                     time,
-                    2,
+                    1,
                 );
             }
             state.last_pointer = Some(pointer);
@@ -248,7 +242,7 @@ fn record_pointer(state: &mut Magic, pointer: Option<Pos2>, pressed: bool, time:
         state.last_pointer = Some(pointer);
     }
     if pressed {
-        release(state, pointer, time, 18);
+        release(state, pointer, time, 4);
     }
 }
 
@@ -301,23 +295,5 @@ mod tests {
         assert!(state.particles.is_empty());
         record_pointer(&mut state, Some(egui::pos2(300.0, 400.0)), false, 2.1);
         assert!(state.particles.is_empty());
-    }
-
-    #[test]
-    fn embedded_portrait_has_transparency_and_renders_in_both_modes() {
-        let image = image::load_from_memory(PORTRAIT).unwrap().to_rgba8();
-        assert!(image.pixels().any(|pixel| pixel[3] == 0));
-        let ctx = egui::Context::default();
-        let skin = crate::app::theme::skins::find("kawaii");
-        crate::app::theme::style::install(&ctx, skin);
-        for theme in [egui::Theme::Light, egui::Theme::Dark] {
-            ctx.set_theme(theme);
-            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
-                paint_background(&ctx, skin.palette(theme == egui::Theme::Dark));
-                companions(ui);
-                paint_overlays(&ctx, skin.palette(theme == egui::Theme::Dark));
-            });
-            assert!(!output.shapes.is_empty());
-        }
     }
 }

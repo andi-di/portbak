@@ -190,17 +190,33 @@ impl App {
                     self.add_job();
                 }
                 ui.add_space(12.0);
+                let mascot_height =
+                    crate::app::scenery::catgirl::reserved_height(ui.available_width());
+                let show_mascot = Skin::of(ui.ctx()).effects.hearts
+                    && (!self.config.jobs.is_empty() || self.settings_open)
+                    && ui.available_height() > mascot_height + 120.0;
+                let list_height = if show_mascot {
+                    ui.available_height() - mascot_height
+                } else {
+                    ui.available_height()
+                };
                 let mut clicked = None;
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for job in &self.config.jobs {
-                        if self.job_card(ui, job) {
-                            clicked = Some(job.id);
+                egui::ScrollArea::vertical()
+                    .max_height(list_height)
+                    .show(ui, |ui| {
+                        for job in &self.config.jobs {
+                            if self.job_card(ui, job) {
+                                clicked = Some(job.id);
+                            }
                         }
-                    }
-                });
+                    });
                 if clicked.is_some() {
                     self.selected = clicked;
                     self.settings_open = false;
+                }
+                if show_mascot {
+                    ui.add_space((ui.available_height() - mascot_height).max(0.0));
+                    ui.vertical_centered(crate::app::scenery::catgirl::show);
                 }
             });
         if ctx

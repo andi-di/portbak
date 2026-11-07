@@ -1,4 +1,4 @@
-//! Kawaii: candy glass, catgirl companions and a sky full of floating hearts.
+//! Kawaii: candy glass, an interactive catgirl companion and a sky full of floating hearts.
 
 use crate::app::rendering::sprites::Sprite;
 use crate::app::theme::style::{
@@ -9,7 +9,7 @@ use eframe::egui::Color32;
 pub static KAWAII: Skin = Skin {
     id: "kawaii",
     name: "Kawaii",
-    description: "Catgirl companions, candy glass, poppable hearts and a magical sparkle trail.",
+    description: "A watchful catgirl, glossy red hearts, candy glass and a subtle sparkle trail.",
     dark: MOONLIGHT,
     light: STRAWBERRY_MILK,
     fonts: Fonts {

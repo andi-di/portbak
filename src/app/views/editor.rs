@@ -105,7 +105,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
         ui.add_space(bob);
         if Skin::of(ui.ctx()).effects.hearts {
-            crate::app::scenery::kawaii::companions(ui);
+            crate::app::scenery::catgirl::show(ui);
         } else {
             sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
         }
