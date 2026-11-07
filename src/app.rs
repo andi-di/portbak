@@ -10,6 +10,8 @@ mod skins;
 mod sprites;
 mod style;
 mod ui;
+#[cfg(target_os = "linux")]
+pub(crate) mod wayland_icon;
 mod widgets;
 
 use crate::engine::{self, history::Backup, Outcome};
