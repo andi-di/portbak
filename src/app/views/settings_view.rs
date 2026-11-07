@@ -89,7 +89,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
                 &mut defaults.auto_destination,
                 "Auto destination folder",
             ));
-            if defaults.auto_destination {
+            ui.add_enabled_ui(defaults.auto_destination, |ui| {
                 let button = ui.add(egui::Button::new(format!(
                     "{}    ",
                     defaults.destination_name.label()
@@ -111,7 +111,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
                         }
                     });
                 });
-            }
+            });
         });
         ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
     });

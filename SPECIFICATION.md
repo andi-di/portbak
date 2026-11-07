@@ -69,7 +69,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 - Settings has **Job settings** and **Theme** tabs. The automatic-destination checkbox appears only in Job settings, not in individual jobs.
 - Display Windows drive and network paths without extended-length prefixes in path fields, the settings-file location, and restore details; preserve internal paths for file operations.
 - Persist editable new-job defaults for automatic destination, compression, scheduling, and retention in `portbak.json`; changes affect future jobs only.
-- When automatic destination is checked, show a dropdown with both choices visible without scrolling: **Job name** (default for new jobs) or **Source folder**. Persist the choice with each job.
+- Always show the automatic-destination dropdown beside its checkbox; disable it when unchecked. Both choices are visible without scrolling: **Job name** (default for new jobs) or **Source folder**. Persist the choice with each job.
 - On source selection, create `<app-dir>/backups/<job UUID>-<chosen name>`. An empty job name uses only the UUID, without a suffix. Replace characters unsafe in filenames with underscores; reject destinations within the source.
 - Job-name destinations follow job renames; move the existing destination with its backups, refuse collisions, and report failures. Source-folder destinations stay unchanged on job renames.
 - Always show an **Auto updates** button beside the destination picker; indicate when active. With a valid source, it restores the generated destination and enables automatic updates without moving the manual destination’s contents. The global setting only supplies the initial state for new jobs.
