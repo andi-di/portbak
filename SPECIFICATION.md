@@ -41,7 +41,7 @@ Provide:
 
 The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
 
-The application remains a single distributable executable with an embedded icon. Under Linux, offer that icon directly to X11 and to Wayland compositors supporting window-icon pixel data. Missing support, icon setup errors, or an unresponsive icon negotiation must not block startup, show an error dialog, or prevent normal use; retain the compositor default icon. Do not install desktop entries or extract icon files.
+The application remains a single distributable executable with an embedded icon. On Windows, use the app icon for the executable in Explorer and shortcuts as well as the app window. Under Linux, offer that icon directly to X11 and to Wayland compositors supporting window-icon pixel data. Missing support, icon setup errors, or an unresponsive icon negotiation must not block startup, show an error dialog, or prevent normal use; retain the compositor default icon. Do not install desktop entries or extract icon files.
 
 ### Job actions
 
