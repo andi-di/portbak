@@ -357,9 +357,20 @@ pub fn paint_centered(
 
 /// Allocates room for the sprite in the layout and paints it.
 pub fn show(ui: &mut egui::Ui, sprite: Sprite, scale: f32, tint: Color32) -> egui::Response {
+    show_awake(ui, sprite, scale, tint, 0.0)
+}
+
+/// Like `show`, with `wake` as in `paint_awake`.
+pub fn show_awake(
+    ui: &mut egui::Ui,
+    sprite: Sprite,
+    scale: f32,
+    tint: Color32,
+    wake: f32,
+) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(size(ui.ctx(), sprite, scale), egui::Sense::hover());
-    paint(ui.painter(), rect.min, sprite, scale, tint);
+    paint_awake(ui.painter(), rect.min, sprite, scale, tint, wake);
     response
 }
 

@@ -28,14 +28,14 @@ pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32,
     let pen = Pen::new(painter, rect);
     let dark = mix(tint, palette.outline, 0.62);
     match sprite {
-        Sprite::Floppy => tome(&pen, palette, tint, dark),
+        Sprite::Floppy => mimic(&pen, palette, tint, wake),
         Sprite::Folder => scroll(&pen, palette, tint),
         Sprite::Clock => hourglass(&pen, palette, tint, dark),
         Sprite::Shield => shield(&pen, palette, tint, dark),
         Sprite::Trash => skull(&pen, palette),
         Sprite::Rewind => chevrons(&pen, tint),
         Sprite::Play => sword(&pen, palette, tint),
-        Sprite::Chest => mimic(&pen, palette, tint, wake),
+        Sprite::Chest => coffin(&pen, palette, tint, wake),
         Sprite::Package => urn(&pen, palette, tint, dark),
         Sprite::Sun => sun(&pen, palette),
         Sprite::Moon => moon(&pen, palette),
@@ -124,24 +124,36 @@ fn polar(center: Point, radius: f32, angle: f32) -> Point {
     )
 }
 
-/// A closed book with a gem on the cover; stands in for stored data.
-fn tome(pen: &Pen, palette: &Palette, tint: Color32, dark: Color32) {
-    let pages = mix(palette.paper, palette.gold, 0.3);
-    pen.rect((0.2, 0.1), (0.92, 0.9), pages, Some(palette.outline));
-    pen.rect((0.1, 0.04), (0.84, 0.96), dark, Some(tint));
-    pen.line(&[(0.24, 0.04), (0.24, 0.96)], tint, 1.0);
-    for corner in [
-        [(0.84, 0.04), (0.84, 0.2), (0.68, 0.04)],
-        [(0.84, 0.96), (0.68, 0.96), (0.84, 0.8)],
-    ] {
-        pen.fill(&corner, palette.gold);
+/// A coffin whose lid slides aside on wake, showing ember eyes inside; manage backups.
+fn coffin(pen: &Pen, palette: &Palette, tint: Color32, wake: f32) {
+    const OUTLINE: [Point; 6] = [
+        (0.32, 0.02),
+        (0.68, 0.02),
+        (0.86, 0.26),
+        (0.68, 0.98),
+        (0.32, 0.98),
+        (0.14, 0.26),
+    ];
+    if wake > 0.0 {
+        pen.shape(&OUTLINE, palette.outline, tint);
+        for x in [0.42, 0.58] {
+            pen.circle((x, 0.34), 0.04 * wake, palette.hot, None);
+        }
     }
-    pen.shape(
-        &[(0.54, 0.28), (0.7, 0.5), (0.54, 0.72), (0.38, 0.5)],
+    let shift = |(x, y): Point| (x + 0.16 * wake, y - 0.04 * wake);
+    let lid = OUTLINE.map(shift);
+    pen.shape(&lid, mix(palette.gold, palette.outline, 0.62), tint);
+    let inset = OUTLINE.map(|(x, y)| shift((0.5 + (x - 0.5) * 0.72, 0.5 + (y - 0.5) * 0.82)));
+    pen.painter.add(Shape::closed_line(
+        pen.points(&inset),
+        pen.stroke(mix(tint, palette.outline, 0.35), 0.6),
+    ));
+    pen.line(&[shift((0.5, 0.2)), shift((0.5, 0.74))], palette.gold, 1.4);
+    pen.line(
+        &[shift((0.35, 0.36)), shift((0.65, 0.36))],
         palette.gold,
-        palette.outline,
+        1.4,
     );
-    pen.circle((0.54, 0.5), 0.05, palette.bad, None);
 }
 
 /// A rolled parchment scroll.
@@ -250,7 +262,7 @@ fn sword(pen: &Pen, palette: &Palette, tint: Color32) {
 }
 
 /// A treasure chest that wakes into a mimic: the lid lifts, fangs and tongue come out, eyes
-/// open, and once fully awake it chomps. Manage backups.
+/// open, and once fully awake it chomps. Stands in for a backup job.
 fn mimic(pen: &Pen, palette: &Palette, tint: Color32, wake: f32) {
     let ctx = pen.painter.ctx();
     let chomp = if wake > 0.0 {

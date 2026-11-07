@@ -192,6 +192,15 @@ impl App {
         let selected = self.selected == Some(job.id);
         let running = self.active == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
+        let card_id = ui.id().with(job.id);
+        // The card's hover is only known after its contents, so wake the icon from last frame's.
+        let hovered = ui
+            .ctx()
+            .read_response(card_id)
+            .is_some_and(|response| response.hovered());
+        let wake = ui
+            .ctx()
+            .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         let width = ui.available_width() - CARD_SHADOW;
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 10))
@@ -203,7 +212,7 @@ impl App {
                     } else {
                         palette.metal
                     };
-                    sprites::show(ui, Sprite::Floppy, 3.0, tint);
+                    sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 2.0;
                         ui.add(
@@ -251,7 +260,7 @@ impl App {
             });
         let rect = frame.response.rect;
         let response = ui
-            .interact(rect, ui.id().with(job.id), egui::Sense::click())
+            .interact(rect, card_id, egui::Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand);
         ui.painter().set(
             background,
