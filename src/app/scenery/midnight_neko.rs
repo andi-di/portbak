@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-const HEARTS: u32 = 28;
+const HEARTS: u32 = 48;
 const PARTICLE_LIMIT: usize = 32;
 const LIFETIME: f32 = 0.55;
 
@@ -83,7 +83,7 @@ fn floating_hearts(ctx: &egui::Context, behind: &egui::Painter, screen: Rect, ti
                 + (time * 0.7 + index as f32).sin() * 18.0,
             screen.bottom() + radius * 2.0 - progress.fract() * travel,
         );
-        let painter = if index % 5 == 0 { &front } else { behind };
+        let painter = if index % 3 == 0 { &front } else { behind };
         let color = mix(
             Color32::from_rgb(0xd4, 0x12, 0x3b),
             Color32::from_rgb(0xff, 0x45, 0x58),

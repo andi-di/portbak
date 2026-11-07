@@ -1,15 +1,11 @@
 //! Approved illustrated portraits; expression changes never paint over the character's eyes.
 
-use crate::app::rendering::gothic;
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect};
 use std::{sync::Arc, time::Duration};
 
 const REACTION_SECONDS: f64 = 4.0;
 const PORTRAIT_SIZE: [u32; 2] = [384, 448];
-const EYE_LINE: f32 = 244.0;
-const EYE_DISTANCE: f32 = 96.0;
-const BACKDROP: image::Rgba<u8> = image::Rgba([0x21, 0x19, 0x1d, 255]);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Expression {
@@ -74,63 +70,31 @@ impl Expression {
         }
     }
 
-    fn portrait(self) -> (Source, Rect) {
-        let (source, bounds) = match self {
-            Self::Neutral => (Source::Expressions, [270.0, 28.0, 616.0, 420.0]),
-            Self::Angry => (Source::Expressions, [636.0, 78.0, 898.0, 317.0]),
-            Self::Pout => (Source::Expressions, [936.0, 78.0, 1200.0, 317.0]),
-            Self::Excited => (Source::Expressions, [1230.0, 78.0, 1488.0, 317.0]),
-            Self::Happy => (Source::Expressions, [636.0, 366.0, 898.0, 607.0]),
-            Self::Surprised => (Source::Expressions, [936.0, 366.0, 1200.0, 607.0]),
-            Self::Superior => (Source::Expressions, [1230.0, 366.0, 1488.0, 607.0]),
-            Self::InLove => (Source::Expressions, [636.0, 660.0, 898.0, 931.0]),
-            Self::ColdStare => (Source::Expressions, [936.0, 660.0, 1200.0, 931.0]),
-            Self::Sleepy => (Source::Expressions, [1230.0, 660.0, 1488.0, 931.0]),
-            Self::Bored => (Source::Poses, [170.0, 90.0, 740.0, 735.0]),
-            Self::Leaning => (Source::Poses, [803.0, 92.0, 1440.0, 927.0]),
-            Self::Yandere => (Source::Yandere, [35.0, 60.0, 1162.0, 1286.0]),
-            Self::Shy => (Source::Shy, [35.0, 65.0, 1162.0, 1286.0]),
-        };
-        (
-            source,
-            Rect::from_min_max(
-                egui::pos2(bounds[0], bounds[1]),
-                egui::pos2(bounds[2], bounds[3]),
-            ),
-        )
-    }
-
-    /// Iris centers measured on the approved source illustrations.
-    fn eyes(self) -> [Pos2; 2] {
-        let points = match self {
-            Self::Neutral => [369.0, 213.0, 444.0, 196.0],
-            Self::Angry => [755.0, 212.9, 823.6, 207.5],
-            Self::Pout => [1052.6, 206.4, 1117.9, 194.1],
-            Self::Excited => [1348.1, 197.2, 1412.4, 183.9],
-            Self::Happy => [763.3, 487.6, 830.6, 471.2],
-            Self::Surprised => [1055.5, 484.9, 1120.2, 474.5],
-            Self::Superior => [1363.5, 473.9, 1431.4, 462.0],
-            Self::InLove => [755.8, 780.1, 823.4, 758.9],
-            Self::ColdStare => [1045.5, 797.9, 1117.9, 791.9],
-            Self::Sleepy => [1349.4, 790.7, 1425.0, 773.5],
-            Self::Bored => [398.9, 344.4, 513.7, 320.3],
-            Self::Leaning => [1183.4, 376.1, 1288.3, 341.3],
-            Self::Yandere => [528.9, 499.0, 726.5, 431.5],
-            Self::Shy => [545.1, 561.9, 741.7, 523.6],
-        };
-        [
-            egui::pos2(points[0], points[1]),
-            egui::pos2(points[2], points[3]),
-        ]
+    fn cell(self) -> u32 {
+        match self {
+            Self::Neutral => 0,
+            Self::Angry => 1,
+            Self::Pout => 2,
+            Self::Excited => 3,
+            Self::Happy => 4,
+            Self::Surprised => 5,
+            Self::Superior => 6,
+            Self::InLove => 7,
+            Self::ColdStare => 8,
+            Self::Sleepy => 9,
+            Self::Bored => 10,
+            Self::Leaning => 11,
+            Self::Yandere => 12,
+            Self::Shy => 13,
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 enum Source {
     Expressions,
-    Poses,
-    Yandere,
-    Shy,
+    Portraits,
+    FullBody,
 }
 
 impl Source {
@@ -139,9 +103,12 @@ impl Source {
             Self::Expressions => {
                 include_bytes!("../../../assets/themes/midnight-neko/expressions.png")
             }
-            Self::Poses => include_bytes!("../../../assets/themes/midnight-neko/poses.png"),
-            Self::Yandere => include_bytes!("../../../assets/themes/midnight-neko/yandere.png"),
-            Self::Shy => include_bytes!("../../../assets/themes/midnight-neko/shy.png"),
+            Self::Portraits => {
+                include_bytes!("../../../assets/themes/midnight-neko/portraits-v2.png")
+            }
+            Self::FullBody => {
+                include_bytes!("../../../assets/themes/midnight-neko/full-body-v2.png")
+            }
         }
     }
 }
@@ -225,43 +192,34 @@ fn texture(ctx: &egui::Context, source: Source, icon: bool) -> Result<egui::Text
     )
 }
 
-fn normalized_portrait(image: &image::DynamicImage, expression: Expression) -> image::RgbaImage {
-    let (_, bounds) = expression.portrait();
-    let [left_eye, right_eye] = expression.eyes();
-    let center = left_eye.lerp(right_eye, 0.5);
-    let scale = EYE_DISTANCE / left_eye.distance(right_eye);
-    let crop = image
-        .crop_imm(
-            bounds.left() as u32,
-            bounds.top() as u32,
-            bounds.width() as u32,
-            bounds.height() as u32,
-        )
-        .to_rgba8();
-    let resized = image::imageops::resize(
-        &crop,
-        (crop.width() as f32 * scale).round() as u32,
-        (crop.height() as f32 * scale).round() as u32,
-        image::imageops::FilterType::Lanczos3,
-    );
-    let mut portrait = image::RgbaImage::from_pixel(PORTRAIT_SIZE[0], PORTRAIT_SIZE[1], BACKDROP);
-    let x = (PORTRAIT_SIZE[0] as f32 / 2.0 - (center.x - bounds.left()) * scale).round() as i64;
-    let y = (EYE_LINE - (center.y - bounds.top()) * scale).round() as i64;
-    image::imageops::overlay(&mut portrait, &resized, x, y);
-    portrait
-}
-
 fn portrait_texture(
     ctx: &egui::Context,
     expression: Expression,
+    full_body: bool,
 ) -> Result<egui::TextureHandle, String> {
     cached_texture(
         ctx,
-        egui::Id::new(format!("midnight_neko_portrait_{expression:?}")),
+        egui::Id::new(format!("midnight_neko_v2_{expression:?}_{full_body}")),
         egui::TextureOptions::LINEAR,
         || {
-            let image = source_image(ctx, expression.portrait().0)?;
-            Ok(normalized_portrait(&image, expression))
+            let source = if full_body {
+                Source::FullBody
+            } else {
+                Source::Portraits
+            };
+            let image = source_image(ctx, source)?;
+            let cell = expression.cell();
+            let width = image.width() / 4;
+            let height = image.height() / 4;
+            let crop = image
+                .crop_imm(cell % 4 * width, cell / 4 * height, width, height)
+                .to_rgba8();
+            Ok(image::imageops::resize(
+                &crop,
+                PORTRAIT_SIZE[0],
+                PORTRAIT_SIZE[1],
+                image::imageops::FilterType::Lanczos3,
+            ))
         },
     )
 }
@@ -305,21 +263,14 @@ fn show_companion(ui: &mut egui::Ui, full_figure: bool) {
     }
     let expression = state.visible(time);
     let palette = Palette::of(ui);
-    ui.painter()
-        .rect_filled(rect, 2, Color32::from_rgb(0x21, 0x19, 0x1d));
-    if full_figure && expression == Expression::Neutral {
-        paint_full_figure(ui.painter(), rect);
-    } else {
-        if let Ok(texture) = portrait_texture(ui.ctx(), expression) {
-            ui.painter().image(
-                texture.id(),
-                rect,
-                Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-        }
+    if let Ok(texture) = portrait_texture(ui.ctx(), expression, full_figure) {
+        ui.painter().image(
+            texture.id(),
+            rect,
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
     }
-    gothic::corners(ui.painter(), rect.shrink(1.0), palette.metal);
     response.on_hover_text("Click Midnight Neko for another expression");
     ui.add_space(4.0);
     ui.label(
@@ -332,25 +283,6 @@ fn show_companion(ui: &mut egui::Ui, full_figure: bool) {
             .request_repaint_after(Duration::from_secs_f64(state.until - time));
     }
     ui.ctx().data_mut(|data| data.insert_temp(id, state));
-}
-
-fn paint_full_figure(painter: &egui::Painter, rect: Rect) {
-    if let Ok(texture) = texture(painter.ctx(), Source::Expressions, false) {
-        let pixels = Rect::from_min_max(egui::pos2(2.0, 2.0), egui::pos2(622.0, 786.0));
-        let size = texture.size_vec2();
-        let uv = Rect::from_min_max(
-            egui::pos2(pixels.min.x / size.x, pixels.min.y / size.y),
-            egui::pos2(pixels.max.x / size.x, pixels.max.y / size.y),
-        );
-        let art_size =
-            pixels.size() * (rect.width() / pixels.width()).min(rect.height() / pixels.height());
-        painter.image(
-            texture.id(),
-            Rect::from_center_size(rect.center(), art_size),
-            uv,
-            Color32::WHITE,
-        );
-    }
 }
 
 #[cfg(test)]
@@ -382,27 +314,13 @@ mod tests {
     }
 
     #[test]
-    fn every_portrait_is_inside_its_embedded_atlas() {
-        for expression in Expression::REACTIONS
-            .into_iter()
-            .chain([Expression::Neutral])
-        {
-            let (source, pixels) = expression.portrait();
-            let image = image::load_from_memory(source.bytes()).unwrap();
-            assert!(pixels.is_positive());
-            assert!(pixels.min.x >= 0.0 && pixels.min.y >= 0.0);
-            assert!(pixels.max.x <= image.width() as f32 && pixels.max.y <= image.height() as f32);
-        }
-    }
-
-    #[test]
     fn every_jobs_portrait_has_the_same_pixel_resolution() {
         let ctx = egui::Context::default();
         for expression in Expression::REACTIONS
             .into_iter()
             .chain([Expression::Neutral])
         {
-            let texture = portrait_texture(&ctx, expression).unwrap();
+            let texture = portrait_texture(&ctx, expression, false).unwrap();
             assert_eq!(texture.size(), [384, 448]);
         }
     }
