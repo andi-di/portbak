@@ -8,7 +8,7 @@ See [SPECIFICATION.md](SPECIFICATION.md) for standalone, implementation-independ
 
 ## Getting started
 
-Copy the executable for your platform into a **writable folder** and launch it. On Linux, run `chmod +x portbak` if necessary. The app creates `portbak.json` (settings and status) and `portbak.lock` (instance lock) alongside the executable. To move your configuration, copy the JSON file too and update source and destination paths. Administrator privileges are not required.
+Copy the executable for your platform into a **writable folder** and launch it. On Linux, run `chmod +x portbak` if necessary. The app creates `portbak.json` (settings and status) and `portbak.lock` (instance lock) alongside the executable. To move your configuration, copy the JSON file too and update source and destination paths. Administrator privileges are not required. Drag the divider beside the job list to adjust its width; the app remembers it across restarts.
 
 1. Select **New job** and choose a name and existing source and destination folders.
 2. Optionally enable **Compress as ZIP**. The default is a full folder copy.
