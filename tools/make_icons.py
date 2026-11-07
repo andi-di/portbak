@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
-PIXEL_GRID = 16
+PIXEL_GRID = 64
 PNG_SIZES = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
 ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 OUT = Path(__file__).resolve().parent.parent / "assets" / "icon"
