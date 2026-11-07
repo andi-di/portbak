@@ -109,7 +109,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
 - Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
 - On enabling a schedule, plan its next future occurrence.
-- The new-job default **Check immediately when enabled** starts unchecked and is saved per job. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
+- The global setting **Check immediately when enabled** starts unchecked and applies to existing and new jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.
 - Persist scheduled due times across normal restarts.
 - If the saved due time is overdue after startup or resume, queue exactly one catch-up check. Do not queue one check for every missed occurrence.

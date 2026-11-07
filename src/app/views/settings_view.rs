@@ -82,7 +82,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
 
 fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
-    ui.label("Defaults apply to newly created jobs. Automatic destinations use the job name.");
+    ui.label("Defaults apply to new jobs. Check immediately when enabled applies to all jobs.");
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
         ui.add(PixelCheckbox::new(
             &mut defaults.auto_destination,
