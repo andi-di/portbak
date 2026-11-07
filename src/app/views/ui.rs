@@ -70,7 +70,7 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.9);
+                pixel::panel_decoration(ui, 1.9);
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -125,7 +125,7 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.0);
+                pixel::panel_decoration(ui, 1.0);
                 if Skin::of(ui.ctx()).finish != Finish::Glass {
                     let clip = ui.clip_rect();
                     let rule =
@@ -174,10 +174,15 @@ impl App {
             .size_range(240.0..=460.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.0);
+                pixel::panel_decoration(ui, 1.0);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    pixel::display_label(ui, "JOBS", 16.0, palette.accent);
+                    pixel::display_label(
+                        ui,
+                        "JOBS",
+                        16.0,
+                        style::decorative_color(ui.ctx(), palette.accent),
+                    );
                     let color = style::decorative_color(ui.ctx(), palette.gold);
                     pixel::badge(ui, &self.config.jobs.len().to_string(), color);
                 });
@@ -190,17 +195,33 @@ impl App {
                     self.add_job();
                 }
                 ui.add_space(12.0);
+                let mascot_height =
+                    crate::app::scenery::catgirl::reserved_height(ui.available_width());
+                let show_mascot = Skin::of(ui.ctx()).effects.hearts
+                    && (!self.config.jobs.is_empty() || self.settings_open)
+                    && ui.available_height() > mascot_height + 120.0;
+                let list_height = if show_mascot {
+                    ui.available_height() - mascot_height
+                } else {
+                    ui.available_height()
+                };
                 let mut clicked = None;
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for job in &self.config.jobs {
-                        if self.job_card(ui, job) {
-                            clicked = Some(job.id);
+                egui::ScrollArea::vertical()
+                    .max_height(list_height)
+                    .show(ui, |ui| {
+                        for job in &self.config.jobs {
+                            if self.job_card(ui, job) {
+                                clicked = Some(job.id);
+                            }
                         }
-                    }
-                });
+                    });
                 if clicked.is_some() {
                     self.selected = clicked;
                     self.settings_open = false;
+                }
+                if show_mascot {
+                    ui.add_space((ui.available_height() - mascot_height).max(0.0));
+                    ui.vertical_centered(crate::app::scenery::catgirl::show);
                 }
             });
         if ctx
@@ -382,7 +403,7 @@ fn card_shapes(
     } else {
         palette.outline
     };
-    let modern = Skin::of(ctx).finish == Finish::Modern;
+    let modern = matches!(Skin::of(ctx).finish, Finish::Modern | Finish::Gothic);
     let radius = style::panel_radius(ctx);
     let mut shapes = vec![
         shadow.as_shape(rect, radius).into(),

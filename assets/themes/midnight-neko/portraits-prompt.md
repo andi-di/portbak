@@ -1,0 +1,5 @@
+# Final generation prompt
+
+Self-contained prompt describing the final asset.
+
+Transparent production sprite atlas with exactly four columns and four rows of equal cells. No labels, frames, grid lines, rectangular matte, halos, scythe, or other weapons. Keep transparent padding within every cell. Preserve detailed illustrated eyes and clean antialiased silhouettes. One consistent adult gothic catgirl, age 25+, with jet-black twintails, black cat ears, burgundy ribbons, detailed emerald green anime eyes, a high-neck long-sleeved black lace dress, and silver crescent jewelry. Natural expressive head tilts and turns, roughly consistent character scale, correct anatomy, no stretching. Head-and-shoulders portraits. Row-major expressions: Neutral, Angry, cat-smug `:3`, Excited; Happy, Surprised, Superior/smug, In love with heart reflections; Cold stare, Sleepy with tiny drool, Bored, cheek on palm with sideways glance; Yandere with tiny pupils, Shy blush, annoyed Pout with puffed cheeks and small downturned pursed lips (not smiling and not `:3`), Neutral.

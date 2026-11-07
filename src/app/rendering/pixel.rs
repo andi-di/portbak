@@ -1,10 +1,10 @@
 //! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
 
-use crate::app::rendering::forge;
 use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::ornaments;
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::aurora;
+use crate::app::rendering::{forge, gothic};
+use crate::app::scenery::{aurora, midnight_neko};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -92,7 +92,7 @@ impl Widget for PixelButton {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
-        let modern = Skin::of(ui.ctx()).finish == Finish::Modern;
+        let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
         let text = style::cased(ui.ctx(), &self.label);
         let font = TextStyle::Button.resolve(ui.style());
         let galley = ui
@@ -151,13 +151,17 @@ impl Widget for PixelButton {
         let painter = ui.painter();
         let face = if modern {
             let face = Rect::from_min_size(rect.min, face_size);
-            crate::app::rendering::modern::control(
-                painter,
-                face,
-                fill,
-                response.has_focus(),
-                enabled,
-            );
+            if finish == Finish::Gothic {
+                gothic::control(painter, face, fill, response.has_focus(), enabled);
+            } else {
+                crate::app::rendering::modern::control(
+                    painter,
+                    face,
+                    fill,
+                    response.has_focus(),
+                    enabled,
+                );
+            }
             face
         } else if finish == Finish::Pixel {
             let offset = if sunk {
@@ -203,6 +207,7 @@ impl Widget for PixelButton {
         if let Some(sprite) = self.sprite {
             let tint = match (enabled, self.tone, self.selected) {
                 (false, ..) => palette.dim,
+                (true, Tone::Plain, false) if finish == Finish::Gothic => palette.metal,
                 (true, Tone::Plain, false) => palette.accent,
                 _ => ink,
             };
@@ -324,25 +329,31 @@ impl Widget for PixelCheckbox<'_> {
                     StrokeKind::Inside,
                 );
             }
-            Finish::Modern => {
+            Finish::Modern | Finish::Gothic => {
                 let fill = if checked {
                     palette.accent
                 } else {
                     palette.sunken
                 };
-                crate::app::rendering::modern::control(
-                    painter,
-                    square,
-                    fill,
-                    response.has_focus(),
-                    enabled,
-                );
+                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                    gothic::control(painter, square, fill, response.has_focus(), enabled);
+                } else {
+                    crate::app::rendering::modern::control(
+                        painter,
+                        square,
+                        fill,
+                        response.has_focus(),
+                        enabled,
+                    );
+                }
             }
             Finish::Engraved => forge::spiked_socket(painter, square, border),
             Finish::Glass => glass::check_socket(painter, square, border),
         }
         if checked {
-            let tint = if Skin::of(ui.ctx()).finish == Finish::Modern && enabled {
+            let tint = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic)
+                && enabled
+            {
                 palette.accent_ink
             } else if enabled {
                 palette.good
@@ -431,6 +442,13 @@ pub fn section<R>(
             })
             .inner
     });
+    if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        gothic::corners(
+            ui.painter(),
+            (framed.response.rect - egui::epaint::MarginF32::from(margin)).shrink(1.0),
+            palette.metal,
+        );
+    }
     if glassy {
         let rect = framed.response.rect - egui::epaint::MarginF32::from(margin);
         let pane = glass::pane(ui.ctx(), rect, m.radius as f32, &Glaze::clear(ui.ctx()));
@@ -445,6 +463,7 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
         TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
         TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
         TitleBar::Glass => aurora::glass_title_bar(ui, title, sprite, band),
+        TitleBar::Gothic => gothic::title_bar(ui, title, sprite),
     }
 }
 
@@ -610,6 +629,10 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
         mix(color, palette.outline, 0.7)
     };
     match Skin::of(ui.ctx()).finish {
+        Finish::Gothic => {
+            gothic::lamp(painter, rect, fill);
+            return response;
+        }
         Finish::Pixel => {}
         Finish::Modern => {
             painter.circle_filled(rect.center(), 4.0, fill);
@@ -641,7 +664,7 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
 /// An indeterminate progress bar: a comet of lit cells sweeping through a sunken track.
 pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let m = style::metrics(ui.ctx());
-    if Skin::of(ui.ctx()).finish == Finish::Modern {
+    if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
         return crate::app::rendering::modern::progress(ui, width, color);
     }
     const CELL: f32 = 8.0;
@@ -709,16 +732,29 @@ pub fn stripes(painter: &egui::Painter, rect: Rect, palette: &Palette) {
 pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
     if Skin::of(ctx).finish == Finish::Glass {
         egui::Frame::new()
+    } else if Skin::of(ctx).finish == Finish::Gothic {
+        egui::Frame::new()
+            .fill(fill)
+            .stroke(Stroke::new(1.0_f32, Palette::of_ctx(ctx).outline))
     } else {
         egui::Frame::new().fill(style::glazed(ctx, fill))
     }
 }
 
-/// A floating glass slab behind a panel's contents in glass skins; call first inside the panel.
+/// Skin-specific panel decoration; call first inside the panel, before its content.
 /// `density` scales the skin's panel opacity, e.g. to keep text legible over a dark sky.
-pub fn panel_glass(ui: &egui::Ui, density: f32) {
+pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     const INSET: f32 = 6.0;
     let ctx = ui.ctx();
+    if Skin::of(ctx).finish == Finish::Gothic {
+        gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
+        gothic::corners(
+            ui.painter(),
+            ui.clip_rect().shrink(5.0),
+            Palette::of(ui).metal,
+        );
+        return;
+    }
     if Skin::of(ctx).finish != Finish::Glass {
         return;
     }
@@ -736,7 +772,9 @@ pub fn panel_glass(ui: &egui::Ui, density: f32) {
 pub fn paint_underlay(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
-    if effects.wallpaper {
+    if effects.hearts {
+        midnight_neko::paint_background(ctx, palette);
+    } else if effects.wallpaper {
         aurora::paint_wallpaper(ctx, palette);
     }
     if effects.bubbles {
@@ -748,6 +786,9 @@ pub fn paint_underlay(ctx: &egui::Context) {
 pub fn paint_scenery(ui: &egui::Ui) {
     let effects = &Skin::of(ui.ctx()).effects;
     let palette = Palette::of(ui);
+    if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        gothic::pattern(ui.painter(), ui.clip_rect());
+    }
     if effects.grid {
         paint_grid(ui.painter(), ui.clip_rect(), palette);
     }
@@ -760,6 +801,9 @@ pub fn paint_scenery(ui: &egui::Ui) {
 pub fn paint_overlays(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
+    if effects.hearts {
+        midnight_neko::paint_overlays(ctx, palette);
+    }
     if effects.vignette {
         ornaments::paint_vignette(ctx, palette);
     }
@@ -997,7 +1041,20 @@ mod tests {
             .filter(|skin| skin.finish != Finish::Modern)
             .flat_map(|skin| [&skin.dark, &skin.light])
         {
-            assert_eq!(readable_on(palette.gold, palette).r(), 0x1a);
+            let luminance = |color: Color32| {
+                let linear = |channel: u8| {
+                    let value = channel as f32 / 255.0;
+                    if value <= 0.04045 {
+                        value / 12.92
+                    } else {
+                        ((value + 0.055) / 1.055).powf(2.4)
+                    }
+                };
+                0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
+            };
+            let fill = luminance(palette.gold);
+            let text = luminance(readable_on(palette.gold, palette));
+            assert!((fill.max(text) + 0.05) / (fill.min(text) + 0.05) >= 4.5);
             assert_eq!(readable_on(palette.outline, palette), palette.paper);
             assert_eq!(readable_on(palette.bad, palette), palette.paper);
         }

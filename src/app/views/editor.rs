@@ -104,7 +104,11 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         ui.add_space(50.0);
         let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
         ui.add_space(bob);
-        sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+        if Skin::of(ui.ctx()).effects.hearts {
+            crate::app::scenery::catgirl::show_welcome(ui);
+        } else {
+            sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+        }
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
         pixel::display_label(ui, wording.welcome_title, 24.0, palette.gold);
@@ -291,7 +295,7 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     };
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        let color = if Skin::of(ui.ctx()).finish == Finish::Modern {
+        let color = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
             palette.hot
         } else {
             palette.accent
