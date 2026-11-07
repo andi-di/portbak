@@ -122,6 +122,7 @@ pub struct App {
     restoring: bool,
     history_dialog: Option<HistoryDialog>,
     settings_open: bool,
+    settings_tab: views::settings_view::SettingsTab,
     history_cache: HashMap<Uuid, CachedHistory>,
     history_requests: HashMap<Uuid, PendingSummary>,
     tx: mpsc::Sender<Event>,
@@ -146,6 +147,7 @@ impl App {
             restoring: false,
             history_dialog: None,
             settings_open: false,
+            settings_tab: views::settings_view::SettingsTab::default(),
             history_cache: HashMap::new(),
             history_requests: HashMap::new(),
             tx,
@@ -198,7 +200,7 @@ impl App {
     }
 
     fn add_job(&mut self) {
-        let job = Job::default();
+        let job = self.config.job_defaults.new_job();
         self.selected = Some(job.id);
         self.settings_open = false;
         self.config.jobs.push(job);
@@ -576,6 +578,23 @@ mod tests {
 
     fn app_with(config: Config, path: PathBuf) -> App {
         App::new(config, path, tempfile::tempfile().unwrap())
+    }
+
+    #[test]
+    fn add_job_copies_current_defaults_and_selects_a_fresh_job() {
+        let mut app = app_with(Config::default(), PathBuf::new());
+        app.add_job();
+        let first = app.config.jobs[0].clone();
+        assert!(first.zip && first.auto_destination && first.rolling);
+        app.config.job_defaults.zip = false;
+        app.config.job_defaults.interval_value = 15;
+        app.add_job();
+        assert!(app.config.jobs[0] == first);
+        let second = &app.config.jobs[1];
+        assert!(!second.zip);
+        assert_eq!(second.interval_value, 15);
+        assert_eq!(app.selected, Some(second.id));
+        assert_ne!(first.id, second.id);
     }
 
     /// Ticks until `done` holds or five seconds pass.

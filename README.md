@@ -12,11 +12,13 @@ See [SPECIFICATION.md](SPECIFICATION.md) for standalone, implementation-independ
 
 Copy the executable for your platform into a **writable folder** and launch it. On Linux, run `chmod +x portbak` if necessary. The app creates `portbak.json` (settings and status) and `portbak.lock` (instance lock) alongside the executable. To move your configuration, copy the JSON file too and update source and destination paths. Administrator privileges are not required. Drag the divider beside the job list to adjust its width; the app remembers it across restarts.
 
-1. Select **New job** and choose a name and existing source and destination folders.
-2. Optionally enable **Compress as ZIP**. The default is a full folder copy.
+1. Select **New job** and choose a name and source folder. By default, the destination is created beside the app under `backups/<job UUID>-<source folder name>`. You can choose a different destination afterward.
+2. New jobs use **Compress as ZIP** by default. Uncheck it for a full folder copy.
 3. Select **Check now** to create the first backup. Subsequent backups are created only when file contents change, files are added or removed, paths are renamed, or empty directories change.
-4. Jobs start with automatic backups disabled. Press the green **Enable automatic backups** button to arm the schedule: interval (the default, every 60 minutes, with selectable seconds, minutes, or hours), daily, or selected weekdays. Active jobs show a green dot beside their names in the job list and detail heading, and a countdown updated every second in both views. Press the red **Disable automatic backups** button at any time to remove pending work; a running backup finishes safely. **Check now** remains available when automatic backups are disabled. Re-enabling starts a fresh schedule.
-5. Optionally enable **rolling retention** with a maximum count and/or total size. Both limits can be combined. Retention is disabled by default.
+4. Jobs start with automatic backups disabled. Press the green **Enable automatic backups** button to arm the schedule: interval (the default, every 10 minutes, with selectable seconds, minutes, or hours), daily, or selected weekdays. Active jobs show a green dot beside their names in the job list and detail heading, and a countdown updated every second in both views. Press the red **Disable automatic backups** button at any time to remove pending work; a running backup finishes safely. **Check now** remains available when automatic backups are disabled. Re-enabling starts a fresh schedule.
+5. New jobs enable **rolling retention** with a maximum count of **100**. The total-size limit starts unchecked at **10 GiB**. Both limits can be combined or disabled.
+
+Use **Settings > Job settings** to change these defaults for future jobs. Existing jobs keep their settings. The **Theme** tab contains look selection.
 
 **The app must be running for scheduled backups.** You can minimize it. Closing the window immediately exits without confirmation, stops scheduling, and terminates running operations. Missed checks are caught up once on startup or resume. Schedules use the local time zone: a time skipped by daylight saving is moved to the first valid minute, and a repeated time runs only once.
 

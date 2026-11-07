@@ -53,6 +53,7 @@ pub struct Job {
     pub target: PathBuf,
     pub enabled: bool,
     pub zip: bool,
+    pub auto_destination: bool,
     pub schedule: Schedule,
     pub hour: u32,
     pub minute: u32,
@@ -76,6 +77,7 @@ impl Default for Job {
             target: PathBuf::new(),
             enabled: false,
             zip: false,
+            auto_destination: false,
             schedule: Schedule::Interval,
             hour: 18,
             minute: 0,
@@ -93,6 +95,23 @@ impl Default for Job {
 }
 
 impl Job {
+    pub fn set_auto_destination(&mut self, app_dir: &std::path::Path) -> anyhow::Result<()> {
+        let source = std::fs::canonicalize(&self.source)?;
+        let name = source
+            .file_name()
+            .ok_or_else(|| anyhow::anyhow!("Source folder has no name"))?;
+        let mut folder = std::ffi::OsString::from(format!("{}-", self.id));
+        folder.push(name);
+        let target = std::fs::canonicalize(app_dir)?.join("backups").join(folder);
+        anyhow::ensure!(
+            !target.starts_with(&source),
+            "Destination must be outside the source folder"
+        );
+        self.target = target;
+        std::fs::create_dir_all(&self.target)?;
+        Ok(())
+    }
+
     /// Weekday schedules need at least one selected day to ever run.
     pub fn has_runnable_schedule(&self) -> bool {
         self.schedule != Schedule::Weekdays || self.weekdays.contains(&true)
@@ -191,11 +210,78 @@ impl Theme {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
+pub struct JobDefaults {
+    pub auto_destination: bool,
+    pub zip: bool,
+    pub schedule: Schedule,
+    pub hour: u32,
+    pub minute: u32,
+    pub weekdays: [bool; 7],
+    pub interval_value: u32,
+    pub interval_unit: IntervalUnit,
+    pub rolling: bool,
+    pub count_enabled: bool,
+    pub max_count: usize,
+    pub size_enabled: bool,
+    pub max_bytes: u64,
+}
+
+impl Default for JobDefaults {
+    fn default() -> Self {
+        Self {
+            auto_destination: true,
+            zip: true,
+            schedule: Schedule::Interval,
+            hour: 18,
+            minute: 0,
+            weekdays: [true; 7],
+            interval_value: 10,
+            interval_unit: IntervalUnit::Minutes,
+            rolling: true,
+            count_enabled: true,
+            max_count: 100,
+            size_enabled: false,
+            max_bytes: 10 * 1024 * 1024 * 1024,
+        }
+    }
+}
+
+impl JobDefaults {
+    pub fn new_job(&self) -> Job {
+        Job {
+            auto_destination: self.auto_destination,
+            zip: self.zip,
+            schedule: self.schedule,
+            hour: self.hour,
+            minute: self.minute,
+            weekdays: self.weekdays,
+            interval_value: self.interval_value,
+            interval_unit: self.interval_unit,
+            rolling: self.rolling,
+            max_count: self.count_enabled.then_some(self.max_count),
+            max_bytes: self.size_enabled.then_some(self.max_bytes),
+            ..Job::default()
+        }
+    }
+
+    pub fn update_schedule(&mut self, job: &Job) {
+        self.schedule = job.schedule;
+        self.hour = job.hour;
+        self.minute = job.minute;
+        self.weekdays = job.weekdays;
+        self.interval_value = job.interval_value;
+        self.interval_unit = job.interval_unit;
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub version: u32,
     pub theme: Theme,
     /// Id of the chosen skin; unknown ids fall back to the default skin.
     pub skin: String,
+    pub job_defaults: JobDefaults,
     pub sidebar_width: f32,
     pub jobs: Vec<Job>,
 }
@@ -206,6 +292,7 @@ impl Default for Config {
             version: 1,
             theme: Theme::System,
             skin: "retro".into(),
+            job_defaults: JobDefaults::default(),
             sidebar_width: 290.0,
             jobs: vec![],
         }
@@ -232,6 +319,59 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_jobs_use_saved_defaults_without_changing_existing_jobs() {
+        let mut config: Config = serde_json::from_str(r#"{"version":1,"jobs":[{}]}"#).unwrap();
+        let existing = config.jobs[0].clone();
+        let first = config.job_defaults.new_job();
+        assert!(first.auto_destination && first.zip && first.rolling);
+        assert_eq!(first.schedule, Schedule::Interval);
+        assert_eq!(first.interval_value, 10);
+        assert_eq!(first.interval_unit, IntervalUnit::Minutes);
+        assert_eq!(first.max_count, Some(100));
+        assert_eq!(first.max_bytes, None);
+        assert!(!first.enabled);
+        config.job_defaults.zip = false;
+        config.job_defaults.interval_value = 25;
+        config.job_defaults.count_enabled = false;
+        config.job_defaults.max_count = 230;
+        config.job_defaults.max_bytes = 20 * 1024 * 1024 * 1024;
+        let saved: Config = serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(saved == config);
+        let second = saved.job_defaults.new_job();
+        assert!(!second.zip);
+        assert_eq!(second.interval_value, 25);
+        assert_eq!(second.max_count, None);
+        assert_ne!(first.id, second.id);
+        assert!(saved.jobs[0] == existing);
+        assert!(!existing.zip && !existing.rolling && !existing.auto_destination);
+    }
+
+    #[test]
+    fn auto_destination_uses_job_uuid_and_source_name_and_allows_override() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("My source");
+        let app = root.path().join("app");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::create_dir(&app).unwrap();
+        let mut job = Job {
+            source: source.clone(),
+            ..JobDefaults::default().new_job()
+        };
+        job.set_auto_destination(&app).unwrap();
+        let expected = std::fs::canonicalize(&app)
+            .unwrap()
+            .join("backups")
+            .join(format!("{}-My source", job.id));
+        assert_eq!(job.target, expected);
+        assert!(expected.is_dir());
+        job.target = root.path().join("manual");
+        let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
+        assert_eq!(saved.target, job.target);
+        job.source = app.clone();
+        assert!(job.set_auto_destination(&app).is_err());
+    }
 
     #[test]
     fn default_job_is_disabled_interval() {

@@ -1,13 +1,21 @@
 use crate::app::rendering::glass::{self, Tint};
-use crate::app::rendering::pixel::{self, PixelButton, Tone};
+use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
 use crate::app::views::widgets::caption;
 use crate::app::App;
+use crate::model::{Config, JobDefaults};
 use eframe::egui;
 
 const SWATCH: f32 = 14.0;
+
+#[derive(Clone, Copy, Default, PartialEq)]
+pub(in crate::app) enum SettingsTab {
+    #[default]
+    Jobs,
+    Theme,
+}
 
 impl App {
     pub(in crate::app) fn show_settings(&mut self, ui: &mut egui::Ui) {
@@ -20,7 +28,7 @@ impl App {
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    close = settings_page(ui, &mut self.config.skin);
+                    close = settings_page(ui, &mut self.config, &mut self.settings_tab);
                 });
             });
         if close {
@@ -30,7 +38,7 @@ impl App {
 }
 
 /// Returns whether the user asked to go back to the jobs.
-fn settings_page(ui: &mut egui::Ui, skin: &mut String) -> bool {
+fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) -> bool {
     let palette = Palette::of(ui);
     let close = ui
         .horizontal(|ui| {
@@ -47,13 +55,93 @@ fn settings_page(ui: &mut egui::Ui, skin: &mut String) -> bool {
         })
         .inner;
     ui.add_space(14.0);
-    pixel::section(ui, "Theme", Sprite::Monitor, palette.hot, |ui| {
-        caption(ui, "Look");
-        for candidate in skins::ALL {
-            skin_card(ui, candidate, skin);
+    ui.horizontal(|ui| {
+        pixel::choice(
+            ui,
+            tab,
+            SettingsTab::Jobs,
+            "Job settings",
+            Some(Sprite::Folder),
+        );
+        pixel::choice(ui, tab, SettingsTab::Theme, "Theme", Some(Sprite::Monitor));
+    });
+    ui.add_space(14.0);
+    match tab {
+        SettingsTab::Jobs => job_defaults(ui, &mut config.job_defaults),
+        SettingsTab::Theme => {
+            pixel::section(ui, "Theme", Sprite::Monitor, palette.hot, |ui| {
+                caption(ui, "Look");
+                for candidate in skins::ALL {
+                    skin_card(ui, candidate, &mut config.skin);
+                }
+            });
+        }
+    }
+    close
+}
+
+fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
+    let palette = Palette::of(ui);
+    ui.label("Defaults apply to newly created jobs. Existing jobs keep their settings.");
+    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut defaults.auto_destination,
+            "Auto destination folder",
+        ));
+        ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
+    });
+    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        let mut job = defaults.new_job();
+        super::editor::schedule_controls(ui, &mut job);
+        defaults.update_schedule(&job);
+        if defaults.schedule == crate::model::Schedule::Interval {
+            let seconds = match defaults.interval_unit {
+                crate::model::IntervalUnit::Seconds => defaults.interval_value,
+                crate::model::IntervalUnit::Minutes => defaults.interval_value * 60,
+                crate::model::IntervalUnit::Hours => defaults.interval_value * 3600,
+            };
+            ui.label(format!(
+                "Interval: {:02}:{:02}:{:02}",
+                seconds / 3600,
+                seconds / 60 % 60,
+                seconds % 60
+            ));
         }
     });
-    close
+    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+        ui.add(PixelCheckbox::new(
+            &mut defaults.rolling,
+            "Enable rolling retention",
+        ));
+        ui.add_enabled_ui(defaults.rolling, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(PixelCheckbox::new(&mut defaults.count_enabled, "Max count"));
+                ui.add_enabled(
+                    defaults.count_enabled,
+                    egui::DragValue::new(&mut defaults.max_count).range(1..=100_000),
+                );
+            });
+            ui.horizontal(|ui| {
+                ui.add(PixelCheckbox::new(
+                    &mut defaults.size_enabled,
+                    "Max total size",
+                ));
+                let mut gib = defaults.max_bytes as f64 / 1_073_741_824.0;
+                if ui
+                    .add_enabled(
+                        defaults.size_enabled,
+                        egui::DragValue::new(&mut gib)
+                            .speed(0.1)
+                            .range(0.001..=100_000.0)
+                            .suffix(" GiB"),
+                    )
+                    .changed()
+                {
+                    defaults.max_bytes = (gib * 1_073_741_824.0) as u64;
+                }
+            });
+        });
+    });
 }
 
 /// A selectable card naming the skin and previewing both of its palettes.
@@ -160,10 +248,34 @@ mod tests {
     use crate::model::Theme;
 
     #[test]
+    fn job_defaults_render_in_every_skin_without_changing_values() {
+        for candidate in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let context = egui::Context::default();
+                style::install(&context, candidate);
+                context.set_theme(theme);
+                let mut config = Config::default();
+                let before = config.clone();
+                let mut tab = SettingsTab::Jobs;
+                let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                    egui::CentralPanel::default().show_inside(ui, |ui| {
+                        assert!(!settings_page(ui, &mut config, &mut tab));
+                    });
+                });
+                assert!(config == before);
+            }
+        }
+    }
+
+    #[test]
     fn settings_page_renders_every_skin_and_keeps_the_choice() {
         for candidate in skins::ALL {
             for mode in Theme::ALL {
-                let mut skin = candidate.id.to_owned();
+                let mut config = Config {
+                    skin: candidate.id.to_owned(),
+                    ..Config::default()
+                };
+                let mut tab = SettingsTab::Theme;
                 let context = egui::Context::default();
                 crate::app::theme::style::install(&context, candidate);
                 context.set_theme(match mode {
@@ -173,10 +285,10 @@ mod tests {
                 });
                 let _ = context.run_ui(egui::RawInput::default(), |ui| {
                     egui::CentralPanel::default().show_inside(ui, |ui| {
-                        assert!(!settings_page(ui, &mut skin));
+                        assert!(!settings_page(ui, &mut config, &mut tab));
                     });
                 });
-                assert_eq!(skin, candidate.id);
+                assert_eq!(config.skin, candidate.id);
             }
         }
     }

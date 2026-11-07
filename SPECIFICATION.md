@@ -64,22 +64,27 @@ Minimizing keeps the application and scheduler running. Closing the window immed
 
 ## 4. Job configuration and defaults
 
-Each job is independent and has a persistent unique identifier. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
+Each job is independent and has a persistent UUID. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
+
+- Settings has **Job settings** and **Theme** tabs.
+- Persist editable new-job defaults for automatic destination, compression, scheduling, and retention in `portbak.json`; changes affect future jobs only.
+- With automatic destination enabled, changing the source sets and creates `<app-dir>/backups/<job UUID>-<source folder name>`. Allow a manual destination afterward. Reject a generated destination within the source.
+- Existing jobs retain their saved values when loading older configurations.
 
 | Setting | Behavior and default |
 | --- | --- |
 | Name | Editable display name; default **New job** |
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
-| Destination folder | Existing folder selected through a folder picker or editable path; initially empty |
+| Destination folder | Automatic destination enabled by default; generated on source selection; manually editable |
 | Automatic scheduling | Disabled by default |
 | Schedule mode | Interval by default; display choices in order: Interval, Daily, Weekdays |
 | Local time | 18:00 by default; hours 0–23, minutes 0–59 |
 | Selected weekdays | All seven selected by default; used only in weekday mode |
-| Interval | 60 Minutes by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
-| Compress as ZIP | Checkbox; disabled by default |
-| Rolling retention | Disabled by default |
-| Maximum count | Independently enabled; initial value when enabled: 10; positive whole number, supporting at least 1–100,000 |
-| Maximum total size | Independently enabled; initial value when enabled: 10 GiB; positive value, supporting at least 0.001–100,000 GiB |
+| Interval | 10 Minutes (00:10:00) by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
+| Compress as ZIP | Checkbox; checked by default |
+| Rolling retention | Enabled by default |
+| Maximum count | Checked by default at 100; positive whole number, supporting at least 1–100,000 |
+| Maximum total size | Unchecked by default at 10 GiB; positive value, supporting at least 0.001–100,000 GiB |
 
 A GiB is 1,073,741,824 bytes. Count and size limits are remembered while rolling retention is disabled, but are not enforced. Enabling rolling retention without an active limit does not delete anything.
 
@@ -199,7 +204,7 @@ After a crash, forced termination, or power loss, temporary output or a publishe
 
 ## 10. Rolling retention
 
-Rolling retention is configured per job and disabled by default. Maximum count and maximum total size can be enabled separately or together.
+Rolling retention is configured per job and enabled by default for new jobs, with a maximum count of 100. Maximum count and maximum total size can be enabled separately or together.
 
 After a newly successful backup:
 

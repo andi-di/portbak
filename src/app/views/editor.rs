@@ -51,6 +51,10 @@ impl App {
         let can_add = !self.scheduling_paused();
         let selected = self.selected;
         let summaries = &self.history_cache;
+        let app_dir = self
+            .path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
         let jobs = &mut self.config.jobs;
         let mut action = None;
         let mut disabled = false;
@@ -68,11 +72,18 @@ impl App {
                         return;
                     };
                     let was_enabled = job.enabled;
+                    let source_before = job.source.clone();
                     let summary = summaries
                         .get(&job.id)
                         .filter(|summary| summary.target == job.target);
                     action =
                         job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    if job.auto_destination && job.source != source_before && job.source.is_dir() {
+                        if let Err(error) = job.set_auto_destination(app_dir) {
+                            self.error =
+                                format!("Could not prepare automatic destination: {error:#}");
+                        }
+                    }
                     disabled = was_enabled && !job.enabled;
                 });
             });
@@ -238,6 +249,10 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             .margin(egui::vec2(8.0, 4.0)),
     );
     ui.add_space(6.0);
+    ui.add(PixelCheckbox::new(
+        &mut job.auto_destination,
+        "Auto destination folder",
+    ));
     path_picker(ui, "Source folder", &mut job.source);
     ui.add_space(6.0);
     path_picker(ui, "Destination folder", &mut job.target);
@@ -264,24 +279,7 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let palette = Palette::of(ui);
     let before = schedule_key(job);
-    centered_row(ui, |ui| {
-        let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Rewind),
-            (Schedule::Daily, "Daily", Sprite::Sun),
-            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
-        ];
-        for (schedule, label, sprite) in modes {
-            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
-        }
-    });
-    match job.schedule {
-        Schedule::Interval => interval_row(ui, job),
-        Schedule::Daily => time_row(ui, job),
-        Schedule::Weekdays => {
-            time_row(ui, job);
-            weekday_row(ui, job);
-        }
-    }
+    schedule_controls(ui, job);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
@@ -306,6 +304,27 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
             readout(ui, "Next check in", &remaining, palette.good);
         }
     });
+}
+
+pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
+    centered_row(ui, |ui| {
+        let modes: [(Schedule, &str, Sprite); 3] = [
+            (Schedule::Interval, "Interval", Sprite::Rewind),
+            (Schedule::Daily, "Daily", Sprite::Sun),
+            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
+        ];
+        for (schedule, label, sprite) in modes {
+            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
+        }
+    });
+    match job.schedule {
+        Schedule::Interval => interval_row(ui, job),
+        Schedule::Daily => time_row(ui, job),
+        Schedule::Weekdays => {
+            time_row(ui, job);
+            weekday_row(ui, job);
+        }
+    }
 }
 
 /// A captioned value in the display face, like a digital readout.
