@@ -14,6 +14,7 @@ const CARD_SHADOW: f32 = 4.0;
 
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.initialize_theme(ctx);
         if ctx.input(|input| input.viewport().close_requested()) {
             if !self.persist() {
                 eprintln!("Could not save settings on exit: {}", self.error);
@@ -49,6 +50,18 @@ impl eframe::App for App {
 }
 
 impl App {
+    fn initialize_theme(&mut self, ctx: &egui::Context) {
+        if self.config.theme == Theme::System {
+            self.config.theme =
+                if ctx.system_theme().unwrap_or(egui::Theme::Dark) == egui::Theme::Dark {
+                    Theme::Dark
+                } else {
+                    Theme::Light
+                };
+            self.persist();
+        }
+    }
+
     /// Installs the configured skin whenever it differs from the one in use.
     fn ensure_skin(&self, ctx: &egui::Context) {
         let wanted = skins::find(&self.config.skin);
@@ -79,6 +92,20 @@ impl App {
                             .selected(self.settings_open);
                         if ui.add(settings).clicked() {
                             self.settings_open = !self.settings_open;
+                        }
+                        let dark = self.config.theme == Theme::Dark;
+                        let (label, sprite) = if dark {
+                            ("Light", Sprite::Sun)
+                        } else {
+                            ("Dark", Sprite::Moon)
+                        };
+                        if ui
+                            .add(PixelButton::new(label).sprite(sprite))
+                            .on_hover_text(format!("Switch to {label} mode"))
+                            .clicked()
+                        {
+                            self.config.theme = if dark { Theme::Light } else { Theme::Dark };
+                            ctx.set_theme(theme_preference(self.config.theme));
                         }
                     });
                 });
@@ -447,6 +474,47 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     use super::*;
     use crate::model::Config;
+
+    #[test]
+    fn initial_system_appearance_is_saved_and_ignores_later_os_changes() {
+        for system in [egui::Theme::Light, egui::Theme::Dark] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("portbak.json");
+            let mut app = App::new(
+                Config::default(),
+                path.clone(),
+                tempfile::tempfile().unwrap(),
+            );
+            let context = egui::Context::default();
+            let _ = context.run_ui(
+                egui::RawInput {
+                    system_theme: Some(system),
+                    ..Default::default()
+                },
+                |_| app.initialize_theme(&context),
+            );
+            let expected = if system == egui::Theme::Dark {
+                Theme::Dark
+            } else {
+                Theme::Light
+            };
+            let saved: Config = crate::engine::load(&path).unwrap();
+            assert_eq!(saved.theme, expected);
+            let mut restarted = App::new(saved, path.clone(), tempfile::tempfile().unwrap());
+            let _ = context.run_ui(
+                egui::RawInput {
+                    system_theme: Some(if system == egui::Theme::Dark {
+                        egui::Theme::Light
+                    } else {
+                        egui::Theme::Dark
+                    }),
+                    ..Default::default()
+                },
+                |_| restarted.initialize_theme(&context),
+            );
+            assert_eq!(restarted.config.theme, expected);
+        }
+    }
 
     #[test]
     fn sidebar_width_stays_fixed_across_frames() {

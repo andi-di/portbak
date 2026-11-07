@@ -185,15 +185,8 @@ pub enum Theme {
 }
 
 impl Theme {
+    #[cfg(test)]
     pub const ALL: [Self; 3] = [Self::System, Self::Light, Self::Dark];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::System => "System",
-            Self::Light => "Light",
-            Self::Dark => "Dark",
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

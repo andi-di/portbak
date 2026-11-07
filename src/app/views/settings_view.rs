@@ -5,7 +5,6 @@ use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
 use crate::app::views::widgets::caption;
 use crate::app::App;
-use crate::model::Theme;
 use eframe::egui;
 
 const SWATCH: f32 = 14.0;
@@ -21,7 +20,7 @@ impl App {
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);
+                    close = settings_page(ui, &mut self.config.skin);
                 });
             });
         if close {
@@ -31,7 +30,7 @@ impl App {
 }
 
 /// Returns whether the user asked to go back to the jobs.
-fn settings_page(ui: &mut egui::Ui, skin: &mut String, theme: &mut Theme) -> bool {
+fn settings_page(ui: &mut egui::Ui, skin: &mut String) -> bool {
     let palette = Palette::of(ui);
     let close = ui
         .horizontal(|ui| {
@@ -53,19 +52,6 @@ fn settings_page(ui: &mut egui::Ui, skin: &mut String, theme: &mut Theme) -> boo
         for candidate in skins::ALL {
             skin_card(ui, candidate, skin);
         }
-    });
-    pixel::section(ui, "Brightness", Sprite::Sun, palette.gold, |ui| {
-        caption(ui, "Light or dark mode");
-        ui.horizontal_wrapped(|ui| {
-            for mode in Theme::ALL {
-                pixel::choice(ui, theme, mode, mode.label(), Some(mode_sprite(mode)));
-            }
-        });
-        ui.label(
-            egui::RichText::new("System follows the operating system's light or dark setting.")
-                .small()
-                .color(palette.dim),
-        );
     });
     close
 }
@@ -168,24 +154,16 @@ fn swatches(ui: &mut egui::Ui, palette: &Palette) {
     });
 }
 
-fn mode_sprite(theme: Theme) -> Sprite {
-    match theme {
-        Theme::System => Sprite::Monitor,
-        Theme::Light => Sprite::Sun,
-        Theme::Dark => Sprite::Moon,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::Theme;
 
     #[test]
     fn settings_page_renders_every_skin_and_keeps_the_choice() {
         for candidate in skins::ALL {
             for mode in Theme::ALL {
                 let mut skin = candidate.id.to_owned();
-                let mut theme = mode;
                 let context = egui::Context::default();
                 crate::app::theme::style::install(&context, candidate);
                 context.set_theme(match mode {
@@ -195,11 +173,10 @@ mod tests {
                 });
                 let _ = context.run_ui(egui::RawInput::default(), |ui| {
                     egui::CentralPanel::default().show_inside(ui, |ui| {
-                        assert!(!settings_page(ui, &mut skin, &mut theme));
+                        assert!(!settings_page(ui, &mut skin));
                     });
                 });
                 assert_eq!(skin, candidate.id);
-                assert_eq!(theme, mode);
             }
         }
     }
