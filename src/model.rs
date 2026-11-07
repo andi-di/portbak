@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+pub const MAX_JOB_NAME_LENGTH: usize = 50;
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Schedule {
     Daily,

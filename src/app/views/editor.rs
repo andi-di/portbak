@@ -6,7 +6,7 @@ use crate::app::views::widgets::{
     DATE_TIME,
 };
 use crate::app::{App, CachedHistory, HistoryMode};
-use crate::model::{IntervalUnit, Job, Schedule};
+use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
 use uuid::Uuid;
@@ -242,6 +242,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
+            .char_limit(MAX_JOB_NAME_LENGTH)
             .desired_width(ui.available_width().min(420.0))
             .margin(egui::vec2(8.0, 4.0)),
     );

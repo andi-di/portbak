@@ -77,7 +77,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 
 | Setting | Behavior and default |
 | --- | --- |
-| Name | Editable display name; default **New job** |
+| Name | Editable display name, limited to 50 characters; default **New job** |
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
 | Destination folder | Automatic destination enabled by default; generated on source selection; manually editable |
 | Automatic scheduling | Disabled by default |
