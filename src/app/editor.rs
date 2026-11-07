@@ -197,14 +197,14 @@ fn job_identity(ui: &mut egui::Ui, job: &Job) {
     ui.add_space(6.0);
     ui.vertical(|ui| {
         ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
-        ui.horizontal(|ui| {
+        pixel::status_row(ui, |ui| {
             let (color, text) = if job.enabled {
                 (palette.good, "Automatic backups enabled")
             } else {
                 (palette.dim, "Automatic backups disabled")
             };
             pixel::led(ui, color, job.enabled);
-            ui.label(egui::RichText::new(text).color(color));
+            pixel::glowing_label(ui, text, color);
         });
     });
 }
@@ -308,26 +308,13 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
 fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
     ui.vertical(|ui| {
         caption(ui, label);
-        let palette = Palette::of(ui);
-        egui::Frame::new()
-            .fill(palette.sunken)
-            .corner_radius(style::radius(ui.ctx(), 6))
-            .stroke(egui::Stroke::new(
-                if Skin::of(ui.ctx()).finish == Finish::Modern {
-                    1.0_f32
-                } else {
-                    2.0_f32
-                },
-                palette.outline,
-            ))
-            .inner_margin(egui::Margin::symmetric(10, 6))
-            .show(ui, |ui| {
-                ui.label(
-                    egui::RichText::new(value.to_uppercase())
-                        .font(label_font(ui.ctx()))
-                        .color(color),
-                );
-            });
+        style::well(ui.ctx()).show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(value.to_uppercase())
+                    .font(label_font(ui.ctx()))
+                    .color(color),
+            );
+        });
     });
 }
 
@@ -341,13 +328,15 @@ fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
             egui::ComboBox::from_id_salt("interval_unit")
                 .selected_text(job.interval_unit.label())
                 .show_ui(ui, |ui| {
-                    for unit in [
-                        IntervalUnit::Seconds,
-                        IntervalUnit::Minutes,
-                        IntervalUnit::Hours,
-                    ] {
-                        ui.selectable_value(&mut job.interval_unit, unit, unit.label());
-                    }
+                    pixel::popup(ui, |ui| {
+                        for unit in [
+                            IntervalUnit::Seconds,
+                            IntervalUnit::Minutes,
+                            IntervalUnit::Hours,
+                        ] {
+                            ui.selectable_value(&mut job.interval_unit, unit, unit.label());
+                        }
+                    })
                 })
         });
         // A smaller unit can lower the maximum below the current value.

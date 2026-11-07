@@ -26,12 +26,15 @@ pub static RETRO: Skin = Skin {
         label: 10.0,
         display_scale: 1.0,
         display_drop: 0.125,
+        display_glow: 0.0,
+        capitals: true,
     },
     metrics: Metrics {
         border: 2.0,
         lift: 3.0,
         shadow: 5,
         shadow_blur: 0,
+        radius: 0,
     },
     effects: Effects {
         scanlines: true,
@@ -39,6 +42,9 @@ pub static RETRO: Skin = Skin {
         stripes: true,
         embers: false,
         vignette: false,
+        wallpaper: false,
+        bubbles: false,
+        opacity: 1.0,
         title_bar: TitleBar::Striped,
     },
     finish: Finish::Pixel,
@@ -73,6 +79,7 @@ const NIGHT: Palette = Palette {
     metal: Color32::from_rgb(0xc2, 0xc3, 0xd6),
     paper: Color32::from_rgb(0xf4, 0xec, 0xff),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 34),
+    sky: Color32::from_rgb(0x0e, 0x08, 0x1d),
     vignette: Color32::TRANSPARENT,
 };
 
@@ -96,5 +103,6 @@ const DAY: Palette = Palette {
     metal: Color32::from_rgb(0x9a, 0x9a, 0xae),
     paper: Color32::from_rgb(0xff, 0xfd, 0xf6),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 12),
+    sky: Color32::from_rgb(0xe4, 0xd8, 0xbc),
     vignette: Color32::TRANSPARENT,
 };

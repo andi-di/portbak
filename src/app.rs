@@ -1,18 +1,29 @@
+mod aquarium;
+mod aurora;
+mod bubbles;
 mod editor;
+mod fishes;
 mod forge;
+mod frost;
+mod glass;
+mod glossy;
 mod glyphs;
 mod history_view;
 mod modern;
 mod ornaments;
 mod pixel;
+mod refraction;
 mod settings_view;
+mod shaders;
 mod skins;
+mod splashes;
 mod sprites;
 mod style;
 mod ui;
 #[cfg(target_os = "linux")]
 pub(crate) mod wayland_icon;
 mod widgets;
+mod wildlife;
 
 use crate::engine::{self, history::Backup, Outcome};
 use crate::model::{Config, Job, Record};

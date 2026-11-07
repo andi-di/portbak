@@ -1,6 +1,6 @@
 use super::pixel::{self, PixelButton};
 use super::sprites::{self, Sprite};
-use super::style::Palette;
+use super::style::{self, Palette};
 use crate::engine;
 use crate::model::{Job, Record};
 use chrono::{DateTime, Local, Utc};
@@ -50,7 +50,8 @@ pub fn centered_combo<R>(
 /// A dim, upper-case field caption.
 pub fn caption(ui: &mut egui::Ui, text: &str) {
     let dim = Palette::of(ui).dim;
-    ui.label(egui::RichText::new(text.to_uppercase()).small().color(dim));
+    let text = style::cased(ui.ctx(), text);
+    ui.label(egui::RichText::new(text).small().color(dim));
 }
 
 pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
