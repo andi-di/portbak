@@ -280,32 +280,80 @@ impl App {
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
-                ui.horizontal(|ui| {
-                    let tint = if job.enabled {
-                        palette.good
-                    } else {
-                        palette.metal
-                    };
-                    let tint = style::decorative_color(ui.ctx(), tint);
-                    sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if let Some(remaining) = job.countdown(Utc::now()) {
-                            style::well(ui.ctx()).show(ui, |ui| {
+                let countdown = job.countdown(Utc::now()).map(|value| value.to_uppercase());
+                let well = style::well(ui.ctx());
+                let countdown_size = countdown.as_ref().map_or(egui::Vec2::ZERO, |text| {
+                    ui.painter()
+                        .layout_no_wrap(text.clone(), style::label_font(ui.ctx()), palette.good)
+                        .size()
+                        + well.total_margin().sum()
+                });
+                let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 3.0);
+                let row_height = icon_size
+                    .y
+                    .max(countdown_size.y)
+                    .max(ui.text_style_height(&egui::TextStyle::Body));
+                let (row, _) = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width(), row_height),
+                    egui::Sense::hover(),
+                );
+                let icon_rect = egui::Rect::from_center_size(
+                    egui::pos2(row.left() + icon_size.x / 2.0, row.center().y),
+                    icon_size,
+                );
+                let tint = if job.enabled {
+                    palette.good
+                } else {
+                    palette.metal
+                };
+                sprites::paint_awake(
+                    ui.painter(),
+                    icon_rect.min,
+                    Sprite::Floppy,
+                    3.0,
+                    style::decorative_color(ui.ctx(), tint),
+                    wake,
+                );
+                let gap = ui.spacing().item_spacing.x;
+                let name_right = if let Some(remaining) = countdown {
+                    let rect = egui::Rect::from_center_size(
+                        egui::pos2(row.right() - countdown_size.x / 2.0, row.center().y),
+                        countdown_size,
+                    );
+                    ui.scope_builder(
+                        egui::UiBuilder::new()
+                            .id_salt((job.id, "countdown"))
+                            .max_rect(rect),
+                        |ui| {
+                            well.show(ui, |ui| {
                                 ui.label(
-                                    egui::RichText::new(remaining.to_uppercase())
+                                    egui::RichText::new(remaining)
                                         .font(style::label_font(ui.ctx()))
                                         .color(palette.good),
                                 );
                             });
-                        }
-                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                            ui.add(
-                                egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
-                                    .truncate(),
-                            );
-                        });
-                    });
-                });
+                        },
+                    );
+                    rect.left() - gap
+                } else {
+                    row.right()
+                };
+                let name_rect = egui::Rect::from_min_max(
+                    egui::pos2(icon_rect.right() + gap, row.top()),
+                    egui::pos2(name_right.max(icon_rect.right() + gap), row.bottom()),
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .id_salt((job.id, "name"))
+                        .max_rect(name_rect)
+                        .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                    |ui| {
+                        ui.add(
+                            egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
+                                .truncate(),
+                        );
+                    },
+                );
             });
         let rect = frame.response.rect;
         let response = ui
@@ -438,6 +486,54 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     use super::*;
     use crate::model::Config;
+
+    #[test]
+    fn disabling_job_keeps_name_layout_stable_across_frames() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let app = App::new(
+                    Config::default(),
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                let mut job = Job {
+                    name: "Artifact test job".into(),
+                    enabled: true,
+                    next_run: Some(Utc::now() + chrono::Duration::minutes(10)),
+                    ..Job::default()
+                };
+                let mut first_disabled = None;
+                for frame in 0..6 {
+                    if frame == 3 {
+                        job.enabled = false;
+                    }
+                    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                        ui.set_width(300.0);
+                        app.job_card(ui, &job);
+                    });
+                    let name = output
+                        .shapes
+                        .iter()
+                        .find_map(|shape| match &shape.shape {
+                            egui::Shape::Text(text) if text.galley.text() == job.name => {
+                                Some((text.pos, text.galley.size(), shape.clip_rect))
+                            }
+                            _ => None,
+                        })
+                        .expect("job name must be rendered");
+                    if frame == 3 {
+                        first_disabled = Some(name);
+                    }
+                    if frame > 3 {
+                        assert_eq!(Some(name), first_disabled, "{} {theme:?}", skin.id);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn initial_system_appearance_is_saved_and_ignores_later_os_changes() {
