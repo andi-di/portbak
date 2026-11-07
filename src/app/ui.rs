@@ -153,11 +153,12 @@ impl App {
                 top: 16,
                 bottom: 8,
             });
-        egui::SidePanel::left("jobs")
-            .default_width(290.0)
+        let panel = egui::SidePanel::left("jobs")
+            .default_width(self.config.sidebar_width.clamp(240.0, 460.0))
             .width_range(240.0..=460.0)
             .frame(frame)
             .show(ctx, |ui| {
+                ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(ui, "JOBS", 16.0, palette.accent);
                     pixel::badge(ui, &self.config.jobs.len().to_string(), palette.gold);
@@ -184,6 +185,12 @@ impl App {
                     self.settings_open = false;
                 }
             });
+        if ctx
+            .read_response(egui::Id::new("jobs").with("__resize"))
+            .is_some_and(|response| response.dragged())
+        {
+            self.config.sidebar_width = panel.response.rect.width().clamp(240.0, 460.0);
+        }
     }
 
     /// Draws the job as a cartridge-like card; returns whether it was clicked.
@@ -357,5 +364,140 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
         Theme::System => egui::ThemePreference::System,
         Theme::Light => egui::ThemePreference::Light,
         Theme::Dark => egui::ThemePreference::Dark,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Config;
+
+    #[test]
+    fn sidebar_width_stays_fixed_across_frames() {
+        for skin in ["retro", "dark-fantasy"] {
+            for with_job in [false, true] {
+                let mut config = Config {
+                    skin: skin.into(),
+                    ..Config::default()
+                };
+                if with_job {
+                    config.jobs.push(Job {
+                        name: "A long job name that should not stretch the sidebar".into(),
+                        status: "A long status that should wrap inside the sidebar".into(),
+                        ..Job::default()
+                    });
+                }
+                let mut app = App::new(
+                    config,
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                let context = egui::Context::default();
+                app.ensure_skin(&context);
+                let id = egui::Id::new("jobs");
+                context.data_mut(|data| {
+                    data.insert_persisted(
+                        id,
+                        egui::containers::panel::PanelState {
+                            rect: egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(350.0, 600.0),
+                            ),
+                        },
+                    )
+                });
+                for _ in 0..4 {
+                    let input = egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1100.0, 960.0),
+                        )),
+                        ..Default::default()
+                    };
+                    let _ = context.run(input, |ctx| app.show_job_list(ctx));
+                    let width = egui::containers::panel::PanelState::load(&context, id)
+                        .unwrap()
+                        .rect
+                        .width();
+                    assert!(
+                        (width - 350.0).abs() < 1.0,
+                        "{skin} with_job={with_job}: {width}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dragged_sidebar_width_survives_frames_and_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let mut app = App::new(
+            Config::default(),
+            path.clone(),
+            tempfile::tempfile().unwrap(),
+        );
+        let ctx = egui::Context::default();
+        app.ensure_skin(&ctx);
+        let frame = |app: &mut App, ctx: &egui::Context, events| {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1100.0, 960.0),
+                )),
+                events,
+                ..Default::default()
+            };
+            let _ = ctx.run(input, |ctx| app.show_job_list(ctx));
+        };
+        frame(&mut app, &ctx, vec![]);
+        let start = egui::pos2(290.0, 300.0);
+        let end = egui::pos2(390.0, 300.0);
+        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
+        frame(
+            &mut app,
+            &ctx,
+            vec![egui::Event::PointerButton {
+                pos: start,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(end)]);
+        frame(
+            &mut app,
+            &ctx,
+            vec![egui::Event::PointerButton {
+                pos: end,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert!(
+            (app.config.sidebar_width - 390.0).abs() < 1.0,
+            "width: {}",
+            app.config.sidebar_width
+        );
+        for _ in 0..5 {
+            frame(&mut app, &ctx, vec![]);
+            let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+                .unwrap()
+                .rect
+                .width();
+            assert!((width - 390.0).abs() < 1.0, "width: {width}");
+        }
+        assert!(app.persist());
+        let config: Config = crate::engine::load(&path).unwrap();
+        let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
+        let new_ctx = egui::Context::default();
+        restarted.ensure_skin(&new_ctx);
+        frame(&mut restarted, &new_ctx, vec![]);
+        let width = egui::containers::panel::PanelState::load(&new_ctx, egui::Id::new("jobs"))
+            .unwrap()
+            .rect
+            .width();
+        assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
     }
 }
