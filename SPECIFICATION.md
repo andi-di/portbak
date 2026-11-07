@@ -67,6 +67,7 @@ Minimizing keeps the application and scheduler running. Closing the window immed
 Each job is independent and has a persistent UUID. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
 
 - Settings has **Job settings** and **Theme** tabs.
+- Display Windows drive and network paths without extended-length prefixes in path fields, the settings-file location, and restore details; preserve internal paths for file operations.
 - Persist editable new-job defaults for automatic destination, compression, scheduling, and retention in `portbak.json`; changes affect future jobs only.
 - With automatic destination enabled, changing the source sets and creates `<app-dir>/backups/<job UUID>-<source folder name>`. Allow a manual destination afterward. Reject a generated destination within the source.
 - Existing jobs retain their saved values when loading older configurations.

@@ -5,7 +5,7 @@ use crate::engine;
 use crate::model::{Job, Record};
 use chrono::{DateTime, Local, Utc};
 use eframe::egui;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const DATE_TIME: &str = "%d.%m.%Y %H:%M:%S";
 pub const DATE_MINUTE: &str = "%d.%m.%Y %H:%M";
@@ -54,6 +54,23 @@ pub fn caption(ui: &mut egui::Ui, text: &str) {
     ui.label(egui::RichText::new(text).small().color(dim));
 }
 
+/// Show ordinary Windows paths while retaining verbatim paths for file operations.
+pub fn display_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        if let Some(Component::Prefix(prefix)) = path.components().next() {
+            match prefix.kind() {
+                Prefix::VerbatimDisk(_) => return text[4..].to_owned(),
+                Prefix::VerbatimUNC(_, _) => return format!(r"\\{}", &text[8..]),
+                _ => {}
+            }
+        }
+    }
+    text.into_owned()
+}
+
 pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
     caption(ui, label);
     centered_row(ui, |ui| {
@@ -65,7 +82,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
                     *path = folder;
                 }
             }
-            let mut text = path.to_string_lossy().into_owned();
+            let mut text = display_path(path);
             let editor = egui::TextEdit::singleline(&mut text)
                 .desired_width(ui.available_width())
                 .margin(egui::vec2(8.0, 4.0))
@@ -110,6 +127,22 @@ pub fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn display_paths_hide_disk_and_unc_verbatim_prefixes() {
+        for (stored, shown) in [
+            (r"\\?\C:\app\backups", r"C:\app\backups"),
+            (r"\\?\UNC\server\share\folder", r"\\server\share\folder"),
+            (r"C:\ordinary", r"C:\ordinary"),
+            (r"\\server\share", r"\\server\share"),
+            (r"\\?\Volume{example}\folder", r"\\?\Volume{example}\folder"),
+        ] {
+            let path = PathBuf::from(stored);
+            assert_eq!(display_path(&path), shown);
+            assert_eq!(path, PathBuf::from(stored));
+        }
+    }
 
     #[test]
     fn mixed_row_controls_share_vertical_center() {
