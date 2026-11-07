@@ -243,8 +243,8 @@ impl App {
                             }
                         }
                     });
-                if clicked.is_some() {
-                    self.selected = clicked;
+                if let Some(id) = clicked {
+                    self.selected = (self.selected != Some(id)).then_some(id);
                     self.settings_open = false;
                 }
                 if show_mascot {
