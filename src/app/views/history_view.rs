@@ -136,20 +136,22 @@ fn restore_confirmation(
     let mut confirm = false;
     let mut cancel = false;
     let response = egui::Modal::new(egui::Id::new("confirm_backup_restore")).show(ctx, |ui| {
-        ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 560.0));
+        ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 760.0));
         egui::ScrollArea::vertical()
-            .max_height((ctx.content_rect().height() - 144.0).max(120.0))
+            .max_height((ctx.content_rect().height() - 64.0).max(120.0))
             .show(ui, |ui| {
                 ui.heading("Restore backup?");
                 restore_details(ui, history, app_error);
-                ui.horizontal_wrapped(|ui| {
+                ui.horizontal(|ui| {
                     cancel = ui.add(PixelButton::new("Cancel")).clicked();
-                    let restore = PixelButton::new("Replace contents and restore")
-                        .sprite(Sprite::Rewind)
-                        .tone(Tone::Danger);
-                    confirm = ui
-                        .add_enabled(history.restorable_selection().is_some(), restore)
-                        .clicked();
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let restore = PixelButton::new("Replace contents and restore")
+                            .sprite(Sprite::Rewind)
+                            .tone(Tone::Danger);
+                        confirm = ui
+                            .add_enabled(history.restorable_selection().is_some(), restore)
+                            .clicked();
+                    });
                 });
             });
     });
