@@ -56,6 +56,7 @@ pub struct Job {
     pub interval_value: u32,
     pub interval_unit: IntervalUnit,
     pub rolling: bool,
+    pub count_protected: bool,
     pub max_count: Option<usize>,
     pub max_bytes: Option<u64>,
     pub next_run: Option<DateTime<Utc>>,
@@ -81,6 +82,7 @@ impl Default for Job {
             interval_value: 60,
             interval_unit: IntervalUnit::Minutes,
             rolling: false,
+            count_protected: false,
             max_count: None,
             max_bytes: None,
             next_run: None,
@@ -302,6 +304,7 @@ pub struct JobDefaults {
     pub interval_value: u32,
     pub interval_unit: IntervalUnit,
     pub rolling: bool,
+    pub count_protected: bool,
     pub count_enabled: bool,
     pub max_count: usize,
     pub size_enabled: bool,
@@ -321,6 +324,7 @@ impl Default for JobDefaults {
             interval_value: 10,
             interval_unit: IntervalUnit::Minutes,
             rolling: true,
+            count_protected: false,
             count_enabled: true,
             max_count: 20,
             size_enabled: false,
@@ -342,6 +346,7 @@ impl JobDefaults {
             interval_value: self.interval_value,
             interval_unit: self.interval_unit,
             rolling: self.rolling,
+            count_protected: self.count_protected,
             max_count: self.count_enabled.then_some(self.max_count),
             max_bytes: self.size_enabled.then_some(self.max_bytes),
             ..Job::default()
@@ -425,6 +430,21 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protected_budget_option_defaults_off_and_is_inherited_independently() {
+        let mut config: Config = serde_json::from_str(r#"{"jobs":[{}]}"#).unwrap();
+        assert!(!config.job_defaults.count_protected);
+        assert!(!config.jobs[0].count_protected);
+        config.job_defaults.count_protected = true;
+        let job = config.job_defaults.new_job();
+        assert!(job.count_protected);
+        config.jobs.push(job);
+        config.job_defaults.count_protected = false;
+        let saved: Config = serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(saved.jobs[1].count_protected);
+        assert!(!saved.job_defaults.count_protected);
+    }
 
     #[test]
     fn legacy_source_named_destinations_migrate_to_job_names_without_losing_backups() {

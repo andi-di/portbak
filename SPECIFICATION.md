@@ -216,7 +216,8 @@ Rolling retention is configured per job and enabled by default for new jobs, wit
 After a newly successful backup:
 
 - Count only successful backups owned by this job and recorded in its manifest.
-- Evaluate both active limits, counting protected versions as well. If either is exceeded, delete the oldest unprotected managed successful backup other than the newest version, repeating until the limits are satisfied or no eligible version remains.
+- The per-job and template checkbox **Count protected backups toward retention limits** defaults to unchecked. Unchecked, exclude protected versions from both budgets; checked, include them. Protected backups are never eligible for deletion.
+- Evaluate both active limits using the counted versions. If either is exceeded, delete the oldest unprotected managed successful backup other than the newest version, repeating until the limits are satisfied or no eligible version remains.
 - Use successful creation order to determine the oldest backup.
 - For folder backups, total size means the sum of regular file lengths. For ZIP backups, use archive file length. Do not use source size, allocated disk blocks, settings, or unrelated files.
 - Always keep the newest successful backup. If it alone exceeds the size limit, retain it and show a notice.
@@ -225,7 +226,7 @@ After a newly successful backup:
 
 Each saved version has a persistent protection flag, false by default (including records that predate the flag). Changing this flag must preserve all other metadata and must not trigger immediate cleanup. Use destination locking and atomic manifest replacement for protection changes.
 
-When rolling retention is enabled and at least one version is protected, warn if the count limit minus the protected count is at most three places, or if at most 20% of the size limit remains after subtracting protected backup sizes. Show concrete remaining values, clamp negative values to zero, and separately report exceeded limits. These are retention budgets, not free disk space; warnings do not block new backups. Protected versions and the newest backup can cause limits to remain exceeded.
+When rolling retention and counting protected backups are enabled and at least one version is protected, warn if the count limit minus the protected count is at most three places, or if at most 20% of the size limit remains after subtracting protected backup sizes. Show concrete remaining values, clamp negative values to zero, and separately report exceeded limits. These are retention budgets, not free disk space; warnings do not block new backups. Counted protected versions and the newest backup can cause limits to remain exceeded.
 
 Do not delete old backups in advance to make room for a new one. If there is not enough space to create the new backup first, report failure and retain previous backups.
 
