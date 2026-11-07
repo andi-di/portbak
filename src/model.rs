@@ -422,6 +422,21 @@ mod tests {
     }
 
     #[test]
+    fn modern_skin_and_brightness_survive_config_roundtrip() {
+        for theme in Theme::ALL {
+            let config = Config {
+                skin: "modern".into(),
+                theme,
+                ..Config::default()
+            };
+            let saved: Config =
+                serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+            assert_eq!(saved.skin, "modern");
+            assert_eq!(saved.theme, theme);
+        }
+    }
+
+    #[test]
     fn configs_without_a_skin_load_the_default_skin() {
         let saved: Config =
             serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();

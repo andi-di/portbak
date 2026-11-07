@@ -135,6 +135,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &HistoryDialog, app_error: &str) {
         ui.label(format!("Selected backup: {name}"));
     }
     egui::Frame::new()
+        .corner_radius(super::style::radius(ui.ctx(), 6))
         .fill(pixel::mix(palette.bad, palette.surface, 0.8))
         .stroke(egui::Stroke::new(2.0_f32, palette.bad))
         .inner_margin(egui::Margin::same(10))
@@ -162,6 +163,7 @@ fn sunken<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R 
     let palette = Palette::of(ui);
     egui::Frame::new()
         .fill(palette.sunken)
+        .corner_radius(super::style::radius(ui.ctx(), 6))
         .stroke(egui::Stroke::new(2.0_f32, palette.outline))
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
@@ -272,8 +274,10 @@ fn backup_row<R>(
         (false, true) => palette.raised,
         (false, false) => egui::Color32::TRANSPARENT,
     };
-    ui.painter()
-        .set(background, egui::Shape::rect_filled(rect, 0.0, fill));
+    ui.painter().set(
+        background,
+        egui::Shape::rect_filled(rect, super::style::radius(ui.ctx(), 6), fill),
+    );
     (response, frame.inner)
 }
 
