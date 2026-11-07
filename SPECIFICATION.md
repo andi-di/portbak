@@ -83,7 +83,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 | Interval | 10 Minutes (00:10:00) by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
 | Compress as ZIP | Checkbox; checked by default |
 | Rolling retention | Enabled by default |
-| Maximum count | Checked by default at 100; positive whole number, supporting at least 1–100,000 |
+| Maximum count | Checked by default at 20; positive whole number, supporting at least 1–100,000 |
 | Maximum total size | Unchecked by default at 10 GiB; positive value, supporting at least 0.001–100,000 GiB |
 
 A GiB is 1,073,741,824 bytes. Count and size limits are remembered while rolling retention is disabled, but are not enforced. Enabling rolling retention without an active limit does not delete anything.
@@ -204,7 +204,7 @@ After a crash, forced termination, or power loss, temporary output or a publishe
 
 ## 10. Rolling retention
 
-Rolling retention is configured per job and enabled by default for new jobs, with a maximum count of 100. Maximum count and maximum total size can be enabled separately or together.
+Rolling retention is configured per job and enabled by default for new jobs, with a maximum count of 20. Maximum count and maximum total size can be enabled separately or together.
 
 After a newly successful backup:
 

@@ -239,7 +239,7 @@ impl Default for JobDefaults {
             interval_unit: IntervalUnit::Minutes,
             rolling: true,
             count_enabled: true,
-            max_count: 100,
+            max_count: 20,
             size_enabled: false,
             max_bytes: 10 * 1024 * 1024 * 1024,
         }
@@ -329,7 +329,7 @@ mod tests {
         assert_eq!(first.schedule, Schedule::Interval);
         assert_eq!(first.interval_value, 10);
         assert_eq!(first.interval_unit, IntervalUnit::Minutes);
-        assert_eq!(first.max_count, Some(100));
+        assert_eq!(first.max_count, Some(20));
         assert_eq!(first.max_bytes, None);
         assert!(!first.enabled);
         config.job_defaults.zip = false;
