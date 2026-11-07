@@ -1,6 +1,8 @@
-# portbak
+# portbak <img src="assets/icon/portbak.svg" width="24" />
 
 Lightweight backup app for Linux and Windows, written in Rust with egui. No browser runtime, server, or installer required.
+
+![Empty portbak window in Retro Dark](assets/screenshots/retro-dark.png)
 
 ## Product specification
 
