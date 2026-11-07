@@ -208,11 +208,7 @@ fn portrait_texture(
                 Source::Portraits
             };
             let image = source_image(ctx, source)?;
-            let cell = if full_body && expression == Expression::Pout {
-                2
-            } else {
-                expression.cell()
-            };
+            let cell = expression.cell();
             let width = image.width() / 4;
             let height = image.height() / 4;
             let crop = image
