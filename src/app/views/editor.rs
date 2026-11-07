@@ -237,9 +237,12 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         .sprite(Sprite::Power)
         .tone(tone)
         .min_size(egui::vec2(52.0, 52.0));
-    let can_toggle = (job.enabled || job.has_runnable_schedule()) && !locked;
+    let folders_chosen = !job.source.as_os_str().is_empty() && !job.target.as_os_str().is_empty();
+    let can_toggle = (job.enabled || (folders_chosen && job.has_runnable_schedule())) && !locked;
     let tooltip = if locked {
         "Automatic backups cannot be changed during restore or while backup history is open"
+    } else if !job.enabled && !folders_chosen {
+        "Choose source and destination folders to enable automatic backups"
     } else if !job.enabled && !job.has_runnable_schedule() {
         "Select at least one weekday to enable automatic backups"
     } else {
