@@ -178,6 +178,25 @@ impl Job {
         Ok(())
     }
 
+    fn portable_destination(&self) -> Option<PathBuf> {
+        if !self.auto_destination {
+            return None;
+        }
+        let name = self.target.file_name()?;
+        let text = name.to_string_lossy();
+        let owned = text == self.id.to_string() || text.starts_with(&format!("{}-", self.id));
+        let parent = self.target.parent()?;
+        if owned
+            && (parent == std::path::Path::new("backups")
+                || (self.target.is_absolute()
+                    && parent.file_name() == Some(std::ffi::OsStr::new("backups"))))
+        {
+            Some(PathBuf::from("backups").join(name))
+        } else {
+            None
+        }
+    }
+
     /// Weekday schedules need at least one selected day to ever run.
     pub fn has_runnable_schedule(&self) -> bool {
         self.schedule != Schedule::Weekdays || self.weekdays.contains(&true)
@@ -360,6 +379,28 @@ impl Default for Config {
             job_defaults: JobDefaults::default(),
             sidebar_width: 290.0,
             jobs: vec![],
+        }
+    }
+}
+
+impl Config {
+    /// Keep runtime paths absolute, but save automatic destinations beside the portable app.
+    pub fn for_storage(&self) -> Self {
+        let mut saved = self.clone();
+        for job in &mut saved.jobs {
+            if let Some(relative) = job.portable_destination() {
+                job.target = relative;
+            }
+        }
+        saved
+    }
+
+    pub fn resolve_destinations(&mut self, app_dir: &std::path::Path) {
+        let app_dir = std::fs::canonicalize(app_dir).unwrap_or_else(|_| app_dir.to_path_buf());
+        for job in &mut self.jobs {
+            if let Some(relative) = job.portable_destination() {
+                job.target = app_dir.join(relative);
+            }
         }
     }
 }

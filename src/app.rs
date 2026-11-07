@@ -136,7 +136,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: Config, path: PathBuf, lock: File) -> Self {
+    pub fn new(mut config: Config, path: PathBuf, lock: File) -> Self {
+        if let Some(app_dir) = path.parent() {
+            config.resolve_destinations(app_dir);
+        }
         let (tx, rx) = mpsc::channel();
         Self {
             selected: config.jobs.first().map(|job| job.id),
@@ -185,7 +188,7 @@ impl App {
     /// Returns whether the configuration is now saved; failures stay dirty and are retried.
     fn persist(&mut self) -> bool {
         self.last_save = Instant::now();
-        match engine::save(&self.path, &self.config) {
+        match engine::save(&self.path, &self.config.for_storage()) {
             Ok(()) => {
                 self.dirty = false;
                 self.error.clear();
@@ -662,6 +665,70 @@ mod tests {
         app.job_mut(id).unwrap().enabled = false;
         app.job_activation_changed(id, true);
         assert!(app.queue.is_empty());
+    }
+
+    #[test]
+    fn moving_app_and_backups_preserves_backup_history_and_restore() {
+        let root = tempfile::tempdir().unwrap();
+        let original = root.path().join("original");
+        let moved = root.path().join("moved");
+        let source = root.path().join("source");
+        std::fs::create_dir(&original).unwrap();
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file"), "original contents").unwrap();
+        let mut job = Job {
+            source: source.clone(),
+            ..crate::model::JobDefaults::default().new_job()
+        };
+        job.set_auto_destination(&original).unwrap();
+        engine::run(&job, &mpsc::channel().0).unwrap();
+        let manual = Job {
+            target: root.path().join("manual"),
+            ..Job::default()
+        };
+        let manual_target = manual.target.clone();
+        let config = Config {
+            jobs: vec![job.clone(), manual],
+            ..Config::default()
+        };
+        let mut app = app_with(config, original.join("portbak.json"));
+        assert!(app.persist());
+        let saved: Config = engine::load(&app.path).unwrap();
+        assert_eq!(
+            saved.jobs[0].target,
+            PathBuf::from("backups").join(job.target.file_name().unwrap())
+        );
+        assert_eq!(saved.jobs[1].target, manual_target);
+        drop(app);
+        std::fs::rename(&original, &moved).unwrap();
+        let path = moved.join("portbak.json");
+        let config = engine::load(&path).unwrap();
+        let app = app_with(config, path);
+        let job = &app.config.jobs[0];
+        assert!(job
+            .target
+            .starts_with(std::fs::canonicalize(&moved).unwrap()));
+        let backups = engine::history::list(job).unwrap();
+        assert_eq!(backups.len(), 1);
+        assert!(!engine::run(job, &mpsc::channel().0).unwrap().created);
+        std::fs::write(source.join("file"), "changed").unwrap();
+        engine::restore::run(job, &backups[0].record.name, &mpsc::channel().0).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(source.join("file")).unwrap(),
+            "original contents"
+        );
+        assert_eq!(app.config.jobs[1].target, manual_target);
+        let mut legacy = Config {
+            jobs: vec![Job {
+                target: original
+                    .join("backups")
+                    .join(job.target.file_name().unwrap()),
+                ..job.clone()
+            }],
+            ..Config::default()
+        };
+        legacy.resolve_destinations(&moved);
+        assert_eq!(legacy.jobs[0].target, job.target);
     }
 
     /// Ticks until `done` holds or five seconds pass.

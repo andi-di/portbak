@@ -94,6 +94,6 @@ fn load_config(path: &Path) -> anyhow::Result<Config> {
         config.version == CONFIG_VERSION,
         "Unknown configuration version"
     );
-    engine::save(path, &config)?;
+    engine::save(path, &config.for_storage())?;
     Ok(config)
 }
