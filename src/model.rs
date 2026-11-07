@@ -177,7 +177,10 @@ impl Job {
             }
             return Ok(());
         }
-        if self.destination_name != DestinationName::JobName || self.name == previous.name {
+        let naming_changed = self.destination_name != previous.destination_name;
+        let job_name_changed =
+            self.destination_name == DestinationName::JobName && self.name != previous.name;
+        if !naming_changed && !job_name_changed {
             return Ok(());
         }
         let old_target = previous.auto_destination_path(app_dir)?;
@@ -404,6 +407,46 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn existing_auto_destinations_can_switch_naming_modes_without_losing_backups() {
+        let root = tempfile::tempdir().unwrap();
+        let app = root.path().join("app");
+        let source = root.path().join("source");
+        std::fs::create_dir(&app).unwrap();
+        std::fs::create_dir(&source).unwrap();
+        let mut job = Job {
+            source,
+            destination_name: DestinationName::SourceFolder,
+            ..JobDefaults::default().new_job()
+        };
+        job.set_auto_destination(&app).unwrap();
+        std::fs::write(job.target.join("backup"), "keep").unwrap();
+        for mode in [
+            DestinationName::JobName,
+            DestinationName::SourceFolder,
+            DestinationName::JobName,
+        ] {
+            let previous = job.clone();
+            job.destination_name = mode;
+            job.name = "Updated job".into();
+            job.update_auto_destination(&previous, &app).unwrap();
+            let suffix = if mode == DestinationName::JobName {
+                "Updated job"
+            } else {
+                "source"
+            };
+            assert_eq!(
+                job.target.file_name().unwrap(),
+                format!("{}-{suffix}", job.id).as_str()
+            );
+            assert_eq!(
+                std::fs::read_to_string(job.target.join("backup")).unwrap(),
+                "keep"
+            );
+            assert!(!previous.target.exists());
+        }
+    }
 
     #[test]
     fn auto_updates_can_be_reenabled_after_manual_destination_override() {

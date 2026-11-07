@@ -6,7 +6,7 @@ use crate::app::views::widgets::{
     retention_warnings, DATE_MINUTE, DATE_TIME,
 };
 use crate::app::{App, CachedHistory, HistoryMode};
-use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
+use crate::model::{DestinationName, IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
 use uuid::Uuid;
@@ -55,6 +55,7 @@ impl App {
             .path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
+        let destination_name = self.config.job_defaults.destination_name;
         let jobs = &mut self.config.jobs;
         let mut action = None;
         let mut disabled = false;
@@ -76,9 +77,15 @@ impl App {
                     let summary = summaries
                         .get(&job.id)
                         .filter(|summary| summary.target == job.target);
-                    action =
-                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    action = job_editor(ui, job, &permissions, summary, destination_name)
+                        .map(|action| (job.id, action));
+                    if job.auto_destination
+                        && (job.name != previous.name || job.source != previous.source)
+                    {
+                        job.destination_name = destination_name;
+                    }
                     if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                        job.destination_name = previous.destination_name;
                         self.error = format!("Could not update automatic destination: {error:#}");
                     }
                     disabled = was_enabled && !job.enabled;
@@ -149,6 +156,7 @@ fn job_editor(
     job: &mut Job,
     permissions: &Permissions,
     summary: Option<&CachedHistory>,
+    destination_name: DestinationName,
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     job_banner(ui, job, permissions.locked);
@@ -162,7 +170,7 @@ fn job_editor(
     ui.add_space(14.0);
     ui.add_enabled_ui(!permissions.busy, |ui| {
         pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-            folder_settings(ui, job)
+            folder_settings(ui, job, destination_name)
         });
         pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
             schedule_settings(ui, job)
@@ -251,7 +259,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     }
 }
 
-fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
+fn folder_settings(ui: &mut egui::Ui, job: &mut Job, destination_name: DestinationName) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
@@ -266,12 +274,16 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
         ui,
         "Destination folder",
         &mut job.target,
-        Some((job.auto_destination, job.source.is_dir())),
+        Some((
+            job.auto_destination && job.destination_name == destination_name,
+            job.source.is_dir(),
+        )),
     );
     if manual {
         job.auto_destination = false;
     } else if enable_auto {
         job.auto_destination = true;
+        job.destination_name = destination_name;
     }
     ui.add_space(6.0);
     ui.horizontal(|ui| {
