@@ -91,9 +91,19 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
             ));
             if defaults.auto_destination {
                 let button = ui.add(egui::Button::new(format!(
-                    "{}  \u{25be}",
+                    "{}    ",
                     defaults.destination_name.label()
                 )));
+                let center = egui::pos2(button.rect.right() - 10.0, button.rect.center().y);
+                ui.painter().add(egui::Shape::convex_polygon(
+                    vec![
+                        center + egui::vec2(-4.0, -2.0),
+                        center + egui::vec2(4.0, -2.0),
+                        center + egui::vec2(0.0, 3.0),
+                    ],
+                    ui.style().interact(&button).fg_stroke.color,
+                    egui::Stroke::NONE,
+                ));
                 egui::Popup::menu(&button).show(|ui| {
                     pixel::popup(ui, |ui| {
                         for mode in [DestinationName::JobName, DestinationName::SourceFolder] {
