@@ -24,6 +24,8 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Midnight Neko** in Settings. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
+On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
+
 On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.
 
 ## Storage format and recovery
@@ -70,7 +72,7 @@ cargo build --release --locked
 
 The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow and librsvg’s `rsvg-convert`, available on Debian/Ubuntu as `librsvg2-bin`). The retro gaming icon shows a gold folder (`#FFD23F`) and cyan backup arrow (`#2CE8F5`) with dark outlines (`#0E081D`) on a filled purple circle (`#2B1E52`) with a lighter purple rim (`#4C3B85`). The area outside the circle is transparent. The SVG uses a finer 64 × 64 pixel grid; exports use nearest-neighbor scaling to preserve sharp pixel edges.
 
-Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
+Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools with the Windows SDK resource compiler (`rc.exe`) to embed the executable icon.
 
 The GitHub Actions workflow runs formatting checks, all tests, Clippy, and release builds on Linux and Windows, and uploads both executables as artifacts. It runs for pull requests, pushes to `main`, and manual dispatches. Feature-branch pushes are checked through their PR, avoiding duplicate push/PR runs. New commits cancel obsolete runs for the same PR or branch. Both platform jobs finish independently so one failure does not hide the other result.
 
