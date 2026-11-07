@@ -13,6 +13,7 @@ enum Expression {
     Neutral,
     Angry,
     Pout,
+    CatSmug,
     Excited,
     Happy,
     Surprised,
@@ -27,9 +28,10 @@ enum Expression {
 }
 
 impl Expression {
-    const REACTIONS: [Self; 13] = [
+    const REACTIONS: [Self; 14] = [
         Self::Angry,
         Self::Pout,
+        Self::CatSmug,
         Self::Excited,
         Self::Happy,
         Self::Surprised,
@@ -74,7 +76,8 @@ impl Expression {
         match self {
             Self::Neutral => 0,
             Self::Angry => 1,
-            Self::Pout => 2,
+            Self::Pout => 14,
+            Self::CatSmug => 2,
             Self::Excited => 3,
             Self::Happy => 4,
             Self::Surprised => 5,
@@ -204,7 +207,11 @@ fn portrait_texture(
                 Source::Portraits
             };
             let image = source_image(ctx, source)?;
-            let cell = expression.cell();
+            let cell = if full_body && expression == Expression::Pout {
+                2
+            } else {
+                expression.cell()
+            };
             let width = image.width() / 4;
             let height = image.height() / 4;
             let crop = image
@@ -290,7 +297,7 @@ mod tests {
             .into_iter()
             .chain([Expression::Neutral])
         {
-            let next: Vec<_> = (0..13).map(|seed| current.next(seed)).collect();
+            let next: Vec<_> = (0..14).map(|seed| current.next(seed)).collect();
             assert!(!next.contains(&current));
             assert!(!next.contains(&Expression::Neutral));
             assert!(Expression::REACTIONS
