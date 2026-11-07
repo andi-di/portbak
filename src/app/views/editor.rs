@@ -249,10 +249,6 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             .margin(egui::vec2(8.0, 4.0)),
     );
     ui.add_space(6.0);
-    ui.add(PixelCheckbox::new(
-        &mut job.auto_destination,
-        "Auto destination folder",
-    ));
     path_picker(ui, "Source folder", &mut job.source);
     ui.add_space(6.0);
     path_picker(ui, "Destination folder", &mut job.target);
