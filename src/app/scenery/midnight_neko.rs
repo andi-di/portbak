@@ -29,7 +29,7 @@ struct Particle {
 }
 
 fn state_id() -> egui::Id {
-    egui::Id::new("kawaii_magic")
+    egui::Id::new("midnight_neko_magic")
 }
 
 pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
@@ -67,7 +67,7 @@ pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
 fn floating_hearts(ctx: &egui::Context, behind: &egui::Painter, screen: Rect, time: f32) {
     let front = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Foreground,
-        egui::Id::new("kawaii_hearts"),
+        egui::Id::new("midnight_neko_hearts"),
     ));
     let pointer = ctx.input(|input| input.pointer.hover_pos());
     let mut state: Magic = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
@@ -258,7 +258,7 @@ pub fn paint_overlays(ctx: &egui::Context, palette: &Palette) {
     record_pointer(&mut state, pointer, pressed, time);
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Tooltip,
-        egui::Id::new("kawaii_stardust"),
+        egui::Id::new("midnight_neko_stardust"),
     ));
     for particle in &state.particles {
         let age = (time - particle.born).max(0.0);

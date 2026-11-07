@@ -70,7 +70,7 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.9);
+                pixel::panel_decoration(ui, 1.9);
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -125,7 +125,7 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.0);
+                pixel::panel_decoration(ui, 1.0);
                 if Skin::of(ui.ctx()).finish != Finish::Glass {
                     let clip = ui.clip_rect();
                     let rule =
@@ -174,10 +174,15 @@ impl App {
             .size_range(240.0..=460.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::panel_glass(ui, 1.0);
+                pixel::panel_decoration(ui, 1.0);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    pixel::display_label(ui, "JOBS", 16.0, palette.accent);
+                    pixel::display_label(
+                        ui,
+                        "JOBS",
+                        16.0,
+                        style::decorative_color(ui.ctx(), palette.accent),
+                    );
                     let color = style::decorative_color(ui.ctx(), palette.gold);
                     pixel::badge(ui, &self.config.jobs.len().to_string(), color);
                 });
@@ -398,7 +403,7 @@ fn card_shapes(
     } else {
         palette.outline
     };
-    let modern = Skin::of(ctx).finish == Finish::Modern;
+    let modern = matches!(Skin::of(ctx).finish, Finish::Modern | Finish::Gothic);
     let radius = style::panel_radius(ctx);
     let mut shapes = vec![
         shadow.as_shape(rect, radius).into(),

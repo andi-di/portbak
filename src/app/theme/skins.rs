@@ -2,7 +2,7 @@
 
 mod dark_fantasy;
 mod frutiger_aero;
-mod kawaii;
+mod midnight_neko;
 mod modern;
 mod retro;
 
@@ -13,7 +13,7 @@ pub static ALL: &[&Skin] = &[
     &dark_fantasy::DARK_FANTASY,
     &modern::MODERN,
     &frutiger_aero::FRUTIGER_AERO,
-    &kawaii::KAWAII,
+    &midnight_neko::MIDNIGHT_NEKO,
 ];
 
 pub fn default() -> &'static Skin {

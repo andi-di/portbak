@@ -1,54 +1,147 @@
-//! A single adult nautical catgirl with live gaze and brief, non-repeating click reactions.
+//! Approved illustrated portraits; expression changes never paint over the character's eyes.
 
-use crate::app::rendering::pixel::mix;
-use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
-use std::f32::consts::TAU;
+use crate::app::rendering::gothic;
+use crate::app::theme::style::Palette;
+use eframe::egui::{self, Color32, Pos2, Rect};
+use std::{sync::Arc, time::Duration};
 
-const ART: &[u8] = include_bytes!("../../../assets/themes/kawaii/catgirl.png");
-const CROP_HEIGHT: f32 = 1044.0;
-const REACTION_SECONDS: f64 = 3.0;
-
-pub fn reserved_height(width: f32) -> f32 {
-    width.min(340.0) * CROP_HEIGHT / 1024.0 + 48.0
-}
+const REACTION_SECONDS: f64 = 4.0;
+const PORTRAIT_SIZE: [u32; 2] = [384, 448];
+const EYE_LINE: f32 = 244.0;
+const EYE_DISTANCE: f32 = 96.0;
+const BACKDROP: image::Rgba<u8> = image::Rgba([0x21, 0x19, 0x1d, 255]);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Expression {
     #[default]
+    Neutral,
+    Angry,
     Pout,
     Excited,
+    Happy,
     Surprised,
-    Smirk,
-    Smug,
+    Superior,
+    InLove,
+    ColdStare,
+    Sleepy,
+    Bored,
+    Leaning,
+    Yandere,
     Shy,
 }
 
 impl Expression {
-    const ALL: [Self; 6] = [
+    const REACTIONS: [Self; 13] = [
+        Self::Angry,
         Self::Pout,
         Self::Excited,
+        Self::Happy,
         Self::Surprised,
-        Self::Smirk,
-        Self::Smug,
+        Self::Superior,
+        Self::InLove,
+        Self::ColdStare,
+        Self::Sleepy,
+        Self::Bored,
+        Self::Leaning,
+        Self::Yandere,
         Self::Shy,
     ];
 
     fn next(self, random: u128) -> Self {
-        let index = Self::ALL
-            .iter()
-            .position(|value| *value == self)
-            .unwrap_or(0);
-        Self::ALL[(index + 1 + random as usize % (Self::ALL.len() - 1)) % Self::ALL.len()]
+        let choices: Vec<_> = Self::REACTIONS
+            .into_iter()
+            .filter(|choice| *choice != self)
+            .collect();
+        choices[(random % choices.len() as u128) as usize]
     }
 
     fn line(self) -> &'static str {
         match self {
-            Self::Pout => "Hmph! I was keeping an eye on your files.",
-            Self::Excited => "You came to see me! I mean… your backups!",
+            Self::Neutral => "Hmph. I suppose you can stay.",
+            Self::Angry => "I wasn't waiting for you!",
+            Self::Pout => "A little attention wouldn't hurt…",
+            Self::Excited => "You came back! I mean… good timing!",
+            Self::Happy => "It's nice having you around.",
             Self::Surprised => "Nya?! You startled me!",
-            Self::Smirk => "Good thing you have me looking after things.",
-            Self::Smug => "Of course I noticed. I notice everything.",
-            Self::Shy => "It's nice when you stop by…",
+            Self::Superior => "Of course I noticed. I notice everything.",
+            Self::InLove => "Maybe I missed you. Just a little.",
+            Self::ColdStare => "I take keeping watch very seriously.",
+            Self::Sleepy => "Five more minutes… nya…",
+            Self::Bored => "Still here. Still keeping watch.",
+            Self::Leaning => "Go on. I'm listening.",
+            Self::Yandere => "Nothing gets past me. Nothing.",
+            Self::Shy => "You noticed me…?",
+        }
+    }
+
+    fn portrait(self) -> (Source, Rect) {
+        let (source, bounds) = match self {
+            Self::Neutral => (Source::Expressions, [270.0, 28.0, 616.0, 420.0]),
+            Self::Angry => (Source::Expressions, [636.0, 78.0, 898.0, 317.0]),
+            Self::Pout => (Source::Expressions, [936.0, 78.0, 1200.0, 317.0]),
+            Self::Excited => (Source::Expressions, [1230.0, 78.0, 1488.0, 317.0]),
+            Self::Happy => (Source::Expressions, [636.0, 366.0, 898.0, 607.0]),
+            Self::Surprised => (Source::Expressions, [936.0, 366.0, 1200.0, 607.0]),
+            Self::Superior => (Source::Expressions, [1230.0, 366.0, 1488.0, 607.0]),
+            Self::InLove => (Source::Expressions, [636.0, 660.0, 898.0, 931.0]),
+            Self::ColdStare => (Source::Expressions, [936.0, 660.0, 1200.0, 931.0]),
+            Self::Sleepy => (Source::Expressions, [1230.0, 660.0, 1488.0, 931.0]),
+            Self::Bored => (Source::Poses, [170.0, 90.0, 740.0, 735.0]),
+            Self::Leaning => (Source::Poses, [803.0, 92.0, 1440.0, 927.0]),
+            Self::Yandere => (Source::Yandere, [35.0, 60.0, 1162.0, 1286.0]),
+            Self::Shy => (Source::Shy, [35.0, 65.0, 1162.0, 1286.0]),
+        };
+        (
+            source,
+            Rect::from_min_max(
+                egui::pos2(bounds[0], bounds[1]),
+                egui::pos2(bounds[2], bounds[3]),
+            ),
+        )
+    }
+
+    /// Iris centers measured on the approved source illustrations.
+    fn eyes(self) -> [Pos2; 2] {
+        let points = match self {
+            Self::Neutral => [369.0, 213.0, 444.0, 196.0],
+            Self::Angry => [755.0, 212.9, 823.6, 207.5],
+            Self::Pout => [1052.6, 206.4, 1117.9, 194.1],
+            Self::Excited => [1348.1, 197.2, 1412.4, 183.9],
+            Self::Happy => [763.3, 487.6, 830.6, 471.2],
+            Self::Surprised => [1055.5, 484.9, 1120.2, 474.5],
+            Self::Superior => [1363.5, 473.9, 1431.4, 462.0],
+            Self::InLove => [755.8, 780.1, 823.4, 758.9],
+            Self::ColdStare => [1045.5, 797.9, 1117.9, 791.9],
+            Self::Sleepy => [1349.4, 790.7, 1425.0, 773.5],
+            Self::Bored => [398.9, 344.4, 513.7, 320.3],
+            Self::Leaning => [1183.4, 376.1, 1288.3, 341.3],
+            Self::Yandere => [528.9, 499.0, 726.5, 431.5],
+            Self::Shy => [545.1, 561.9, 741.7, 523.6],
+        };
+        [
+            egui::pos2(points[0], points[1]),
+            egui::pos2(points[2], points[3]),
+        ]
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Source {
+    Expressions,
+    Poses,
+    Yandere,
+    Shy,
+}
+
+impl Source {
+    fn bytes(self) -> &'static [u8] {
+        match self {
+            Self::Expressions => {
+                include_bytes!("../../../assets/themes/midnight-neko/expressions.png")
+            }
+            Self::Poses => include_bytes!("../../../assets/themes/midnight-neko/poses.png"),
+            Self::Yandere => include_bytes!("../../../assets/themes/midnight-neko/yandere.png"),
+            Self::Shy => include_bytes!("../../../assets/themes/midnight-neko/shy.png"),
         }
     }
 }
@@ -57,27 +150,31 @@ impl Expression {
 struct Companion {
     expression: Expression,
     until: f64,
-    gaze: Vec2,
 }
 
-fn texture(ctx: &egui::Context) -> Result<egui::TextureHandle, String> {
-    let id = egui::Id::new("kawaii_catgirl_art");
+impl Companion {
+    fn visible(&self, time: f64) -> Expression {
+        if time < self.until {
+            self.expression
+        } else {
+            Expression::Neutral
+        }
+    }
+
+    fn react(&mut self, time: f64, random: u128) {
+        self.expression = self.expression.next(random);
+        self.until = time + REACTION_SECONDS;
+    }
+}
+
+fn source_image(ctx: &egui::Context, source: Source) -> Result<Arc<image::DynamicImage>, String> {
+    let id = egui::Id::new(format!("midnight_neko_source_{source:?}"));
     if let Some(cached) = ctx.data_mut(|data| data.get_temp(id)) {
         return cached;
     }
-    let loaded = image::load_from_memory(ART)
-        .map(|image| {
-            let rgba = image.to_rgba8();
-            ctx.load_texture(
-                "Kawaii catgirl",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [rgba.width() as usize, rgba.height() as usize],
-                    rgba.as_raw(),
-                ),
-                egui::TextureOptions::LINEAR,
-            )
-        })
-        .map_err(|error| format!("Could not load Kawaii catgirl: {error}"));
+    let loaded = image::load_from_memory(source.bytes())
+        .map(Arc::new)
+        .map_err(|error| format!("Could not load Midnight Neko artwork: {error}"));
     if let Err(error) = &loaded {
         eprintln!("{error}");
     }
@@ -85,260 +182,175 @@ fn texture(ctx: &egui::Context) -> Result<egui::TextureHandle, String> {
     loaded
 }
 
-pub fn show(ui: &mut egui::Ui) {
-    let Ok(texture) = texture(ui.ctx()) else {
-        return;
-    };
-    let width = ui.available_width().min(340.0);
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(width, width * CROP_HEIGHT / 1024.0),
-        egui::Sense::click(),
+fn cached_texture(
+    ctx: &egui::Context,
+    id: egui::Id,
+    options: egui::TextureOptions,
+    pixels: impl FnOnce() -> Result<image::RgbaImage, String>,
+) -> Result<egui::TextureHandle, String> {
+    if let Some(cached) = ctx.data_mut(|data| data.get_temp(id)) {
+        return cached;
+    }
+    let result = pixels().map(|rgba| {
+        ctx.load_texture(
+            format!("Midnight Neko {id:?}"),
+            egui::ColorImage::from_rgba_unmultiplied(
+                [rgba.width() as usize, rgba.height() as usize],
+                rgba.as_raw(),
+            ),
+            options,
+        )
+    });
+    ctx.data_mut(|data| data.insert_temp(id, result.clone()));
+    result
+}
+
+fn texture(ctx: &egui::Context, source: Source, icon: bool) -> Result<egui::TextureHandle, String> {
+    cached_texture(
+        ctx,
+        egui::Id::new(format!("midnight_neko_{source:?}_{icon}")),
+        if icon {
+            egui::TextureOptions::NEAREST
+        } else {
+            egui::TextureOptions::LINEAR
+        },
+        || {
+            let image = source_image(ctx, source)?;
+            Ok(if icon {
+                image.crop_imm(31, 800, 158, 163).to_rgba8()
+            } else {
+                image.to_rgba8()
+            })
+        },
+    )
+}
+
+fn normalized_portrait(image: &image::DynamicImage, expression: Expression) -> image::RgbaImage {
+    let (_, bounds) = expression.portrait();
+    let [left_eye, right_eye] = expression.eyes();
+    let center = left_eye.lerp(right_eye, 0.5);
+    let scale = EYE_DISTANCE / left_eye.distance(right_eye);
+    let crop = image
+        .crop_imm(
+            bounds.left() as u32,
+            bounds.top() as u32,
+            bounds.width() as u32,
+            bounds.height() as u32,
+        )
+        .to_rgba8();
+    let resized = image::imageops::resize(
+        &crop,
+        (crop.width() as f32 * scale).round() as u32,
+        (crop.height() as f32 * scale).round() as u32,
+        image::imageops::FilterType::Lanczos3,
     );
-    let (time, pointer, dt) =
-        ui.input(|input| (input.time, input.pointer.hover_pos(), input.stable_dt));
-    let id = egui::Id::new("kawaii_companion_state");
+    let mut portrait = image::RgbaImage::from_pixel(PORTRAIT_SIZE[0], PORTRAIT_SIZE[1], BACKDROP);
+    let x = (PORTRAIT_SIZE[0] as f32 / 2.0 - (center.x - bounds.left()) * scale).round() as i64;
+    let y = (EYE_LINE - (center.y - bounds.top()) * scale).round() as i64;
+    image::imageops::overlay(&mut portrait, &resized, x, y);
+    portrait
+}
+
+fn portrait_texture(
+    ctx: &egui::Context,
+    expression: Expression,
+) -> Result<egui::TextureHandle, String> {
+    cached_texture(
+        ctx,
+        egui::Id::new(format!("midnight_neko_portrait_{expression:?}")),
+        egui::TextureOptions::LINEAR,
+        || {
+            let image = source_image(ctx, expression.portrait().0)?;
+            Ok(normalized_portrait(&image, expression))
+        },
+    )
+}
+
+pub fn paint_icon(painter: &egui::Painter, rect: Rect) {
+    if let Ok(texture) = texture(painter.ctx(), Source::Expressions, true) {
+        painter.image(
+            texture.id(),
+            rect,
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
+    }
+}
+
+pub fn reserved_height(width: f32) -> f32 {
+    width.min(340.0) * PORTRAIT_SIZE[1] as f32 / PORTRAIT_SIZE[0] as f32 + 48.0
+}
+
+pub fn show(ui: &mut egui::Ui) {
+    show_companion(ui, false);
+}
+
+pub fn show_welcome(ui: &mut egui::Ui) {
+    show_companion(ui, true);
+}
+
+fn show_companion(ui: &mut egui::Ui, full_figure: bool) {
+    let time = ui.input(|input| input.time);
+    let id = egui::Id::new("midnight_neko_companion");
     let mut state: Companion = ui
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
-    if response.clicked() {
-        state.expression = state.expression.next(uuid::Uuid::new_v4().as_u128());
-        state.until = time + REACTION_SECONDS;
-    }
-    let face_center = rect.min + egui::vec2(514.0, 480.0) * (width / 1024.0);
-    let wanted = gaze(pointer, face_center, width);
-    state.gaze += (wanted - state.gaze) * (1.0 - (-dt.min(0.05) * 14.0).exp());
-    let expression = (time < state.until).then_some(state.expression);
-    let bounce = if expression.is_some() {
-        let age = (time - (state.until - REACTION_SECONDS)) as f32;
-        (age * 14.0).sin() * (-age * 3.5).exp() * 3.0
-    } else {
-        0.0
-    };
-    let art_rect = rect.translate(egui::vec2(0.0, bounce));
-    ui.painter().image(
-        texture.id(),
-        art_rect,
-        Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, CROP_HEIGHT / 1536.0)),
-        Color32::WHITE,
+    let width = ui.available_width().min(340.0);
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(width, reserved_height(width) - 48.0),
+        egui::Sense::click(),
     );
-    face(ui.painter(), art_rect, state.gaze, expression, time);
-    response.on_hover_text("Click for a reaction");
-    if let Some(expression) = expression {
-        ui.label(egui::RichText::new(expression.line()).small());
+    if response.clicked() {
+        state.react(time, uuid::Uuid::new_v4().as_u128());
+    }
+    let expression = state.visible(time);
+    let palette = Palette::of(ui);
+    ui.painter()
+        .rect_filled(rect, 2, Color32::from_rgb(0x21, 0x19, 0x1d));
+    if full_figure && expression == Expression::Neutral {
+        paint_full_figure(ui.painter(), rect);
     } else {
-        ui.label(egui::RichText::new("I'm watching… your files, obviously.").small());
-    }
-    ui.ctx().data_mut(|data| data.insert_temp(id, state));
-    ui.ctx()
-        .request_repaint_after(std::time::Duration::from_millis(33));
-}
-
-fn gaze(pointer: Option<Pos2>, center: Pos2, width: f32) -> Vec2 {
-    pointer.map_or(Vec2::ZERO, |point| {
-        let offset = (point - center) / width.max(1.0);
-        egui::vec2(offset.x.clamp(-1.0, 1.0), offset.y.clamp(-1.0, 1.0))
-    })
-}
-
-fn face(
-    painter: &egui::Painter,
-    rect: Rect,
-    gaze: Vec2,
-    expression: Option<Expression>,
-    time: f64,
-) {
-    let scale = rect.width() / 1024.0;
-    let at = |x, y| rect.min + egui::vec2(x, y) * scale;
-    let ink = Color32::from_rgb(68, 27, 48);
-    let blink = time.rem_euclid(4.7) > 4.56 && expression != Some(Expression::Surprised);
-    for (x, side) in [(419.0, -1.0), (609.0, 1.0)] {
-        let center = at(x, 478.0);
-        let narrow = matches!(expression, Some(Expression::Smug | Expression::Smirk));
-        let height = if blink {
-            2.0
-        } else if narrow {
-            15.0
-        } else {
-            29.0
-        };
-        eye(painter, center, scale, height, gaze, expression);
-        let brow_y = if expression == Some(Expression::Surprised) {
-            420.0
-        } else {
-            433.0
-        };
-        let tilt = match expression {
-            Some(Expression::Pout) => -10.0,
-            Some(Expression::Shy | Expression::Surprised) => 6.0,
-            _ => -4.0,
-        } * side;
-        painter.line_segment(
-            [at(x - 48.0, brow_y - tilt), at(x + 48.0, brow_y + tilt)],
-            Stroke::new(3.2 * scale, ink),
-        );
-    }
-    let center = at(514.0, 587.0);
-    match expression {
-        Some(Expression::Surprised) => {
-            painter.add(egui::Shape::ellipse_filled(
-                center,
-                egui::vec2(15.0, 23.0) * scale,
-                ink,
-            ));
-            painter.add(egui::Shape::ellipse_filled(
-                center + Vec2::Y * 9.0 * scale,
-                egui::vec2(10.0, 7.0) * scale,
-                Color32::from_rgb(224, 119, 145),
-            ));
-        }
-        Some(Expression::Excited) => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    at(482.0, 578.0),
-                    at(546.0, 578.0),
-                    at(538.0, 604.0),
-                    at(514.0, 614.0),
-                    at(490.0, 604.0),
-                ],
-                Color32::from_rgb(166, 57, 89),
-                Stroke::new(2.0 * scale, ink),
-            ));
-            painter.line_segment(
-                [at(489.0, 582.0), at(539.0, 582.0)],
-                Stroke::new(5.0 * scale, Color32::WHITE),
-            );
-        }
-        Some(Expression::Pout) => {
-            painter.add(egui::Shape::line(
-                vec![
-                    at(488.0, 591.0),
-                    at(504.0, 585.0),
-                    at(514.0, 590.0),
-                    at(524.0, 585.0),
-                    at(540.0, 591.0),
-                ],
-                Stroke::new(3.0 * scale, ink),
-            ));
-        }
-        _ => {
-            let lift = if expression == Some(Expression::Smirk) {
-                12.0
-            } else {
-                0.0
-            };
-            painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
-                [
-                    at(486.0, 581.0),
-                    at(502.0, 601.0),
-                    at(531.0, 597.0),
-                    at(546.0, 580.0 - lift),
-                ],
-                false,
-                Color32::TRANSPARENT,
-                Stroke::new(3.0 * scale, ink),
-            ));
-        }
-    }
-    if matches!(expression, Some(Expression::Shy | Expression::Pout)) {
-        for x in [365.0, 663.0] {
-            painter.add(egui::Shape::ellipse_filled(
-                at(x, 524.0),
-                egui::vec2(32.0, 12.0) * scale,
-                Color32::from_rgba_unmultiplied(244, 106, 134, 48),
-            ));
-        }
-    }
-}
-
-fn eye(
-    painter: &egui::Painter,
-    center: Pos2,
-    scale: f32,
-    height: f32,
-    gaze: Vec2,
-    expression: Option<Expression>,
-) {
-    let ink = Color32::from_rgb(62, 27, 49);
-    let points: Vec<_> = (0..32)
-        .map(|step| {
-            let angle = step as f32 / 32.0 * TAU;
-            let sine = angle.sin();
-            let y = sine.signum() * sine.abs().powf(1.7) * height;
-            center + egui::vec2(angle.cos() * 58.0, y) * scale
-        })
-        .collect();
-    painter.add(egui::Shape::convex_polygon(
-        points,
-        Color32::from_rgb(255, 250, 253),
-        Stroke::new(2.0 * scale, ink),
-    ));
-    if height > 3.0 {
-        let clip = Rect::from_center_size(center, egui::vec2(112.0, height * 1.7) * scale);
-        let eye_painter = painter.with_clip_rect(painter.clip_rect().intersect(clip));
-        let iris = center + egui::vec2(gaze.x * 13.0, gaze.y * 6.0) * scale;
-        eye_painter.add(egui::Shape::ellipse_filled(
-            iris,
-            egui::vec2(28.0, 30.0) * scale,
-            Color32::from_rgb(69, 32, 99),
-        ));
-        eye_painter.add(egui::Shape::ellipse_filled(
-            iris + Vec2::Y * 3.0 * scale,
-            egui::vec2(23.0, 25.0) * scale,
-            Color32::from_rgb(164, 91, 190),
-        ));
-        eye_painter.add(egui::Shape::ellipse_filled(
-            iris,
-            egui::vec2(8.0, 19.0) * scale,
-            ink,
-        ));
-        if expression == Some(Expression::Excited) {
-            star(&eye_painter, iris, 23.0 * scale);
-        } else {
-            eye_painter.circle_filled(
-                iris + egui::vec2(-7.0, -10.0) * scale,
-                6.0 * scale,
+        if let Ok(texture) = portrait_texture(ui.ctx(), expression) {
+            ui.painter().image(
+                texture.id(),
+                rect,
+                Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
-            eye_painter.circle_filled(
-                iris + egui::vec2(8.0, 11.0) * scale,
-                3.0 * scale,
-                Color32::from_rgb(255, 217, 246),
-            );
         }
     }
-    let upper: Vec<_> = (0..=16)
-        .map(|step| {
-            let angle = std::f32::consts::PI + step as f32 / 16.0 * std::f32::consts::PI;
-            center + egui::vec2(angle.cos() * 58.0, -angle.sin().abs().powf(1.7) * height) * scale
-        })
-        .collect();
-    painter.add(egui::Shape::line(upper, Stroke::new(5.0 * scale, ink)));
-    for side in [-1.0, 1.0] {
-        painter.line_segment(
-            [
-                center + egui::vec2(side * 51.0, -height * 0.5) * scale,
-                center + egui::vec2(side * 65.0, -height * 0.9 - 5.0) * scale,
-            ],
-            Stroke::new(3.0 * scale, ink),
-        );
+    gothic::corners(ui.painter(), rect.shrink(1.0), palette.metal);
+    response.on_hover_text("Click Midnight Neko for another expression");
+    ui.add_space(4.0);
+    ui.label(
+        egui::RichText::new(expression.line())
+            .small()
+            .color(palette.dim),
+    );
+    if time < state.until {
+        ui.ctx()
+            .request_repaint_after(Duration::from_secs_f64(state.until - time));
     }
+    ui.ctx().data_mut(|data| data.insert_temp(id, state));
 }
 
-fn star(painter: &egui::Painter, center: Pos2, radius: f32) {
-    let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(center, Color32::WHITE);
-    for index in 0..=8 {
-        let reach = if index % 2 == 0 { radius } else { radius * 0.3 };
-        let point = center + Vec2::angled(index as f32 / 8.0 * TAU) * reach;
-        mesh.colored_vertex(
-            point,
-            mix(Color32::WHITE, Color32::from_rgb(255, 200, 83), 0.6),
+fn paint_full_figure(painter: &egui::Painter, rect: Rect) {
+    if let Ok(texture) = texture(painter.ctx(), Source::Expressions, false) {
+        let pixels = Rect::from_min_max(egui::pos2(2.0, 2.0), egui::pos2(622.0, 786.0));
+        let size = texture.size_vec2();
+        let uv = Rect::from_min_max(
+            egui::pos2(pixels.min.x / size.x, pixels.min.y / size.y),
+            egui::pos2(pixels.max.x / size.x, pixels.max.y / size.y),
         );
-        if index > 0 {
-            mesh.add_triangle(0, index, index + 1);
-        }
+        let art_size =
+            pixels.size() * (rect.width() / pixels.width()).min(rect.height() / pixels.height());
+        painter.image(
+            texture.id(),
+            Rect::from_center_size(rect.center(), art_size),
+            uv,
+            Color32::WHITE,
+        );
     }
-    painter.add(mesh);
 }
 
 #[cfg(test)]
@@ -346,46 +358,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reactions_do_not_repeat_and_every_expression_can_be_reached() {
-        for current in Expression::ALL {
-            let next: Vec<_> = (0..5).map(|seed| current.next(seed)).collect();
+    fn every_reaction_is_reachable_without_immediate_repeats() {
+        for current in Expression::REACTIONS
+            .into_iter()
+            .chain([Expression::Neutral])
+        {
+            let next: Vec<_> = (0..13).map(|seed| current.next(seed)).collect();
             assert!(!next.contains(&current));
-            assert!(Expression::ALL
+            assert!(!next.contains(&Expression::Neutral));
+            assert!(Expression::REACTIONS
                 .iter()
                 .all(|value| *value == current || next.contains(value)));
         }
     }
 
     #[test]
-    fn gaze_is_bounded_and_returns_to_center_without_pointer() {
-        assert_eq!(gaze(None, Pos2::ZERO, 300.0), Vec2::ZERO);
-        assert_eq!(
-            gaze(Some(egui::pos2(10000.0, -10000.0)), Pos2::ZERO, 300.0),
-            egui::vec2(1.0, -1.0)
-        );
+    fn starts_neutral_and_returns_to_neutral_after_a_reaction() {
+        let mut state = Companion::default();
+        assert_eq!(state.visible(0.0), Expression::Neutral);
+        state.react(10.0, 4);
+        assert_ne!(state.visible(10.1), Expression::Neutral);
+        assert_eq!(state.visible(14.0), Expression::Neutral);
     }
 
     #[test]
-    fn artwork_and_every_expression_render_in_both_modes() {
-        let image = image::load_from_memory(ART).unwrap().to_rgba8();
-        assert_eq!(image.dimensions(), (1024, 1536));
-        assert!(image.pixels().any(|pixel| pixel[3] == 0));
+    fn every_portrait_is_inside_its_embedded_atlas() {
+        for expression in Expression::REACTIONS
+            .into_iter()
+            .chain([Expression::Neutral])
+        {
+            let (source, pixels) = expression.portrait();
+            let image = image::load_from_memory(source.bytes()).unwrap();
+            assert!(pixels.is_positive());
+            assert!(pixels.min.x >= 0.0 && pixels.min.y >= 0.0);
+            assert!(pixels.max.x <= image.width() as f32 && pixels.max.y <= image.height() as f32);
+        }
+    }
+
+    #[test]
+    fn every_jobs_portrait_has_the_same_pixel_resolution() {
         let ctx = egui::Context::default();
-        for theme in [egui::Theme::Light, egui::Theme::Dark] {
-            ctx.set_theme(theme);
-            for expression in Expression::ALL {
-                let output = ctx.run_ui(egui::RawInput::default(), |ui| {
-                    show(ui);
-                    face(
-                        ui.painter(),
-                        Rect::from_min_size(Pos2::ZERO, egui::vec2(340.0, 346.0)),
-                        Vec2::new(-1.0, 1.0),
-                        Some(expression),
-                        1.0,
-                    );
-                });
-                assert!(!output.shapes.is_empty());
-            }
+        for expression in Expression::REACTIONS
+            .into_iter()
+            .chain([Expression::Neutral])
+        {
+            let texture = portrait_texture(&ctx, expression).unwrap();
+            assert_eq!(texture.size(), [384, 448]);
         }
     }
 }

@@ -297,7 +297,8 @@ pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
             egui::vec2(width as f32, bitmap.len() as f32)
         }
         Finish::Engraved | Finish::Glass => glyphs::grid(sprite),
-        Finish::Modern => glyphs::grid(sprite) * 0.8,
+        Finish::Gothic if sprite == Sprite::Floppy => egui::vec2(16.0, 16.0),
+        Finish::Modern | Finish::Gothic => glyphs::grid(sprite) * 0.8,
     };
     grid * scale
 }
@@ -319,6 +320,14 @@ pub fn paint_awake(
     let origin = origin.round();
     match Skin::of(painter.ctx()).finish {
         Finish::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
+        Finish::Gothic => {
+            let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
+            if sprite == Sprite::Floppy {
+                crate::app::scenery::catgirl::paint_icon(painter, rect);
+            } else {
+                crate::app::rendering::modern::icon(painter, rect, sprite, tint);
+            }
+        }
         Finish::Modern => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
             crate::app::rendering::modern::icon(painter, rect, sprite, tint);

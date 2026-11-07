@@ -1,7 +1,0 @@
-# Kawaii companion artwork
-
-`catgirl.png` is an embedded transparent PNG created with OpenAI's built-in image generation tool. The adult character wears nautical fashion. Her face is deliberately left blank in the source layer: the app draws eyes, brows and mouth at runtime for live gaze and click expressions. The view crops the image to a shoulder portrait.
-
-Generation prompt:
-
-Production character artwork layer for an interactive desktop mascot. One clearly adult catgirl woman, age 28, with mature adult facial proportions, elegant rose-pink hair and white cat ears, waist-up, facing directly forward with head upright and level, perfectly symmetrical front-facing eyes area. She is wearing an adult nautical fashion outfit: opaque navy officer-style jacket with a broad white sailor collar over a high-neck cream blouse, a burgundy ribbon at the neck, gold anchor buttons. Not a school uniform. Cute tsundere companion styling, polished anime illustration, intricate flowing pink hair and soft luminous cel shading. Neutral standing pose, shoulders level, no hands near face, entire ears and hair inside the canvas, generous padding, portrait 2:3 aspect. This is a layered animation asset: leave the face area below bangs clean skin with NO EYES, NO EYEBROWS and NO MOUTH; include a small delicately shaded nose, cheeks and light blush. All eyes, eyebrows and mouth will be painted by the app at runtime. Keep the face unobstructed by hair in the eye region. Nonsexual wholesome adult character art. Transparent background, no text, no props, no border.

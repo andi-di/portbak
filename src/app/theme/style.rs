@@ -34,6 +34,8 @@ pub enum Finish {
     Engraved,
     /// Glossy icons, gel buttons, glass tiles and orb lamps.
     Glass,
+    /// Matte gothic panels, silver ornaments and crimson accents.
+    Gothic,
 }
 
 /// Flavor text in the display face; plain instructions stay the same in every skin.
@@ -124,7 +126,7 @@ pub struct Effects {
     pub wallpaper: bool,
     /// Bubbles drifting up behind the panels; keeps the window repainting while visible.
     pub bubbles: bool,
-    /// Kawaii wallpaper, poppable hearts and a sparkling pointer trail.
+    /// Poppable red hearts and a sparse sparkling pointer trail.
     pub hearts: bool,
     /// Opacity of panels, sections and cards; below 1 needs the wallpaper to show through.
     pub opacity: f32,
@@ -141,6 +143,8 @@ pub enum TitleBar {
     Engraved,
     /// A tinted glass band with a glossy reflection and a glowing title.
     Glass,
+    /// Matte gothic panels, silver ornaments and crimson accents.
+    Gothic,
 }
 
 impl Skin {
@@ -186,10 +190,12 @@ pub fn face_font(ctx: &egui::Context, size: f32) -> FontId {
     }
 }
 
-/// Modern keeps decorative details neutral; status colors retain their meaning.
+/// Matte looks keep decorative details neutral; status colors retain their meaning.
 pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
     if Skin::of(ctx).finish == Finish::Modern {
         Palette::of_ctx(ctx).ink
+    } else if Skin::of(ctx).finish == Finish::Gothic {
+        Palette::of_ctx(ctx).metal
     } else {
         original
     }
@@ -219,7 +225,7 @@ pub fn well(ctx: &egui::Context) -> egui::Frame {
     let palette = Palette::of_ctx(ctx);
     let stroke = match Skin::of(ctx).finish {
         Finish::Glass => Stroke::new(1.0_f32, palette.hot.gamma_multiply(0.8)),
-        Finish::Modern => Stroke::new(1.0_f32, palette.outline),
+        Finish::Modern | Finish::Gothic => Stroke::new(1.0_f32, palette.outline),
         Finish::Pixel | Finish::Engraved => Stroke::new(2.0_f32, palette.outline),
     };
     egui::Frame::new()
@@ -309,8 +315,8 @@ fn apply(style: &mut egui::Style, skin: &Skin, palette: &Palette) {
     spacing.scroll.handle_min_length = 24.0;
     style.interaction.selectable_labels = false;
     apply_visuals(&mut style.visuals, skin, palette);
-    if skin.finish == Finish::Modern {
-        // Modern keeps windows to a hairline edge and selects in its calm blue.
+    if matches!(skin.finish, Finish::Modern | Finish::Gothic) {
+        // Matte skins use hairline window borders and their accent for selection.
         style.visuals.window_stroke = Stroke::new(1.0_f32, palette.outline);
         style.visuals.selection.bg_fill = palette.accent;
     }
@@ -328,8 +334,15 @@ fn apply_visuals(visuals: &mut egui::Visuals, skin: &Skin, palette: &Palette) {
     // Inputs and popups stay denser than panels so their text reads over the scenery.
     let field = (skin.effects.opacity + 1.0) / 2.0;
     visuals.window_fill = palette.surface.gamma_multiply(field);
-    visuals.window_stroke = if skin.finish == Finish::Glass {
-        Stroke::new(metrics.border, palette.hot)
+    visuals.window_stroke = if matches!(skin.finish, Finish::Glass | Finish::Gothic) {
+        Stroke::new(
+            metrics.border,
+            if skin.finish == Finish::Gothic {
+                palette.outline
+            } else {
+                palette.hot
+            },
+        )
     } else {
         Stroke::new(metrics.border + 1.0, palette.outline)
     };
@@ -342,7 +355,11 @@ fn apply_visuals(visuals: &mut egui::Visuals, skin: &Skin, palette: &Palette) {
     visuals.code_bg_color = palette.sunken.gamma_multiply(field);
     visuals.warn_fg_color = palette.gold;
     visuals.error_fg_color = palette.bad;
-    visuals.hyperlink_color = palette.accent;
+    visuals.hyperlink_color = if skin.finish == Finish::Gothic {
+        palette.hot
+    } else {
+        palette.accent
+    };
     visuals.selection.bg_fill = palette.hot;
     visuals.selection.stroke = Stroke::new(metrics.border, palette.paper);
     visuals.text_cursor.stroke = Stroke::new(metrics.border + 1.0, palette.accent);
