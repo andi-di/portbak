@@ -857,45 +857,6 @@ fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     ctx.layer_painter(layer).add(mesh);
 }
 
-/// A centered pixel window with its own title bar over a dimmed backdrop.
-pub fn dialog<R>(
-    ctx: &egui::Context,
-    window: egui::Window<'_>,
-    title: &str,
-    sprite: Sprite,
-    band: Color32,
-    contents: impl FnOnce(&mut egui::Ui) -> R,
-) -> Option<R> {
-    paint_backdrop(ctx);
-    let glassy = Skin::of(ctx).finish == Finish::Glass;
-    let mut frame = egui::Frame::window(&ctx.global_style()).inner_margin(0);
-    if glassy {
-        // The pane is painted inside the window so it can carry reflections and a halo.
-        frame = frame.fill(Color32::TRANSPARENT).stroke(Stroke::NONE);
-    }
-    window
-        .title_bar(false)
-        .frame(frame)
-        .show(ctx, |ui| {
-            let backing = ui.painter().add(egui::Shape::Noop);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            title_bar(ui, title, sprite, band);
-            let inner = egui::Frame::new()
-                .inner_margin(egui::Margin::same(18))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 8.0;
-                    contents(ui)
-                })
-                .inner;
-            if glassy {
-                let rect = ui.min_rect();
-                ui.painter().set(backing, dialog_pane(ctx, rect));
-            }
-            inner
-        })
-        .and_then(|response| response.inner)
-}
-
 /// A row of status text; glass skins set it on a small frosted capsule so it reads over the sky.
 pub fn status_row<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let ctx = ui.ctx().clone();
@@ -948,32 +909,6 @@ pub fn popup<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) ->
     let radius = f32::from(ui.visuals().menu_corner_radius.nw);
     painter.set(backing, glass::pane(&ctx, rect, radius, &glaze));
     inner
-}
-
-/// A dialog's glass: denser than panels so its text reads over the scene, with an aqua halo.
-fn dialog_pane(ctx: &egui::Context, rect: Rect) -> Vec<egui::Shape> {
-    let palette = Palette::of_ctx(ctx);
-    let clear = Glaze::clear(ctx);
-    let glaze = Glaze {
-        opacity: (clear.opacity * 1.6).min(1.0),
-        glow: Some(palette.hot.gamma_multiply(0.7)),
-        ..clear
-    };
-    glass::pane(ctx, rect, style::metrics(ctx).radius as f32, &glaze)
-}
-
-/// Dims the panels behind an open dialog without blocking them; call after all panels.
-pub fn paint_backdrop(ctx: &egui::Context) {
-    let palette = Palette::of_ctx(ctx);
-    // Glass skins wash the scene in a bright haze instead of darkening it.
-    let veil = if Skin::of(ctx).finish == Finish::Glass {
-        palette.background.gamma_multiply(0.35)
-    } else {
-        Color32::from_black_alpha(140)
-    };
-    // Panels share the background layer; painting last there covers them but stays below windows.
-    ctx.layer_painter(egui::LayerId::background())
-        .rect_filled(ctx.content_rect(), 0.0, veil);
 }
 
 /// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.

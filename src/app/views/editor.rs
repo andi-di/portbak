@@ -5,7 +5,7 @@ use crate::app::views::widgets::{
     alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_MINUTE,
     DATE_TIME,
 };
-use crate::app::{App, CachedHistory, HistoryMode};
+use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
@@ -23,8 +23,6 @@ type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
 #[derive(Clone, Copy)]
 enum JobAction {
     Check,
-    Restore,
-    Manage,
     Remove,
 }
 
@@ -32,19 +30,20 @@ enum JobAction {
 struct Permissions {
     /// The job is running, queued, or another operation blocks editing.
     busy: bool,
-    /// History and restore need an idle worker and an empty queue.
-    idle: bool,
-    /// Activation cannot change during a restore or while history is open.
+    /// Activation cannot change during a restore or while the Backups tab is open.
     locked: bool,
     backup_running: bool,
 }
 
 impl App {
     pub(in crate::app) fn show_job_editor(&mut self, ui: &mut egui::Ui) {
+        if self.backups_tab && self.selected.is_some() {
+            self.show_backups_tab(ui);
+            return;
+        }
         let ctx = ui.ctx().clone();
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
-            idle: self.is_idle(),
             locked: self.scheduling_paused(),
             backup_running: self.active == Some(id) && !self.restoring,
         });
@@ -71,6 +70,7 @@ impl App {
                         add = welcome(ui, can_add);
                         return;
                     };
+                    job_tabs(ui, &mut self.backups_tab);
                     let was_enabled = job.enabled;
                     let previous = job.clone();
                     let summary = summaries
@@ -96,15 +96,13 @@ impl App {
             self.job_activation_changed(id, was_enabled);
         }
         if let Some((id, action)) = action {
-            self.apply(id, action, &ctx);
+            self.apply(id, action);
         }
     }
 
-    fn apply(&mut self, id: Uuid, action: JobAction, ctx: &egui::Context) {
+    fn apply(&mut self, id: Uuid, action: JobAction) {
         match action {
             JobAction::Check => self.enqueue(id),
-            JobAction::Restore => self.open_history(id, HistoryMode::Restore, ctx),
-            JobAction::Manage => self.open_history(id, HistoryMode::Manage, ctx),
             JobAction::Remove => self.remove_job(id),
         }
     }
@@ -176,10 +174,10 @@ fn job_editor(
             retention_settings(ui, job, summary)
         });
     });
-    let status_action = pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
-        status_panel(ui, job, permissions)
+    pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
+        status_panel(ui, job)
     });
-    action.or(status_action)
+    action
 }
 
 /// Keep job actions beside the identity, or below it in narrow windows.
@@ -270,7 +268,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     let folders_chosen = !job.source.as_os_str().is_empty() && !job.target.as_os_str().is_empty();
     let can_toggle = (job.enabled || (folders_chosen && job.has_runnable_schedule())) && !locked;
     let tooltip = if locked {
-        "Automatic backups cannot be changed during restore or while backup history is open"
+        "Automatic backups cannot be changed during restore or while the Backups tab is open"
     } else if !job.enabled && !folders_chosen {
         "Choose source and destination folders to enable automatic backups"
     } else if !job.enabled && !job.has_runnable_schedule() {
@@ -549,7 +547,7 @@ fn optional_limit<T>(
     });
 }
 
-fn status_panel(ui: &mut egui::Ui, job: &Job, permissions: &Permissions) -> Option<JobAction> {
+fn status_panel(ui: &mut egui::Ui, job: &Job) {
     let palette = Palette::of(ui);
     let last_backup = job
         .last_success
@@ -563,47 +561,20 @@ fn status_panel(ui: &mut egui::Ui, job: &Job, permissions: &Permissions) -> Opti
         ui.add(egui::Label::new(&job.status).wrap());
     }
     ui.add_space(8.0);
-    let action = action_buttons(ui, permissions);
-    ui.add_space(8.0);
     ui.label(
         egui::RichText::new(
             "Backups are full copies. Links are skipped. Each check reads all file contents. \
-             Restore with Restore backup… or by copying/extracting.",
+             Restore from the Backups tab or by copying/extracting.",
         )
         .small()
         .color(palette.dim),
     );
-    action
 }
 
-fn action_buttons(ui: &mut egui::Ui, permissions: &Permissions) -> Option<JobAction> {
-    let can_edit = !permissions.busy;
-    let can_open_history = can_edit && permissions.idle;
-    let buttons = [
-        (
-            "Restore backup…",
-            Sprite::Rewind,
-            Tone::Plain,
-            can_open_history,
-            JobAction::Restore,
-        ),
-        (
-            "Manage backups…",
-            Sprite::Chest,
-            Tone::Plain,
-            can_open_history,
-            JobAction::Manage,
-        ),
-    ];
-    let mut clicked = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = egui::vec2(12.0, 12.0);
-        for (label, sprite, tone, enabled, action) in buttons {
-            let button = PixelButton::new(label).sprite(sprite).tone(tone);
-            if ui.add_enabled(enabled, button).clicked() {
-                clicked = Some(action);
-            }
-        }
+pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
+    ui.horizontal(|ui| {
+        pixel::choice(ui, backups, false, "Job settings", Some(Sprite::Folder));
+        pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
-    clicked
+    ui.add_space(14.0);
 }

@@ -36,12 +36,13 @@ impl eframe::App for App {
         self.show_header(ui);
         self.show_footer(ui);
         self.show_job_list(ui);
+        self.close_inactive_history();
         if self.settings_open {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
         }
-        self.show_history(&ctx);
+        self.close_inactive_history();
         if self.config != before {
             self.dirty = true;
         }

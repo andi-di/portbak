@@ -50,11 +50,12 @@ The application remains a single distributable executable with an embedded icon.
 
 - **New job**: create and select a new independent job.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
-- **Restore backup…**: when no operation is active or queued, asynchronously list this job's recorded versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Pause automatic starts while the dialog is open. Show the full resolved source path, selected version, and an explicit warning that all current source contents will be replaced. Require a red **Replace contents and restore** confirmation; cancellation changes nothing.
-- **Manage backups…**: beside Restore, open the same history overview when no operation is running or queued, without requiring an available source folder. Pause automatic starts while open. Show each saved version’s protection checkbox and save changes in the background. Disable further edits and closing while saving; report errors without pretending the protection changed. Closing preserves job activation. Missing versions are marked unavailable, but existing protection can be removed.
-- At the default main-window size, the restore dialog must show its instructions, full source path, selected-version details, warning, and action buttons without outer scrolling in every look, both before and after selecting a backup. The backup list may scroll independently. Keep outer scrolling available for smaller windows or unusually long content.
-- In both history dialogs, subtly highlight the first list entry of each local calendar day, newest first. Keep selection and protection independently recognizable. Wrap job action buttons on narrow windows.
-- Show retention capacity warnings in the management overview and job details; refresh after protection changes, limit changes, and backup completion.
+- Each job has **Job settings** and **Backups** tabs. The Backups tab replaces restoration and management dialogs; load recorded versions asynchronously when no operation is active or queued. Pause automatic starts while browsing backups; leaving the tab preserves job activation.
+- List saved versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Each entry has a **Locked** checkbox protecting it from retention deletion; save changes in the background, disable further edits while saving, and report failures without displaying unsaved protection. Missing versions may be unlocked. Browsing and protection do not require an available source folder.
+- Select an available backup and use the red **Replace contents and restore** button. Show the resolved source path, selected version, and an explicit warning that all current source contents will be replaced. Require an available source folder to restore. Leaving without restoring changes neither source nor job activation.
+- Keep the Backups tab usable in narrow windows in every look. Allow the backup list and the surrounding content to scroll; wrap long names and paths. Use **Restore backup** as the confirmation label in narrow views.
+- In the Backups tab, subtly highlight the first list entry of each local calendar day, newest first. Keep selection and protection independently recognizable. Wrap job action buttons on narrow windows.
+- Show retention capacity warnings in the Backups tab and job details; refresh after protection changes, limit changes, and backup completion.
 - On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits and manual starts while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
@@ -294,7 +295,7 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Restore completes or fails | Job remains disabled; history and last backup time unchanged |
 | Protected versions with exceeded limits | Keep protected and newest versions; delete only eligible unprotected versions; report remaining excess |
 | Protection consumes count/size budget | Warn at three remaining places or 20% remaining size budget, inclusive |
-| History crosses local midnight | Highlight the first listed version of each local day in both dialogs |
+| History crosses local midnight | Highlight the first listed version of each local day in the Backups tab |
 | Narrow window with a wide job list | Selected job remains visible and usable without a crash |
 | Resize job list, then release and restart | Divider stays at the chosen width and is restored after restart |
 | Restart after normal edits | Settings, theme, next due time, and results restored |
