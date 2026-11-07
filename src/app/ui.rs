@@ -165,7 +165,8 @@ impl App {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(ui, "JOBS", 16.0, palette.accent);
-                    pixel::badge(ui, &self.config.jobs.len().to_string(), palette.gold);
+                    let color = style::decorative_color(ui.ctx(), palette.gold);
+                    pixel::badge(ui, &self.config.jobs.len().to_string(), color);
                 });
                 ui.add_space(10.0);
                 let new_job = PixelButton::new("New job")
@@ -223,6 +224,7 @@ impl App {
                     } else {
                         palette.metal
                     };
+                    let tint = style::decorative_color(ui.ctx(), tint);
                     sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 2.0;

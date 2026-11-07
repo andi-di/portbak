@@ -174,6 +174,15 @@ pub fn radius(ctx: &egui::Context, modern: u8) -> CornerRadius {
     })
 }
 
+/// Modern keeps decorative details neutral; status colors retain their meaning.
+pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
+    if Skin::of(ctx).finish == Finish::Modern {
+        Palette::of_ctx(ctx).ink
+    } else {
+        original
+    }
+}
+
 pub fn metrics(ctx: &egui::Context) -> &'static Metrics {
     &Skin::of(ctx).metrics
 }
