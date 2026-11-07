@@ -14,7 +14,7 @@ const LIST_HEIGHT: f32 = 300.0;
 /// Changes are applied after the history state is no longer borrowed.
 #[derive(Default)]
 struct HistoryResponse {
-    confirm: bool,
+    restore: Option<String>,
     protection: Option<(String, bool)>,
 }
 
@@ -44,7 +44,7 @@ impl App {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     if let Some(history) = &mut self.backup_history {
                         if history.job.id == id {
-                            response = history_contents(ui, history, &self.error);
+                            response = history_contents(ui, history);
                         } else {
                             ui.label("Finishing protection changes for the previous job ...");
                         }
@@ -58,8 +58,27 @@ impl App {
         if let Some((name, protected)) = response.protection {
             self.save_protection(name, protected, &ctx);
         }
-        if response.confirm {
-            self.confirm_restore(&ctx);
+        if let Some(name) = response.restore {
+            if let Some(history) = &mut self.backup_history {
+                history.selected = Some(name);
+                history.confirming_restore = true;
+            }
+        }
+        self.show_restore_confirmation(&ctx);
+    }
+
+    fn show_restore_confirmation(&mut self, ctx: &egui::Context) {
+        let Some(history) = &mut self.backup_history else {
+            return;
+        };
+        if !history.confirming_restore {
+            return;
+        }
+        let response = restore_confirmation(ctx, history, &self.error);
+        if response.1 {
+            history.confirming_restore = false;
+        } else if response.0 {
+            self.confirm_restore(ctx);
         }
     }
 
@@ -73,16 +92,12 @@ impl App {
     }
 }
 
-fn history_contents(
-    ui: &mut egui::Ui,
-    dialog: &mut BackupHistory,
-    app_error: &str,
-) -> HistoryResponse {
+fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryResponse {
     let palette = Palette::of(ui);
     let mut response = HistoryResponse::default();
     ui.heading(&dialog.job.name);
     ui.label(
-        "Lock backups to protect them from retention deletion. Select a backup to restore it.",
+        "Lock backups to protect them from retention deletion. Use a backup's restore button to replace the source contents.",
     );
     match &dialog.backups {
         None => {
@@ -93,7 +108,13 @@ fn history_contents(
             if backups.is_empty() {
                 ui.label("No saved backups for this job.");
             }
-            response.protection = backup_list(ui, backups, &mut dialog.selected, dialog.saving);
+            response = backup_list(
+                ui,
+                backups,
+                &mut dialog.selected,
+                dialog.saving,
+                dialog.source_display.is_some(),
+            );
             retention_warnings(ui, &dialog.job, &records_of(backups));
         }
     }
@@ -103,27 +124,36 @@ fn history_contents(
     if !dialog.error.is_empty() {
         alert(ui, palette.bad, &dialog.error);
     }
-    if dialog.selected.is_some() {
-        restore_details(ui, dialog, app_error);
-    }
-    let restore_label = if ui.available_width() < 420.0 {
-        "Restore backup"
-    } else {
-        "Replace contents and restore"
-    };
-    let restore = PixelButton::new(restore_label)
-        .sprite(Sprite::Rewind)
-        .tone(Tone::Danger);
-    response.confirm = ui
-        .add_enabled(
-            dialog.restorable_selection().is_some() && dialog.source_display.is_some(),
-            restore,
-        )
-        .on_disabled_hover_text(
-            "Select an available backup and ensure the source folder is available",
-        )
-        .clicked();
     response
+}
+
+/// Returns confirmation and cancellation separately so dismissal never starts a restore.
+fn restore_confirmation(
+    ctx: &egui::Context,
+    history: &BackupHistory,
+    app_error: &str,
+) -> (bool, bool) {
+    let mut confirm = false;
+    let mut cancel = false;
+    let response = egui::Modal::new(egui::Id::new("confirm_backup_restore")).show(ctx, |ui| {
+        ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 560.0));
+        egui::ScrollArea::vertical()
+            .max_height((ctx.content_rect().height() - 144.0).max(120.0))
+            .show(ui, |ui| {
+                ui.heading("Restore backup?");
+                restore_details(ui, history, app_error);
+                ui.horizontal_wrapped(|ui| {
+                    cancel = ui.add(PixelButton::new("Cancel")).clicked();
+                    let restore = PixelButton::new("Replace contents and restore")
+                        .sprite(Sprite::Rewind)
+                        .tone(Tone::Danger);
+                    confirm = ui
+                        .add_enabled(history.restorable_selection().is_some(), restore)
+                        .clicked();
+                });
+            });
+    });
+    (confirm, cancel || response.should_close())
 }
 
 fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
@@ -187,14 +217,15 @@ fn day_starts<T: TimeZone>(backups: &[Backup], zone: &T) -> Vec<bool> {
         .collect()
 }
 
-/// Returns a protection change requested in manage mode.
+/// Returns the action requested from the backup list.
 fn backup_list(
     ui: &mut egui::Ui,
     backups: &[Backup],
     selected: &mut Option<String>,
     saving: bool,
-) -> Option<(String, bool)> {
-    let mut changed = None;
+    source_available: bool,
+) -> HistoryResponse {
+    let mut response = HistoryResponse::default();
     let starts = day_starts(backups, &Local);
     sunken(ui, |ui| {
         egui::ScrollArea::vertical()
@@ -205,13 +236,17 @@ fn backup_list(
                     if first_of_day {
                         day_header(ui, backup);
                     }
-                    if let Some(change) = selection_row(ui, backup, selected, saving) {
-                        changed = Some(change);
+                    let row = selection_row(ui, backup, selected, saving, source_available);
+                    if row.protection.is_some() {
+                        response.protection = row.protection;
+                    }
+                    if row.restore.is_some() {
+                        response.restore = row.restore;
                     }
                 }
             });
     });
-    changed
+    response
 }
 
 /// A dated divider that opens each calendar day's group.
@@ -255,7 +290,7 @@ fn backup_row<R>(
                     (Sprite::Folder, palette.gold)
                 };
                 sprites::show(ui, sprite, 2.0, tint);
-                let text_width = (ui.available_width() - 100.0).max(40.0);
+                let text_width = (ui.available_width() - 144.0).max(40.0);
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
                     size = backup_text(ui, backup, selected);
                 });
@@ -268,7 +303,7 @@ fn backup_row<R>(
     let id = ui.id().with(&backup.record.name);
     let selection_rect = egui::Rect::from_min_max(
         rect.min,
-        egui::pos2((rect.right() - 100.0).max(rect.left()), rect.bottom()),
+        egui::pos2((rect.right() - 144.0).max(rect.left()), rect.bottom()),
     );
     let response = ui.interact(selection_rect, id, sense);
     let exact = format!("{} bytes", backup.record.bytes);
@@ -340,9 +375,21 @@ fn selection_row(
     backup: &Backup,
     selected: &mut Option<String>,
     saving: bool,
-) -> Option<(String, bool)> {
+    source_available: bool,
+) -> HistoryResponse {
+    let mut restore = None;
     let is_selected = selected.as_deref() == Some(backup.record.name.as_str());
     let (row, change) = backup_row(ui, backup, is_selected, egui::Sense::click(), |ui| {
+        let button = PixelButton::new("Restore backup")
+            .icon_only()
+            .sprite(Sprite::Rewind)
+            .tone(Tone::Danger);
+        if ui.add_enabled(!saving && backup.available && source_available, button)
+            .on_hover_text("Restore this backup")
+            .on_disabled_hover_text("Restoration requires an available backup and source folder, with no protection save in progress")
+            .clicked() {
+                restore = Some(backup.record.name.clone());
+            }
         let mut protected = backup.record.protected;
         let enabled = !saving && (backup.available || protected);
         let checkbox = PixelCheckbox::new(&mut protected, "Locked");
@@ -354,7 +401,10 @@ fn selection_row(
     if row.clicked() && backup.available && !saving && change.is_none() {
         *selected = (!is_selected).then(|| backup.record.name.clone());
     }
-    change
+    HistoryResponse {
+        restore,
+        protection: change,
+    }
 }
 
 #[cfg(test)]
@@ -362,6 +412,52 @@ mod tests {
     use super::*;
     use crate::model::Record;
     use chrono::Utc;
+
+    #[test]
+    fn confirmation_modal_fits_and_escape_cancels_without_confirming() {
+        for skin in crate::app::theme::skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                crate::app::theme::style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let history = BackupHistory::new(crate::model::Job::default());
+                for frame in 0..4 {
+                    let screen =
+                        egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(750.0, 600.0));
+                    let mut input = egui::RawInput {
+                        screen_rect: Some(screen),
+                        ..Default::default()
+                    };
+                    if frame == 3 {
+                        input.events.push(egui::Event::Key {
+                            key: egui::Key::Escape,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        });
+                    }
+                    let _ = ctx.run_ui(input, |ui| {
+                        let (confirm, cancel) = restore_confirmation(ui.ctx(), &history, "");
+                        assert!(!confirm);
+                        assert_eq!(cancel, frame == 3);
+                    });
+                    if frame >= 2 {
+                        let rect = ctx
+                            .memory(|memory| {
+                                memory.area_rect(egui::Id::new("confirm_backup_restore"))
+                            })
+                            .unwrap();
+                        assert!(
+                            screen.contains_rect(rect),
+                            "{} {theme:?}: {rect:?}",
+                            skin.id
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn backups_tab_fits_narrow_job_views_in_every_skin() {
@@ -389,7 +485,7 @@ mod tests {
                         let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
                             ui.set_max_width(width);
                             let output = egui::ScrollArea::vertical().show(ui, |ui| {
-                                history_contents(ui, &mut history, "");
+                                history_contents(ui, &mut history);
                             });
                             assert!(
                                 output.content_size.x <= width + 1.0,

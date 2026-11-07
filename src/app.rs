@@ -70,6 +70,7 @@ struct BackupHistory {
     selected: Option<String>,
     source_display: Option<PathBuf>,
     saving: bool,
+    confirming_restore: bool,
     error: String,
 }
 
@@ -82,6 +83,7 @@ impl BackupHistory {
             selected: None,
             source_display: None,
             saving: false,
+            confirming_restore: false,
             error: String::new(),
         }
     }
