@@ -44,6 +44,7 @@ pub static RETRO: Skin = Skin {
         vignette: false,
         wallpaper: false,
         bubbles: false,
+        hearts: false,
         opacity: 1.0,
         title_bar: TitleBar::Striped,
     },

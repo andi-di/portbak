@@ -47,6 +47,7 @@ pub static FRUTIGER_AERO: Skin = Skin {
         vignette: false,
         wallpaper: true,
         bubbles: true,
+        hearts: false,
         opacity: 0.24,
         title_bar: TitleBar::Glass,
     },

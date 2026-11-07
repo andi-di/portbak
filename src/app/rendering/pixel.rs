@@ -4,7 +4,7 @@ use crate::app::rendering::forge;
 use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::ornaments;
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::aurora;
+use crate::app::scenery::{aurora, kawaii};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -736,7 +736,9 @@ pub fn panel_glass(ui: &egui::Ui, density: f32) {
 pub fn paint_underlay(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
-    if effects.wallpaper {
+    if effects.hearts {
+        kawaii::paint_background(ctx, palette);
+    } else if effects.wallpaper {
         aurora::paint_wallpaper(ctx, palette);
     }
     if effects.bubbles {
@@ -760,6 +762,9 @@ pub fn paint_scenery(ui: &egui::Ui) {
 pub fn paint_overlays(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
+    if effects.hearts {
+        kawaii::paint_overlays(ctx, palette);
+    }
     if effects.vignette {
         ornaments::paint_vignette(ctx, palette);
     }
@@ -997,7 +1002,20 @@ mod tests {
             .filter(|skin| skin.finish != Finish::Modern)
             .flat_map(|skin| [&skin.dark, &skin.light])
         {
-            assert_eq!(readable_on(palette.gold, palette).r(), 0x1a);
+            let luminance = |color: Color32| {
+                let linear = |channel: u8| {
+                    let value = channel as f32 / 255.0;
+                    if value <= 0.04045 {
+                        value / 12.92
+                    } else {
+                        ((value + 0.055) / 1.055).powf(2.4)
+                    }
+                };
+                0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
+            };
+            let fill = luminance(palette.gold);
+            let text = luminance(readable_on(palette.gold, palette));
+            assert!((fill.max(text) + 0.05) / (fill.min(text) + 0.05) >= 4.5);
             assert_eq!(readable_on(palette.outline, palette), palette.paper);
             assert_eq!(readable_on(palette.bad, palette), palette.paper);
         }

@@ -124,6 +124,8 @@ pub struct Effects {
     pub wallpaper: bool,
     /// Bubbles drifting up behind the panels; keeps the window repainting while visible.
     pub bubbles: bool,
+    /// Kawaii wallpaper, poppable hearts and a sparkling pointer trail.
+    pub hearts: bool,
     /// Opacity of panels, sections and cards; below 1 needs the wallpaper to show through.
     pub opacity: f32,
     pub title_bar: TitleBar,

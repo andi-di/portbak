@@ -104,7 +104,11 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         ui.add_space(50.0);
         let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
         ui.add_space(bob);
-        sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+        if Skin::of(ui.ctx()).effects.hearts {
+            crate::app::scenery::kawaii::companions(ui);
+        } else {
+            sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+        }
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
         pixel::display_label(ui, wording.welcome_title, 24.0, palette.gold);

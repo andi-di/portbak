@@ -47,6 +47,7 @@ pub static DARK_FANTASY: Skin = Skin {
         vignette: true,
         wallpaper: false,
         bubbles: false,
+        hearts: false,
         opacity: 1.0,
         title_bar: TitleBar::Engraved,
     },

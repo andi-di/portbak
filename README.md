@@ -20,7 +20,7 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 
 **The app must be running for scheduled backups.** You can minimize it. Closing the window immediately exits without confirmation, stops scheduling, and terminates running operations. Missed checks are caught up once on startup or resume. Schedules use the local time zone: a time skipped by daylight saving is moved to the first valid minute, and a repeated time runs only once.
 
-Choose **Retro**, **Dark Fantasy**, or **Modern** in Settings. Modern uses neutral Zinc surfaces, blue accents, rounded controls and simple line icons. Every look supports Light, Dark, and System brightness; the app remembers both selections.
+Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Kawaii** in Settings. Modern uses neutral Zinc surfaces, blue accents, rounded controls and simple line icons. Kawaii combines pink and lavender candy glass with illustrated adult catgirl companions, floating hearts that burst when touched by the pointer, and a sparkling heart-and-stardust cursor trail with bursts on clicks. The artwork is embedded; no separate downloads are needed. Every look supports Light, Dark, and System brightness; the app remembers both selections.
 
 On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.
 
