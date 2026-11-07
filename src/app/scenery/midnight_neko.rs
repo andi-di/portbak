@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-const MOTES: u32 = 18;
+const MOTES: u32 = 60;
 const PARTICLE_LIMIT: usize = 16;
 const LIFETIME: f32 = 0.4;
 
