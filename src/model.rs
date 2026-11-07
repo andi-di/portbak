@@ -68,7 +68,7 @@ impl Default for Job {
     fn default() -> Self {
         Self {
             id: Uuid::new_v4(),
-            name: "New job".into(),
+            name: String::new(),
             source: PathBuf::new(),
             target: PathBuf::new(),
             enabled: false,
@@ -659,7 +659,7 @@ mod tests {
         let expected = std::fs::canonicalize(&app)
             .unwrap()
             .join("backups")
-            .join(format!("{}-New job", job.id));
+            .join(job.id.to_string());
         assert_eq!(job.target, expected);
         assert!(expected.is_dir());
         let previous = job.clone();
