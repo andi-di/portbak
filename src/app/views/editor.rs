@@ -47,7 +47,7 @@ impl App {
             locked: self.scheduling_paused(),
             backup_running: self.active == Some(id) && !self.restoring,
         });
-        let can_add = !self.scheduling_paused();
+        let can_add = self.can_add_job();
         let selected = self.selected;
         let summaries = &self.history_cache;
         let app_dir = self

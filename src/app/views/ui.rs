@@ -220,7 +220,7 @@ impl App {
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
-                if ui.add_enabled(!self.scheduling_paused(), new_job).clicked() {
+                if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
                 }
                 ui.add_space(12.0);

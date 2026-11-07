@@ -49,7 +49,7 @@ The application remains a single distributable executable with an embedded icon.
 
 ### Job actions
 
-- **New job**: create and select a new independent job.
+- **New job**: create and select a new independent job in its settings tab, including while browsing backups. Disable during restoration or while saving backup protection; preserve existing jobs when leaving their history.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
 - Each job has **Job settings** and **Backups** tabs. The Backups tab replaces restoration and management overview dialogs; load recorded versions asynchronously when no operation is active or queued. Pause automatic starts while browsing backups; leaving the tab preserves job activation.
 - List saved versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Each entry has a **Locked** checkbox protecting it from retention deletion; save changes in the background, disable further edits while saving, and report failures without displaying unsaved protection. Missing versions may be unlocked. Browsing and protection do not require an available source folder.

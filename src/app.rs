@@ -177,6 +177,14 @@ impl App {
         self.restoring || self.backup_history.is_some()
     }
 
+    fn can_add_job(&self) -> bool {
+        !self.restoring
+            && !self
+                .backup_history
+                .as_ref()
+                .is_some_and(|history| history.saving)
+    }
+
     fn is_busy(&self, id: Uuid) -> bool {
         self.active == Some(id) || self.queue.contains(&id) || self.scheduling_paused()
     }
@@ -199,9 +207,14 @@ impl App {
     }
 
     fn add_job(&mut self) {
+        if !self.can_add_job() {
+            return;
+        }
         let job = self.config.job_defaults.new_job();
         self.selected = Some(job.id);
         self.settings_open = false;
+        self.backups_tab = false;
+        self.backup_history = None;
         self.config.jobs.push(job);
     }
 
@@ -803,6 +816,37 @@ mod tests {
         assert!(app.backup_history.is_none());
         assert!(app.config.jobs[0].enabled);
         assert_eq!(app.config.jobs[0].next_run, due);
+    }
+
+    #[test]
+    fn new_job_leaves_backups_and_preserves_existing_job() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        app.backups_tab = true;
+        let original = app.config.jobs[0].clone();
+        assert!(app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 2);
+        assert!(app.config.jobs[0] == original);
+        assert_eq!(app.selected, Some(app.config.jobs[1].id));
+        assert!(!app.backups_tab);
+        assert!(app.backup_history.is_none());
+        assert!(!app.scheduling_paused());
+    }
+
+    #[test]
+    fn new_job_waits_for_restore_and_protection_save() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        app.backup_history.as_mut().unwrap().saving = true;
+        assert!(!app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 1);
+        app.backup_history.as_mut().unwrap().saving = false;
+        app.restoring = true;
+        assert!(!app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 1);
     }
 
     #[test]
