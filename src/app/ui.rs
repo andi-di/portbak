@@ -12,7 +12,7 @@ use eframe::egui;
 const CARD_SHADOW: f32 = 4.0;
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if ctx.input(|input| input.viewport().close_requested()) {
             if !self.persist() {
                 eprintln!("Could not save settings on exit: {}", self.error);
@@ -25,20 +25,24 @@ impl eframe::App for App {
             self.ensure_summary(id, ctx);
         }
         ctx.set_theme(theme_preference(self.config.theme));
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         let before = self.config.clone();
-        self.show_header(ctx);
-        self.show_footer(ctx);
-        self.show_job_list(ctx);
+        self.show_header(ui);
+        self.show_footer(ui);
+        self.show_job_list(ui);
         if self.settings_open {
-            self.show_settings(ctx);
+            self.show_settings(ui);
         } else {
-            self.show_job_editor(ctx);
+            self.show_job_editor(ui);
         }
-        self.show_history(ctx);
+        self.show_history(&ctx);
         if self.config != before {
             self.dirty = true;
         }
-        pixel::paint_overlays(ctx);
+        pixel::paint_overlays(&ctx);
     }
 }
 
@@ -51,8 +55,9 @@ impl App {
         }
     }
 
-    fn show_header(&mut self, ctx: &egui::Context) {
-        let palette = palette_of(ctx);
+    fn show_header(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let palette = palette_of(&ctx);
         let frame = egui::Frame::new()
             .fill(palette.surface)
             .inner_margin(egui::Margin {
@@ -61,10 +66,10 @@ impl App {
                 top: 14,
                 bottom: 0,
             });
-        egui::TopBottomPanel::top("header")
+        egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -106,15 +111,16 @@ impl App {
             });
     }
 
-    fn show_footer(&self, ctx: &egui::Context) {
-        let palette = palette_of(ctx);
+    fn show_footer(&self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let palette = palette_of(&ctx);
         let frame = egui::Frame::new()
             .fill(palette.sunken)
             .inner_margin(egui::Margin::symmetric(18, 8));
-        egui::TopBottomPanel::bottom("footer")
+        egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 let clip = ui.clip_rect();
                 let rule =
                     egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
@@ -147,8 +153,9 @@ impl App {
             });
     }
 
-    fn show_job_list(&mut self, ctx: &egui::Context) {
-        let palette = palette_of(ctx);
+    fn show_job_list(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let palette = palette_of(&ctx);
         let frame = egui::Frame::new()
             .fill(palette.surface)
             .inner_margin(egui::Margin {
@@ -157,11 +164,11 @@ impl App {
                 top: 16,
                 bottom: 8,
             });
-        let panel = egui::SidePanel::left("jobs")
-            .default_width(self.config.sidebar_width.clamp(240.0, 460.0))
-            .width_range(240.0..=460.0)
+        let panel = egui::Panel::left("jobs")
+            .default_size(self.config.sidebar_width.clamp(240.0, 460.0))
+            .size_range(240.0..=460.0)
             .frame(frame)
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(ui, "JOBS", 16.0, palette.accent);
@@ -454,7 +461,7 @@ mod tests {
                         )),
                         ..Default::default()
                     };
-                    let _ = context.run(input, |ctx| app.show_job_list(ctx));
+                    let _ = context.run_ui(input, |ui| app.show_job_list(ui));
                     let width = egui::containers::panel::PanelState::load(&context, id)
                         .unwrap()
                         .rect
@@ -489,7 +496,7 @@ mod tests {
                 events,
                 ..Default::default()
             };
-            let _ = ctx.run(input, |ctx| app.show_job_list(ctx));
+            let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
         };
         frame(&mut app, &ctx, vec![]);
         let start = egui::pos2(290.0, 300.0);
@@ -578,11 +585,11 @@ mod tests {
                         )),
                         ..Default::default()
                     };
-                    let _ = ctx.run(input, |ctx| {
-                        app.show_header(ctx);
-                        app.show_footer(ctx);
-                        app.show_job_list(ctx);
-                        app.show_job_editor(ctx);
+                    let _ = ctx.run_ui(input, |ui| {
+                        app.show_header(ui);
+                        app.show_footer(ui);
+                        app.show_job_list(ui);
+                        app.show_job_editor(ui);
                     });
                 }
             }

@@ -263,8 +263,8 @@ mod tests {
         style::install(&ctx, skins::find("modern"));
         for theme in [egui::Theme::Light, egui::Theme::Dark] {
             ctx.set_theme(theme);
-            let output = ctx.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
+            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
                     let tint = Palette::of(ui).ink;
                     for sprite in Sprite::ALL {
                         sprites::show(ui, sprite, 2.0, tint);

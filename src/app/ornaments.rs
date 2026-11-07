@@ -40,7 +40,7 @@ pub fn paint_vignette(ctx: &egui::Context, palette: &Palette) {
     // Strength per ring, from the window edge inward; the steep first step keeps the middle clear.
     const RINGS: [(f32, f32); 3] = [(0.0, 1.0), (0.3, 0.35), (1.0, 0.0)];
     let layer = egui::LayerId::new(egui::Order::Debug, egui::Id::new("vignette"));
-    let screen = ctx.screen_rect();
+    let screen = ctx.content_rect();
     let depth = screen.width().min(screen.height()) * 0.16;
     let mut mesh = Mesh::default();
     for (inset, strength) in RINGS {
@@ -187,12 +187,12 @@ mod tests {
         let context = egui::Context::default();
         for skin in skins::ALL {
             style::install(&context, skin);
-            let _ = context.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
+            let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
                     paint_embers(ui, ui.clip_rect(), Palette::of(ui));
                     engraved_title_bar(ui, "Folders", Sprite::Folder, Palette::of(ui).accent);
                 });
-                paint_vignette(ctx, Palette::of_ctx(ctx));
+                paint_vignette(ui.ctx(), Palette::of_ctx(ui.ctx()));
             });
         }
     }

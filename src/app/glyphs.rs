@@ -555,7 +555,8 @@ mod tests {
             } else {
                 egui::Theme::Light
             });
-            let _ = context.run(egui::RawInput::default(), |ctx| {
+            let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                let ctx = ui.ctx();
                 let painter = ctx.layer_painter(egui::LayerId::background());
                 for sprite in Sprite::ALL {
                     let rect = Rect::from_min_size(Pos2::ZERO, grid(sprite) * 2.0);

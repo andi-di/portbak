@@ -10,15 +10,19 @@ use eframe::egui;
 const SWATCH: f32 = 14.0;
 
 impl App {
-    pub(super) fn show_settings(&mut self, ctx: &egui::Context) {
-        let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
+    pub(super) fn show_settings(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let frame =
+            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         let mut close = false;
-        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-            pixel::paint_scenery(ui);
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);
+        egui::CentralPanel::default()
+            .frame(frame)
+            .show_inside(ui, |ui| {
+                pixel::paint_scenery(ui);
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    close = settings_page(ui, &mut self.config.skin, &mut self.config.theme);
+                });
             });
-        });
         if close {
             self.settings_open = false;
         }
@@ -174,8 +178,8 @@ mod tests {
                     Theme::Light => egui::ThemePreference::Light,
                     Theme::Dark => egui::ThemePreference::Dark,
                 });
-                let _ = context.run(egui::RawInput::default(), |ctx| {
-                    egui::CentralPanel::default().show(ctx, |ui| {
+                let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                    egui::CentralPanel::default().show_inside(ui, |ui| {
                         assert!(!settings_page(ui, &mut skin, &mut theme));
                     });
                 });

@@ -40,7 +40,8 @@ struct Permissions {
 }
 
 impl App {
-    pub(super) fn show_job_editor(&mut self, ctx: &egui::Context) {
+    pub(super) fn show_job_editor(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
             idle: self.is_idle(),
@@ -54,23 +55,27 @@ impl App {
         let mut action = None;
         let mut disabled = false;
         let mut add = false;
-        let frame = egui::Frame::central_panel(&ctx.style()).inner_margin(egui::Margin::same(22));
-        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-            pixel::paint_scenery(ui);
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                let (Some(job), Some(permissions)) = (job, permissions) else {
-                    add = welcome(ui, can_add);
-                    return;
-                };
-                let was_enabled = job.enabled;
-                let summary = summaries
-                    .get(&job.id)
-                    .filter(|summary| summary.target == job.target);
-                action = job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
-                disabled = was_enabled && !job.enabled;
+        let frame =
+            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
+        egui::CentralPanel::default()
+            .frame(frame)
+            .show_inside(ui, |ui| {
+                pixel::paint_scenery(ui);
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                    let (Some(job), Some(permissions)) = (job, permissions) else {
+                        add = welcome(ui, can_add);
+                        return;
+                    };
+                    let was_enabled = job.enabled;
+                    let summary = summaries
+                        .get(&job.id)
+                        .filter(|summary| summary.target == job.target);
+                    action =
+                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    disabled = was_enabled && !job.enabled;
+                });
             });
-        });
         if add {
             self.add_job();
         }
@@ -78,7 +83,7 @@ impl App {
             self.remove_pending(id);
         }
         if let Some((id, action)) = action {
-            self.apply(id, action, ctx);
+            self.apply(id, action, &ctx);
         }
     }
 

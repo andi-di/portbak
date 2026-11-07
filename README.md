@@ -53,7 +53,7 @@ These JSON files document the configuration; committing them does not activate G
 
 ## Development and builds
 
-Install stable Rust, then run:
+Install stable Rust (1.92 or newer), then run:
 
 ```sh
 cargo test --locked

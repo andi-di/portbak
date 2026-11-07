@@ -2,10 +2,11 @@
 name = "portbak"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.92"
 
 [dependencies]
 anyhow = "1"
-eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+eframe = { version = "0.34.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
