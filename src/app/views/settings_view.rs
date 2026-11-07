@@ -84,24 +84,25 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
     ui.label("Defaults apply to newly created jobs. Existing jobs keep their settings.");
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut defaults.auto_destination,
-            "Auto destination folder",
-        ));
-        if defaults.auto_destination {
-            caption(ui, "Destination folder name based on");
-            let button = ui.add(egui::Button::new(format!(
-                "{}  \u{25be}",
-                defaults.destination_name.label()
-            )));
-            egui::Popup::menu(&button).show(|ui| {
-                pixel::popup(ui, |ui| {
-                    for mode in [DestinationName::JobName, DestinationName::SourceFolder] {
-                        ui.selectable_value(&mut defaults.destination_name, mode, mode.label());
-                    }
+        ui.horizontal(|ui| {
+            ui.add(PixelCheckbox::new(
+                &mut defaults.auto_destination,
+                "Auto destination folder",
+            ));
+            if defaults.auto_destination {
+                let button = ui.add(egui::Button::new(format!(
+                    "{}  \u{25be}",
+                    defaults.destination_name.label()
+                )));
+                egui::Popup::menu(&button).show(|ui| {
+                    pixel::popup(ui, |ui| {
+                        for mode in [DestinationName::JobName, DestinationName::SourceFolder] {
+                            ui.selectable_value(&mut defaults.destination_name, mode, mode.label());
+                        }
+                    });
                 });
-            });
-        }
+            }
+        });
         ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
