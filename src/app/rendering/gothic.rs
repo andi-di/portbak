@@ -5,6 +5,67 @@ use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
+pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
+    let cell = match sprite {
+        Sprite::Folder => 0,
+        Sprite::Clock => 1,
+        Sprite::Shield => 2,
+        Sprite::Trash => 3,
+        Sprite::Rewind => 4,
+        Sprite::Play => 5,
+        Sprite::Chest => 6,
+        Sprite::Package => 7,
+        Sprite::Sun => 8,
+        Sprite::Moon => 9,
+        Sprite::Monitor => 10,
+        Sprite::Warning => 11,
+        Sprite::Power => 12,
+        Sprite::Check => 13,
+        Sprite::Plus => 14,
+        Sprite::Gear => 15,
+        Sprite::Floppy | Sprite::Cursor => {
+            crate::app::scenery::catgirl::paint_icon(painter, rect);
+            return;
+        }
+    };
+    let id = egui::Id::new("midnight_neko_icons_v3");
+    let cached: Option<Result<egui::TextureHandle, String>> =
+        painter.ctx().data_mut(|data| data.get_temp(id));
+    let texture = cached.unwrap_or_else(|| {
+        let result = image::load_from_memory(include_bytes!(
+            "../../../assets/themes/midnight-neko/icons.png"
+        ))
+        .map(|image| {
+            let rgba = image.to_rgba8();
+            painter.ctx().load_texture(
+                "Midnight Neko icons",
+                egui::ColorImage::from_rgba_unmultiplied(
+                    [rgba.width() as usize, rgba.height() as usize],
+                    rgba.as_raw(),
+                ),
+                egui::TextureOptions::LINEAR,
+            )
+        })
+        .map_err(|error| format!("Could not load Gothic icons: {error}"));
+        if let Err(error) = &result {
+            eprintln!("{error}");
+        }
+        painter
+            .ctx()
+            .data_mut(|data| data.insert_temp(id, result.clone()));
+        result
+    });
+    if let Ok(texture) = texture {
+        let min = egui::pos2((cell % 4) as f32 / 4.0, (cell / 4) as f32 / 4.0);
+        painter.image(
+            texture.id(),
+            rect,
+            Rect::from_min_max(min, min + Vec2::splat(0.25)),
+            Color32::WHITE,
+        );
+    }
+}
+
 pub fn corners(painter: &egui::Painter, rect: Rect, color: Color32) {
     painter.rect_stroke(
         rect,
@@ -73,7 +134,12 @@ fn filigree(painter: &egui::Painter, origin: Pos2, direction: Vec2, color: Color
 
 pub fn pattern(painter: &egui::Painter, rect: Rect) {
     let palette = Palette::of_ctx(painter.ctx());
-    let color = palette.metal.gamma_multiply(0.085);
+    let strength = if painter.ctx().global_style().visuals.dark_mode {
+        0.13
+    } else {
+        0.25
+    };
+    let color = palette.metal.gamma_multiply(strength);
     let mut mesh = egui::Mesh::default();
     let mut row = 0;
     let mut y = rect.top() + 18.0;

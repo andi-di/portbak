@@ -1,0 +1,3 @@
+# Built-in imagegen production prompt
+
+One crisp cute PIXEL ART adult anime catgirl FACE icon for a desktop app. Black hair in twintails, black cat ears, detailed small emerald green eyes, burgundy ribbons, tiny neutral tsundere mouth, pale face. Gothic emo character palette black charcoal emerald burgundy silver. Clean visible square pixel clusters, limited palette, authentic 32x32 sprite aesthetic enlarged with sharp nearest-neighbor edges. Perfectly isolated on genuinely transparent background, generous transparent padding. NO background tile, NO black square behind head, no border, no frame, no circle, no leaf, no glow.

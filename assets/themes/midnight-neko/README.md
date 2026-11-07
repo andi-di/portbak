@@ -1,5 +1,10 @@
 # Midnight Neko artwork
 
-`portraits-v2.png` and `full-body-v2.png` are newly generated transparent 4 × 4 sprite atlases. Each expression uses one equally sized cell. Jobs use only portraits; the welcome screen uses only full-body sprites, including during reactions. The app adds no picture frame or backdrop.
+Only current production assets are kept here:
 
-The exact built-in imagegen prompts are recorded in `portraits-v2-prompt.md` and `full-body-v2-prompt.md`. The earlier approved `expressions.png` is retained only as the source for the pixel-art icon. Earlier pose and expression sheets are design references, not displayed character sprites.
+- `upper-body.png`: scythe-free waist-up reactions for the main screen.
+- `portraits.png`: natural head-and-shoulders reactions for the jobs view.
+- `pixel-face.png`: transparent pixel-art mascot.
+- `icons.png`: silver, ruby and crescent-themed interface icons.
+
+All use transparent backgrounds. Character images retain their original proportions when fitted into the view; faces are not forced into identical positions. Sprite atlases use equal cells. No app-drawn picture frame or backdrop is added. Exact built-in imagegen prompts are in the matching `*-prompt.md` files.

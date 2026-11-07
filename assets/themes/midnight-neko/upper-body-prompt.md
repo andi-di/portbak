@@ -1,0 +1,5 @@
+# Final upper-body edit prompt
+
+Generated with the built-in image generation tool from the upper-body draft. The scythe was removed and transparency cleaned.
+
+Edit this production 4x4 equal-grid anime sprite atlas. Remove EVERY scythe, blade, staff and weapon from ALL sixteen cells. Replace the gripping hand poses naturally with relaxed arms below the crop, or a hand softly resting at waist. Preserve the cheek-on-palm pose in its existing cell. Preserve this exact adult black-haired green-eyed gothic catgirl identity, dress, expressions and the existing row-major expression ordering. Keep only upper bodies, no legs. Keep roughly consistent character size, natural head tilts, detailed beautiful green eyes, no stretching. Crucial: clean TRUE transparent background, NO grey matte around silhouettes, NO rectangular cell borders, NO gridlines, NO frames, NO backdrop or halo. Keep a transparent margin inside every equal cell so artwork does not cross cell boundaries. Maintain a strict 4x4 production grid. Preserve opaque character interiors and natural antialiased silhouette edges. No weapons anywhere.

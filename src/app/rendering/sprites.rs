@@ -325,7 +325,7 @@ pub fn paint_awake(
             if sprite == Sprite::Floppy {
                 crate::app::scenery::catgirl::paint_icon(painter, rect);
             } else {
-                crate::app::rendering::modern::icon(painter, rect, sprite, tint);
+                crate::app::rendering::gothic::icon(painter, rect, sprite);
             }
         }
         Finish::Modern => {

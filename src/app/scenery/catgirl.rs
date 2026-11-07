@@ -101,13 +101,13 @@ impl Source {
     fn bytes(self) -> &'static [u8] {
         match self {
             Self::Expressions => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions.png")
+                include_bytes!("../../../assets/themes/midnight-neko/pixel-face.png")
             }
             Self::Portraits => {
-                include_bytes!("../../../assets/themes/midnight-neko/portraits-v2.png")
+                include_bytes!("../../../assets/themes/midnight-neko/portraits.png")
             }
             Self::FullBody => {
-                include_bytes!("../../../assets/themes/midnight-neko/full-body-v2.png")
+                include_bytes!("../../../assets/themes/midnight-neko/upper-body.png")
             }
         }
     }
@@ -183,11 +183,7 @@ fn texture(ctx: &egui::Context, source: Source, icon: bool) -> Result<egui::Text
         },
         || {
             let image = source_image(ctx, source)?;
-            Ok(if icon {
-                image.crop_imm(31, 800, 158, 163).to_rgba8()
-            } else {
-                image.to_rgba8()
-            })
+            Ok(image.to_rgba8())
         },
     )
 }
@@ -214,21 +210,18 @@ fn portrait_texture(
             let crop = image
                 .crop_imm(cell % 4 * width, cell / 4 * height, width, height)
                 .to_rgba8();
-            Ok(image::imageops::resize(
-                &crop,
-                PORTRAIT_SIZE[0],
-                PORTRAIT_SIZE[1],
-                image::imageops::FilterType::Lanczos3,
-            ))
+            Ok(crop)
         },
     )
 }
 
 pub fn paint_icon(painter: &egui::Painter, rect: Rect) {
     if let Ok(texture) = texture(painter.ctx(), Source::Expressions, true) {
+        let size = texture.size_vec2();
+        let fitted = size * (rect.width() / size.x).min(rect.height() / size.y);
         painter.image(
             texture.id(),
-            rect,
+            Rect::from_center_size(rect.center(), fitted),
             Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
             Color32::WHITE,
         );
@@ -264,9 +257,11 @@ fn show_companion(ui: &mut egui::Ui, full_figure: bool) {
     let expression = state.visible(time);
     let palette = Palette::of(ui);
     if let Ok(texture) = portrait_texture(ui.ctx(), expression, full_figure) {
+        let size = texture.size_vec2();
+        let fitted = size * (rect.width() / size.x).min(rect.height() / size.y);
         ui.painter().image(
             texture.id(),
-            rect,
+            Rect::from_center_size(rect.center(), fitted),
             Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
             Color32::WHITE,
         );
@@ -321,7 +316,7 @@ mod tests {
             .chain([Expression::Neutral])
         {
             let texture = portrait_texture(&ctx, expression, false).unwrap();
-            assert_eq!(texture.size(), [384, 448]);
+            assert!(texture.size()[0] > 0 && texture.size()[1] > 0);
         }
     }
 }
