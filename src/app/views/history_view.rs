@@ -352,7 +352,7 @@ fn selection_row(
             .then(|| (backup.record.name.clone(), protected))
     });
     if row.clicked() && backup.available && !saving && change.is_none() {
-        *selected = Some(backup.record.name.clone());
+        *selected = (!is_selected).then(|| backup.record.name.clone());
     }
     change
 }
