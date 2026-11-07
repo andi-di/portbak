@@ -23,7 +23,6 @@ type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
 #[derive(Clone, Copy)]
 enum JobAction {
     Check,
-    RefreshDestination,
     Restore,
     Manage,
     Remove,
@@ -104,18 +103,6 @@ impl App {
     fn apply(&mut self, id: Uuid, action: JobAction, ctx: &egui::Context) {
         match action {
             JobAction::Check => self.enqueue(id),
-            JobAction::RefreshDestination => {
-                let app_dir = self
-                    .path
-                    .parent()
-                    .unwrap_or_else(|| std::path::Path::new("."))
-                    .to_path_buf();
-                if let Some(job) = self.job_mut(id) {
-                    if let Err(error) = job.set_auto_destination(&app_dir) {
-                        self.error = format!("Could not refresh automatic destination: {error:#}");
-                    }
-                }
-            }
             JobAction::Restore => self.open_history(id, HistoryMode::Restore, ctx),
             JobAction::Manage => self.open_history(id, HistoryMode::Manage, ctx),
             JobAction::Remove => self.remove_job(id),
@@ -178,10 +165,9 @@ fn job_editor(
         );
     }
     ui.add_space(14.0);
-    let mut refresh = false;
     ui.add_enabled_ui(!permissions.busy, |ui| {
         pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-            refresh = folder_settings(ui, job)
+            folder_settings(ui, job)
         });
         pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
             schedule_settings(ui, job)
@@ -190,14 +176,9 @@ fn job_editor(
             retention_settings(ui, job, summary)
         });
     });
-    let action = pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
+    pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
         status_panel(ui, job, permissions)
-    });
-    if refresh {
-        Some(JobAction::RefreshDestination)
-    } else {
-        action
-    }
+    })
 }
 
 /// The job's floppy, name, state lamp and the power switch for automatic backups.
@@ -275,8 +256,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     }
 }
 
-fn folder_settings(ui: &mut egui::Ui, job: &mut Job) -> bool {
-    let mut refresh = false;
+fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
@@ -287,27 +267,12 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) -> bool {
     ui.add_space(6.0);
     path_picker(ui, "Source folder", &mut job.source);
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.auto_destination,
-            "Auto destination folder",
-        ));
-        refresh = ui
-            .add_enabled(
-                job.auto_destination && job.source.is_dir(),
-                PixelButton::new("Refresh automatic destination")
-                    .sprite(Sprite::Rewind)
-                    .icon_only(),
-            )
-            .on_hover_text("Refresh automatic destination")
-            .on_disabled_hover_text(
-                "Enable automatic destination and choose a source folder to refresh",
-            )
-            .clicked();
-    });
+    ui.add(PixelCheckbox::new(
+        &mut job.auto_destination,
+        "Auto destination folder",
+    ));
     if path_picker(ui, "Destination folder", &mut job.target) {
         job.auto_destination = false;
-        refresh = false;
     }
     ui.add_space(6.0);
     ui.horizontal(|ui| {
@@ -315,7 +280,6 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) -> bool {
         let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
         sprites::show(ui, Sprite::Package, 2.0, tint);
     });
-    refresh
 }
 
 fn schedule_key(job: &Job) -> ScheduleKey {
