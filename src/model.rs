@@ -38,22 +38,6 @@ impl IntervalUnit {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DestinationName {
-    JobName,
-    #[default]
-    SourceFolder,
-}
-
-impl DestinationName {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::JobName => "Job name",
-            Self::SourceFolder => "Source folder",
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Job {
@@ -64,7 +48,6 @@ pub struct Job {
     pub enabled: bool,
     pub zip: bool,
     pub auto_destination: bool,
-    pub destination_name: DestinationName,
     pub schedule: Schedule,
     pub hour: u32,
     pub minute: u32,
@@ -89,7 +72,6 @@ impl Default for Job {
             enabled: false,
             zip: false,
             auto_destination: false,
-            destination_name: DestinationName::SourceFolder,
             schedule: Schedule::Interval,
             hour: 18,
             minute: 0,
@@ -119,14 +101,7 @@ impl Job {
 
     fn auto_destination_path(&self, app_dir: &std::path::Path) -> anyhow::Result<PathBuf> {
         let source = std::fs::canonicalize(&self.source)?;
-        let name = match self.destination_name {
-            DestinationName::JobName => self.name.clone(),
-            DestinationName::SourceFolder => source
-                .file_name()
-                .ok_or_else(|| anyhow::anyhow!("Source folder has no name"))?
-                .to_string_lossy()
-                .into_owned(),
-        };
+        let name = &self.name;
         let name: String = name
             .chars()
             .map(|c| {
@@ -177,14 +152,14 @@ impl Job {
             }
             return Ok(());
         }
-        let naming_changed = self.destination_name != previous.destination_name;
-        let job_name_changed =
-            self.destination_name == DestinationName::JobName && self.name != previous.name;
-        if !naming_changed && !job_name_changed {
-            return Ok(());
-        }
-        let old_target = previous.auto_destination_path(app_dir)?;
-        if !self.target.as_os_str().is_empty() && self.target != old_target {
+        let backups = std::fs::canonicalize(app_dir)?.join("backups");
+        let owned_name = self.target.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy();
+            name == self.id.to_string() || name.starts_with(&format!("{}-", self.id))
+        });
+        if !self.target.as_os_str().is_empty()
+            && (self.target.parent() != Some(backups.as_path()) || !owned_name)
+        {
             return Ok(());
         }
         let target = self.auto_destination_path(app_dir)?;
@@ -297,7 +272,6 @@ impl Theme {
 #[serde(default)]
 pub struct JobDefaults {
     pub auto_destination: bool,
-    pub destination_name: DestinationName,
     pub zip: bool,
     pub schedule: Schedule,
     pub hour: u32,
@@ -316,7 +290,6 @@ impl Default for JobDefaults {
     fn default() -> Self {
         Self {
             auto_destination: true,
-            destination_name: DestinationName::JobName,
             zip: true,
             schedule: Schedule::Interval,
             hour: 18,
@@ -337,7 +310,6 @@ impl JobDefaults {
     pub fn new_job(&self) -> Job {
         Job {
             auto_destination: self.auto_destination,
-            destination_name: self.destination_name,
             zip: self.zip,
             schedule: self.schedule,
             hour: self.hour,
@@ -409,7 +381,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn existing_auto_destinations_can_switch_naming_modes_without_losing_backups() {
+    fn legacy_source_named_destinations_migrate_to_job_names_without_losing_backups() {
         let root = tempfile::tempdir().unwrap();
         let app = root.path().join("app");
         let source = root.path().join("source");
@@ -417,35 +389,29 @@ mod tests {
         std::fs::create_dir(&source).unwrap();
         let mut job = Job {
             source,
-            destination_name: DestinationName::SourceFolder,
+            name: "Project".into(),
             ..JobDefaults::default().new_job()
         };
-        job.set_auto_destination(&app).unwrap();
+        job.target = std::fs::canonicalize(&app)
+            .unwrap()
+            .join("backups")
+            .join(format!("{}-source", job.id));
+        std::fs::create_dir_all(&job.target).unwrap();
         std::fs::write(job.target.join("backup"), "keep").unwrap();
-        for mode in [
-            DestinationName::JobName,
-            DestinationName::SourceFolder,
-            DestinationName::JobName,
-        ] {
-            let previous = job.clone();
-            job.destination_name = mode;
-            job.name = "Updated job".into();
-            job.update_auto_destination(&previous, &app).unwrap();
-            let suffix = if mode == DestinationName::JobName {
-                "Updated job"
-            } else {
-                "source"
-            };
-            assert_eq!(
-                job.target.file_name().unwrap(),
-                format!("{}-{suffix}", job.id).as_str()
-            );
-            assert_eq!(
-                std::fs::read_to_string(job.target.join("backup")).unwrap(),
-                "keep"
-            );
-            assert!(!previous.target.exists());
-        }
+        let mut value = serde_json::to_value(&job).unwrap();
+        value["destination_name"] = serde_json::json!("SourceFolder");
+        let mut job: Job = serde_json::from_value(value).unwrap();
+        let previous = job.clone();
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert_eq!(
+            job.target.file_name().unwrap(),
+            format!("{}-Project", job.id).as_str()
+        );
+        assert_eq!(
+            std::fs::read_to_string(job.target.join("backup")).unwrap(),
+            "keep"
+        );
+        assert!(!previous.target.exists());
     }
 
     #[test]
@@ -462,7 +428,6 @@ mod tests {
             source,
             target: manual.clone(),
             auto_destination: false,
-            destination_name: DestinationName::JobName,
             ..Job::default()
         };
         let previous = job.clone();
@@ -503,7 +468,6 @@ mod tests {
             source,
             ..JobDefaults::default().new_job()
         };
-        assert_eq!(job.destination_name, DestinationName::JobName);
         job.set_auto_destination(&app).unwrap();
         assert_eq!(
             job.target.file_name().unwrap(),
@@ -523,7 +487,7 @@ mod tests {
             format!("{}-Renamed", job.id).as_str()
         );
         let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
-        assert_eq!(saved.destination_name, DestinationName::JobName);
+        assert_eq!(saved.target, job.target);
         let previous = job.clone();
         job.name.clear();
         job.update_auto_destination(&previous, &app).unwrap();
@@ -568,8 +532,6 @@ mod tests {
         assert!(job.update_auto_destination(&previous, &app).is_err());
         assert_eq!(job.target, previous.target);
         assert!(previous.target.is_dir());
-        let legacy: Job = serde_json::from_str(r#"{"auto_destination":true}"#).unwrap();
-        assert_eq!(legacy.destination_name, DestinationName::SourceFolder);
     }
 
     #[test]
@@ -617,14 +579,13 @@ mod tests {
     }
 
     #[test]
-    fn auto_destination_uses_job_uuid_and_source_name_and_allows_override() {
+    fn auto_destination_uses_job_uuid_and_job_name_and_allows_override() {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("My source");
         let app = root.path().join("app");
         std::fs::create_dir(&source).unwrap();
         std::fs::create_dir(&app).unwrap();
         let mut job = Job {
-            destination_name: DestinationName::SourceFolder,
             source: source.clone(),
             ..JobDefaults::default().new_job()
         };
@@ -632,13 +593,13 @@ mod tests {
         let expected = std::fs::canonicalize(&app)
             .unwrap()
             .join("backups")
-            .join(format!("{}-My source", job.id));
+            .join(format!("{}-New job", job.id));
         assert_eq!(job.target, expected);
         assert!(expected.is_dir());
         let previous = job.clone();
-        job.name = "Renamed source-mode job".into();
+        job.name = "Renamed job".into();
         job.update_auto_destination(&previous, &app).unwrap();
-        assert_eq!(job.target, previous.target);
+        assert_ne!(job.target, previous.target);
         job.target = root.path().join("manual");
         let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
         assert_eq!(saved.target, job.target);

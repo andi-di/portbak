@@ -5,7 +5,7 @@ use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
 use crate::app::views::widgets::caption;
 use crate::app::App;
-use crate::model::{Config, DestinationName, JobDefaults};
+use crate::model::{Config, JobDefaults};
 use eframe::egui;
 
 const SWATCH: f32 = 14.0;
@@ -82,39 +82,12 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
 
 fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
-    ui.label(
-        "Defaults apply to new jobs. Automatic destination updates use the current naming choice.",
-    );
+    ui.label("Defaults apply to newly created jobs. Automatic destinations use the job name.");
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-        ui.horizontal(|ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.auto_destination,
-                "Auto destination folder",
-            ));
-            ui.add_enabled_ui(defaults.auto_destination, |ui| {
-                let button = ui.add(egui::Button::new(format!(
-                    "{}    ",
-                    defaults.destination_name.label()
-                )));
-                let center = egui::pos2(button.rect.right() - 10.0, button.rect.center().y);
-                ui.painter().add(egui::Shape::convex_polygon(
-                    vec![
-                        center + egui::vec2(-4.0, -2.0),
-                        center + egui::vec2(4.0, -2.0),
-                        center + egui::vec2(0.0, 3.0),
-                    ],
-                    ui.style().interact(&button).fg_stroke.color,
-                    egui::Stroke::NONE,
-                ));
-                egui::Popup::menu(&button).show(|ui| {
-                    pixel::popup(ui, |ui| {
-                        for mode in [DestinationName::JobName, DestinationName::SourceFolder] {
-                            ui.selectable_value(&mut defaults.destination_name, mode, mode.label());
-                        }
-                    });
-                });
-            });
-        });
+        ui.add(PixelCheckbox::new(
+            &mut defaults.auto_destination,
+            "Auto destination folder",
+        ));
         ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
