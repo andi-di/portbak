@@ -7,9 +7,9 @@ use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-const MOTES: u32 = 60;
-const PARTICLE_LIMIT: usize = 16;
-const LIFETIME: f32 = 0.4;
+const MOTES: u32 = 90;
+const PARTICLE_LIMIT: usize = 48;
+const LIFETIME: f32 = 0.7;
 
 #[derive(Clone, Default)]
 struct Magic {
@@ -63,7 +63,7 @@ fn floating_motes(
     ));
     let pointer = ctx.input(|input| input.pointer.hover_pos());
     for index in 0..MOTES {
-        let radius = 1.2 + noise(index, 10) * 1.6;
+        let radius = 2.0 + noise(index, 10) * 2.0;
         let progress =
             time * (5.0 + noise(index, 11) * 5.0) / (screen.height() + 12.0) + noise(index, 12);
         let center = egui::pos2(
@@ -76,12 +76,12 @@ fn floating_motes(
         let distance_fade =
             pointer.map_or(1.0, |point| (point.distance(center) / 70.0).clamp(0.0, 1.0));
         let color = mix(palette.metal, palette.hot, noise(index, 14) * 0.35)
-            .gamma_multiply(fade * distance_fade * 0.28);
-        let painter = if index % 6 == 0 { &front } else { behind };
+            .gamma_multiply(fade * distance_fade * 0.55);
+        let painter = if index % 2 == 0 { &front } else { behind };
         if index % 3 == 0 {
             diamond(painter, center, radius, color);
         } else {
-            painter.circle_filled(center, radius * 0.55, color);
+            painter.circle_filled(center, radius * 0.7, color);
         }
     }
 }
@@ -139,8 +139,8 @@ fn record_pointer(state: &mut Magic, pointer: Option<Pos2>, pressed: bool, time:
     };
     if let Some(previous) = state.last_pointer {
         let distance = previous.distance(pointer);
-        if distance >= 32.0 {
-            let steps = (distance / 32.0).floor().min(2.0) as u32;
+        if distance >= 12.0 {
+            let steps = (distance / 12.0).floor().min(6.0) as u32;
             for step in 1..=steps {
                 release(
                     state,
@@ -155,7 +155,7 @@ fn record_pointer(state: &mut Magic, pointer: Option<Pos2>, pressed: bool, time:
         state.last_pointer = Some(pointer);
     }
     if pressed {
-        release(state, pointer, time, 2);
+        release(state, pointer, time, 5);
     }
 }
 
@@ -178,8 +178,8 @@ pub fn paint_overlays(ctx: &egui::Context, palette: &Palette) {
         let fade = 1.0 - age / LIFETIME;
         let center = particle.origin + particle.velocity * age + egui::vec2(0.0, -24.0 * age * age);
         let color =
-            mix(palette.hot, palette.gold, noise(particle.seed, 83)).gamma_multiply(fade * 0.35);
-        let radius = (1.0 + noise(particle.seed, 84) * 1.8) * fade;
+            mix(palette.hot, palette.gold, noise(particle.seed, 83)).gamma_multiply(fade * 0.55);
+        let radius = (1.5 + noise(particle.seed, 84) * 2.0) * fade;
         if particle.seed % 4 == 0 {
             diamond(&painter, center, radius, color);
         } else {
