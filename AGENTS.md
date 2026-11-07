@@ -14,5 +14,6 @@ them here.
 - Follow clean code principles: small functions, meaningful names, no duplication, no dead code, handle errors explicitly.
 - Keep comments short and concise — one or two lines explaining the why or a non-obvious constraint, never a restatement of what the code already says.
 - Keep this file short and durable-facts-only. Open tasks belong in the local `todos/` directory; never add task lists or history here, or anything that goes stale with the next refactor.
-- Keep `README.md` current whenever a change requires it; update `SPECIFICATION.md` when observable behavior changes.
-- Before finishing: run `cargo fmt`, `cargo test --locked`, and `cargo clippy --locked --all-targets -- -D warnings`.
+- Keep `README.md` current whenever a change requires it but keep it free from implementation details, only include information that could be relevant to the user.
+- Keep the `SPECIFICATION.md` bullet points short and concisive, add sub bullet points for more comnplex topics and update the file when observable behavior changes.
+- Before creating the final PR: run `cargo fmt`, `cargo test --locked`, and `cargo clippy --locked --all-targets -- -D warnings`.
