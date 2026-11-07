@@ -18,9 +18,19 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 fs2 = "0.4"
 atomicwrites = "0.4"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+winit = { version = "0.30.13", default-features = false, features = ["rwh_06", "wayland"] }
+wayland-client = { version = "0.31", features = ["system", "dlopen"] }
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+rustix = { version = "1", features = ["event", "fs"] }
+
 [dev-dependencies]
 tempfile = "3"
 chrono-tz = "0.10"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wayland-server = "0.31"
+wayland-protocols = { version = "0.32", features = ["server", "staging"] }
 
 [profile.release]
 lto = true

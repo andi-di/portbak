@@ -2,6 +2,8 @@
 mod app;
 mod engine;
 mod model;
+#[cfg(target_os = "linux")]
+mod wayland_icon;
 
 use anyhow::Context;
 use eframe::egui;
@@ -52,7 +54,13 @@ fn startup() -> anyhow::Result<()> {
     eframe::run_native(
         "portbak",
         options,
-        Box::new(move |_| Ok(Box::new(app::App::new(config, path, lock)))),
+        Box::new(move |creation| {
+            #[cfg(target_os = "linux")]
+            wayland_icon::install(creation, app_icon());
+            #[cfg(not(target_os = "linux"))]
+            let _ = creation;
+            Ok(Box::new(app::App::new(config, path, lock)))
+        }),
     )
     .map_err(|error| anyhow::anyhow!("{error}"))
 }
