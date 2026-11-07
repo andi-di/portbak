@@ -10,6 +10,8 @@ mod skins;
 mod sprites;
 mod style;
 mod ui;
+#[cfg(target_os = "linux")]
+pub(crate) mod wayland_icon;
 mod widgets;
 
 use crate::engine::{self, history::Backup, Outcome};
@@ -787,8 +789,8 @@ mod tests {
         let mut app = app_with(config, PathBuf::new());
         app.enqueue(id);
         let context = egui::Context::default();
-        let _ = context.run(egui::RawInput::default(), |ctx| {
-            app.show_job_editor(ctx);
+        let _ = context.run_ui(egui::RawInput::default(), |ui| {
+            app.show_job_editor(ui);
         });
         assert!(!app.config.jobs[0].enabled);
         assert!(app.config.jobs[0].next_run.is_none());

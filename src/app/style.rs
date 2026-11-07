@@ -144,7 +144,7 @@ impl Palette {
     }
 
     pub fn of_ctx(ctx: &egui::Context) -> &'static Self {
-        Skin::of(ctx).palette(ctx.style().visuals.dark_mode)
+        Skin::of(ctx).palette(ctx.global_style().visuals.dark_mode)
     }
 }
 

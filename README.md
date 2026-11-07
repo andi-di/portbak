@@ -20,6 +20,8 @@ Copy the executable for your platform into a **writable folder** and launch it. 
 
 Choose **Retro**, **Dark Fantasy**, or **Modern** in Settings. Modern uses neutral Zinc surfaces, blue accents, rounded controls and simple line icons. Every look supports Light, Dark, and System brightness; the app remembers both selections.
 
+On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.
+
 ## Storage format and recovery
 
 Backups are stored directly in the selected destination, alongside a per-job `manifest-<UUID>.json` and a destination `.lock` file. Backups are named `2026-11-06_18-30-00_Project` or `2026-11-06_18-30-00_Project.zip`. Name collisions receive a numeric suffix.
@@ -53,7 +55,7 @@ These JSON files document the configuration; committing them does not activate G
 
 ## Development and builds
 
-Install stable Rust, then run:
+Install stable Rust (1.92 or newer), then run:
 
 ```sh
 cargo test --locked

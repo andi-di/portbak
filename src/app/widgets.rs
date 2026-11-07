@@ -113,8 +113,8 @@ mod tests {
     #[test]
     fn mixed_row_controls_share_vertical_center() {
         let context = egui::Context::default();
-        let _ = context.run(egui::RawInput::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let _ = context.run_ui(egui::RawInput::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 ui.spacing_mut().button_padding = egui::vec2(10.0, 5.0);
                 for (style, size) in [
                     (egui::TextStyle::Heading, 22.0),

@@ -395,8 +395,8 @@ mod tests {
                         ..Default::default()
                     };
                     let mut sizes = None;
-                    let _ = ctx.run(input, |ctx| {
-                        let output = history_window(ctx, &mut dialog, "").unwrap();
+                    let _ = ctx.run_ui(input, |ui| {
+                        let output = history_window(ui.ctx(), &mut dialog, "").unwrap();
                         sizes = Some((output.content_size, output.inner_rect));
                     });
                     if frame < 2 {

@@ -655,7 +655,7 @@ fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
 fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     const PITCH: f32 = 3.0;
     let layer = egui::LayerId::new(egui::Order::Debug, egui::Id::new("scanlines"));
-    let screen = ctx.screen_rect();
+    let screen = ctx.content_rect();
     let mut mesh = egui::Mesh::default();
     let mut y = screen.top();
     while y < screen.bottom() {
@@ -679,7 +679,7 @@ pub fn dialog<R>(
     contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> Option<R> {
     paint_backdrop(ctx);
-    let frame = egui::Frame::window(&ctx.style()).inner_margin(0);
+    let frame = egui::Frame::window(&ctx.global_style()).inner_margin(0);
     window
         .title_bar(false)
         .frame(frame)
@@ -701,7 +701,7 @@ pub fn dialog<R>(
 pub fn paint_backdrop(ctx: &egui::Context) {
     // Panels share the background layer; painting last there covers them but stays below windows.
     ctx.layer_painter(egui::LayerId::background()).rect_filled(
-        ctx.screen_rect(),
+        ctx.content_rect(),
         0.0,
         Color32::from_black_alpha(140),
     );
@@ -772,8 +772,8 @@ mod tests {
             } else {
                 egui::Theme::Light
             });
-            let _ = context.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
+            let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
                     let size = egui::vec2(260.0, 52.0);
                     let button = PixelButton::new("New job")
                         .sprite(Sprite::Plus)
@@ -789,8 +789,8 @@ mod tests {
         let context = egui::Context::default();
         let mut checked = false;
         let mut current = 1;
-        let _ = context.run(egui::RawInput::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let _ = context.run_ui(egui::RawInput::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 assert!(!ui.add(PixelCheckbox::new(&mut checked, "Label")).changed());
                 assert!(!choice(ui, &mut current, 2, "Two", None).changed());
             });
