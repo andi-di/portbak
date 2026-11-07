@@ -185,7 +185,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     } else {
         ui.horizontal(|ui| {
             ui.allocate_ui(
-                egui::vec2((ui.available_width() - 320.0).max(0.0), 60.0),
+                egui::vec2((ui.available_width() - 72.0).max(0.0), 60.0),
                 |ui| {
                     ui.horizontal(|ui| job_identity(ui, job));
                 },
@@ -228,11 +228,24 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         ("Enable automatic backups", Tone::Good)
     };
     let button = PixelButton::new(label)
+        .icon_only()
         .sprite(Sprite::Power)
         .tone(tone)
-        .min_size(egui::vec2(300.0, 52.0));
+        .min_size(egui::vec2(52.0, 52.0));
     let can_toggle = (job.enabled || job.has_runnable_schedule()) && !locked;
-    if ui.add_enabled(can_toggle, button).clicked() {
+    let tooltip = if locked {
+        "Automatic backups cannot be changed during restore or while backup history is open"
+    } else if !job.enabled && !job.has_runnable_schedule() {
+        "Select at least one weekday to enable automatic backups"
+    } else {
+        label
+    };
+    if ui
+        .add_enabled(can_toggle, button)
+        .on_hover_text(tooltip)
+        .on_disabled_hover_text(tooltip)
+        .clicked()
+    {
         job.enabled = !job.enabled;
         job.reschedule(Utc::now());
     }
