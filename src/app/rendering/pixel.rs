@@ -421,6 +421,14 @@ pub fn section<R>(
     band: Color32,
     contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> R {
+    section_with_header(ui, |ui| title_bar(ui, title, sprite, band), contents)
+}
+
+pub fn section_with_header<R>(
+    ui: &mut egui::Ui,
+    header: impl FnOnce(&mut egui::Ui),
+    contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
     let glassy = Skin::of(ui.ctx()).finish == Finish::Glass;
@@ -443,7 +451,7 @@ pub fn section<R>(
     let framed = frame.show(ui, |ui| {
         ui.set_min_width(ui.available_width());
         ui.spacing_mut().item_spacing.y = 0.0;
-        title_bar(ui, title, sprite, band);
+        header(ui);
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(16, 12))
             .show(ui, |ui| {

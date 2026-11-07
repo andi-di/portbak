@@ -168,9 +168,12 @@ fn job_editor(
         pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
             folder_settings(ui, job)
         });
-        pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
-            schedule_settings(ui, job)
-        });
+        let schedule_preview = job.clone();
+        pixel::section_with_header(
+            ui,
+            |ui| scheduling_header(ui, &schedule_preview),
+            |ui| schedule_settings(ui, job),
+        );
         pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
             retention_settings(ui, job, summary)
         });
@@ -367,6 +370,116 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     }
 }
 
+fn scheduling_header(ui: &mut egui::Ui, job: &Job) {
+    let palette = Palette::of(ui);
+    let (next, countdown) = schedule_readout_values(job, Utc::now());
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(16, 10))
+        .show(ui, |ui| {
+            if ui.available_width() < 620.0 {
+                pixel::title_bar(ui, "Scheduling", Sprite::Clock, palette.hot);
+                scheduling_readouts(ui, &next, &countdown);
+            } else {
+                ui.horizontal(|ui| {
+                    ui.allocate_ui(egui::vec2(190.0, 52.0), |ui| {
+                        pixel::title_bar(ui, "Scheduling", Sprite::Clock, palette.hot);
+                    });
+                    scheduling_readouts(ui, &next, &countdown);
+                });
+            }
+        });
+}
+
+fn schedule_readout_values(job: &Job, now: chrono::DateTime<Utc>) -> (String, String) {
+    let next = if job.has_runnable_schedule() {
+        let next = if job.enabled {
+            job.next_run.unwrap_or_else(|| job.next_after(now))
+        } else {
+            job.next_after(now)
+        };
+        local_time(next, DATE_MINUTE)
+    } else {
+        "No weekdays selected".into()
+    };
+    let countdown = if job.enabled {
+        job.countdown(now).unwrap_or_else(|| "Pending".into())
+    } else {
+        "Disabled".into()
+    };
+    (next, countdown)
+}
+
+fn scheduling_readouts(ui: &mut egui::Ui, next: &str, countdown: &str) {
+    let palette = Palette::of(ui);
+    let color = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
+        palette.hot
+    } else {
+        palette.accent
+    };
+    let items = [
+        ("Next check", next, color),
+        ("Next check in", countdown, palette.good),
+    ];
+    let sizes: Vec<_> = items
+        .iter()
+        .map(|(label, value, _)| {
+            let caption = ui
+                .painter()
+                .layout_no_wrap(
+                    label.to_uppercase(),
+                    egui::TextStyle::Small.resolve(ui.style()),
+                    palette.dim,
+                )
+                .size();
+            let value = ui
+                .painter()
+                .layout_no_wrap(value.to_uppercase(), label_font(ui.ctx()), palette.ink)
+                .size()
+                + style::well(ui.ctx()).total_margin().sum();
+            egui::vec2(
+                caption.x.max(value.x),
+                caption.y + ui.spacing().item_spacing.y + value.y,
+            )
+        })
+        .collect();
+    let gap = 16.0;
+    let stacked = sizes[0].x + sizes[1].x + gap > ui.available_width();
+    let height = if stacked {
+        sizes[0].y + sizes[1].y + gap
+    } else {
+        sizes[0].y.max(sizes[1].y)
+    };
+    let (row, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), height),
+        egui::Sense::hover(),
+    );
+    for (index, (label, value, color)) in items.into_iter().enumerate() {
+        let right = if !stacked && index == 0 {
+            row.right() - sizes[1].x - gap
+        } else {
+            row.right()
+        };
+        let top = if stacked && index == 1 {
+            row.top() + sizes[0].y + gap
+        } else {
+            row.top()
+        };
+        let rect = egui::Rect::from_min_size(
+            egui::pos2((right - sizes[index].x).max(row.left()), top),
+            sizes[index],
+        );
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .id_salt(label)
+                .max_rect(rect)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+            |ui| {
+                readout(ui, label, value, color);
+            },
+        );
+    }
+}
+
 pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
     centered_row(ui, |ui| {
         let modes: [(Schedule, &str, Sprite); 3] = [
@@ -553,27 +666,10 @@ fn optional_limit<T>(
 
 fn job_status(ui: &mut egui::Ui, job: &Job) {
     let palette = Palette::of(ui);
-    let next = if !job.enabled {
-        "disabled".to_owned()
-    } else {
-        job.next_run.map_or_else(
-            || "pending".to_owned(),
-            |time| local_time(time, DATE_MINUTE),
-        )
-    };
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
     ui.horizontal_wrapped(|ui| {
-        let color = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-            palette.hot
-        } else {
-            palette.accent
-        };
-        readout(ui, "Next check", &next, color);
-        if let Some(remaining) = job.countdown(Utc::now()) {
-            readout(ui, "Next check in", &remaining, palette.good);
-        }
         ui.label(
             egui::RichText::new(format!("Last backup: {last_backup}"))
                 .small()
@@ -598,4 +694,61 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
         pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disabled_schedule_previews_current_settings_without_enabling_job() {
+        let now = Utc::now();
+        let mut job = Job::default();
+        job.set_interval_seconds(600);
+        let (next, countdown) = schedule_readout_values(&job, now);
+        assert_eq!(
+            next,
+            local_time(now + chrono::Duration::minutes(10), DATE_MINUTE)
+        );
+        assert_eq!(countdown, "Disabled");
+        job.set_interval_seconds(1200);
+        assert_eq!(
+            schedule_readout_values(&job, now).0,
+            local_time(now + chrono::Duration::minutes(20), DATE_MINUTE)
+        );
+        assert!(!job.enabled);
+        assert!(job.next_run.is_none());
+        job.enabled = true;
+        job.next_run = Some(now + chrono::Duration::seconds(30));
+        assert_eq!(
+            schedule_readout_values(&job, now),
+            (
+                local_time(job.next_run.unwrap(), DATE_MINUTE),
+                "00:00:30".into()
+            )
+        );
+    }
+
+    #[test]
+    fn scheduling_header_fits_every_skin() {
+        for skin in crate::app::theme::skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                for width in [290.0, 600.0, 1000.0] {
+                    let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                        ui.set_width(width);
+                        let response = ui.scope(|ui| scheduling_header(ui, &Job::default()));
+                        assert!(
+                            response.response.rect.width() <= width + 1.0,
+                            "{} {theme:?}: width={width}, rect={:?}",
+                            skin.id,
+                            response.response.rect
+                        );
+                    });
+                }
+            }
+        }
+    }
 }
