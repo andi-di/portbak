@@ -354,7 +354,6 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 }
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
-    let palette = Palette::of(ui);
     let before = schedule_key(job);
     centered_row(ui, |ui| {
         ui.add(PixelCheckbox::new(
@@ -366,27 +365,6 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
-    let next = if !job.enabled {
-        "disabled".to_owned()
-    } else {
-        job.next_run.map_or_else(
-            || "pending".to_owned(),
-            |time| local_time(time, DATE_MINUTE),
-        )
-    };
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        let color = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-            palette.hot
-        } else {
-            palette.accent
-        };
-        readout(ui, "Next check", &next, color);
-        if let Some(remaining) = job.countdown(Utc::now()) {
-            ui.add_space(24.0);
-            readout(ui, "Next check in", &remaining, palette.good);
-        }
-    });
 }
 
 pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
@@ -575,10 +553,27 @@ fn optional_limit<T>(
 
 fn job_status(ui: &mut egui::Ui, job: &Job) {
     let palette = Palette::of(ui);
+    let next = if !job.enabled {
+        "disabled".to_owned()
+    } else {
+        job.next_run.map_or_else(
+            || "pending".to_owned(),
+            |time| local_time(time, DATE_MINUTE),
+        )
+    };
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
     ui.horizontal_wrapped(|ui| {
+        let color = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
+            palette.hot
+        } else {
+            palette.accent
+        };
+        readout(ui, "Next check", &next, color);
+        if let Some(remaining) = job.countdown(Utc::now()) {
+            readout(ui, "Next check in", &remaining, palette.good);
+        }
         ui.label(
             egui::RichText::new(format!("Last backup: {last_backup}"))
                 .small()

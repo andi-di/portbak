@@ -35,7 +35,7 @@ Provide:
 - A job list showing only each job’s icon, name, and right-aligned next-check countdown in one vertically centered row. Box the countdown like the scheduling readout, without a text prefix; hide it when scheduling is disabled. Its divider remains at the selected width after dragging and is restored after restarting.
 - Clicking the selected job deselects it and returns to the start screen.
 - At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
-- Show the last backup time and latest result in a compact line below the job header; show errors prominently. Do not use a separate Status pane.
+- Show the next-check time and countdown alongside the last backup time and latest result in a compact status row below the job header; show errors prominently. Do not use a separate Status pane.
 - An editor for the selected job.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
 - A **Light/Dark** toggle in the top toolbar next to **Settings**. On first launch without `portbak.json`, resolve the system appearance and persist **Light** or **Dark**; later launches use the saved choice. Resolve legacy **System** settings once, then persist the result.
