@@ -170,8 +170,12 @@ impl Job {
         if !self.auto_destination || !self.source.is_dir() {
             return Ok(());
         }
-        if self.source != previous.source {
-            return self.set_auto_destination(app_dir);
+        if !previous.auto_destination || self.source != previous.source {
+            if let Err(error) = self.set_auto_destination(app_dir) {
+                self.auto_destination = previous.auto_destination;
+                return Err(error);
+            }
+            return Ok(());
         }
         if self.destination_name != DestinationName::JobName || self.name == previous.name {
             return Ok(());
@@ -400,6 +404,49 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn auto_updates_can_be_reenabled_after_manual_destination_override() {
+        let root = tempfile::tempdir().unwrap();
+        let app = root.path().join("app");
+        let source = root.path().join("source");
+        let manual = root.path().join("manual");
+        for path in [&app, &source, &manual] {
+            std::fs::create_dir(path).unwrap();
+        }
+        std::fs::write(manual.join("keep"), "manual data").unwrap();
+        let mut job = Job {
+            source,
+            target: manual.clone(),
+            auto_destination: false,
+            destination_name: DestinationName::JobName,
+            ..Job::default()
+        };
+        let previous = job.clone();
+        job.auto_destination = true;
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert!(job.auto_destination);
+        assert_ne!(job.target, manual);
+        assert_eq!(
+            std::fs::read_to_string(manual.join("keep")).unwrap(),
+            "manual data"
+        );
+        let previous = job.clone();
+        job.target = manual.clone();
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert!(!job.auto_destination);
+        let previous = job.clone();
+        job.auto_destination = true;
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert!(job.auto_destination);
+        let previous = job.clone();
+        job.name = "Renamed again".into();
+        job.update_auto_destination(&previous, &app).unwrap();
+        assert_eq!(
+            job.target.file_name().unwrap(),
+            format!("{}-Renamed again", job.id).as_str()
+        );
+    }
 
     #[test]
     fn job_named_destination_follows_renames_and_preserves_contents() {

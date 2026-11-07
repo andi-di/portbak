@@ -56,14 +56,38 @@ pub fn display_path(path: &Path) -> String {
 }
 
 pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
+    path_picker_with_auto(ui, label, path, None);
+}
+
+pub fn path_picker_with_auto(
+    ui: &mut egui::Ui,
+    label: &str,
+    path: &mut PathBuf,
+    auto: Option<(bool, bool)>,
+) -> (bool, bool) {
+    let mut changed = false;
+    let mut enable_auto = false;
     caption(ui, label);
     centered_row(ui, |ui| {
-        // Right-to-left so the field takes exactly the width the button leaves.
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some((active, can_enable)) = auto {
+                let button = PixelButton::new("Auto updates")
+                    .sprite(Sprite::Rewind)
+                    .selected(active);
+                enable_auto = ui
+                    .add_enabled(!active && can_enable, button)
+                    .on_hover_text(if active {
+                        "Automatic destination updates are enabled"
+                    } else {
+                        "Use the automatic destination and follow name/source changes"
+                    })
+                    .clicked();
+            }
             let choose = PixelButton::new("Choose folder …").sprite(Sprite::Folder);
             if ui.add(choose).clicked() {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
+                    changed = true;
                 }
             }
             let mut text = display_path(path);
@@ -73,9 +97,11 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) {
                 .hint_text("Type a path or choose a folder");
             if ui.add(editor).changed() {
                 *path = PathBuf::from(text);
+                changed = true;
             }
         });
     });
+    (changed, enable_auto)
 }
 
 pub fn alert(ui: &mut egui::Ui, color: egui::Color32, text: &str) {

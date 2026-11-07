@@ -72,7 +72,8 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 - When automatic destination is checked, show a dropdown with both choices visible without scrolling: **Job name** (default for new jobs) or **Source folder**. Persist the choice with each job.
 - On source selection, create `<app-dir>/backups/<job UUID>-<chosen name>`. An empty job name uses only the UUID, without a suffix. Replace characters unsafe in filenames with underscores; reject destinations within the source.
 - Job-name destinations follow job renames; move the existing destination with its backups, refuse collisions, and report failures. Source-folder destinations stay unchanged on job renames.
-- A manual destination override stops automatic updates for that job. Older jobs without a naming choice retain source-folder naming.
+- Always show an **Auto updates** button beside the destination picker; indicate when active. With a valid source, it restores the generated destination and enables automatic updates without moving the manual destination’s contents. The global setting only supplies the initial state for new jobs.
+- Choosing or typing a manual destination stops automatic updates for that job, including choosing the same folder. Older jobs without a naming choice retain source-folder naming.
 - Existing jobs retain their saved values when loading older configurations.
 
 | Setting | Behavior and default |

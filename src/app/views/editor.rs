@@ -2,8 +2,8 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_MINUTE,
-    DATE_TIME,
+    alert, caption, centered_row, local_time, path_picker, path_picker_with_auto,
+    retention_warnings, DATE_MINUTE, DATE_TIME,
 };
 use crate::app::{App, CachedHistory, HistoryMode};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -249,7 +249,17 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
     ui.add_space(6.0);
     path_picker(ui, "Source folder", &mut job.source);
     ui.add_space(6.0);
-    path_picker(ui, "Destination folder", &mut job.target);
+    let (manual, enable_auto) = path_picker_with_auto(
+        ui,
+        "Destination folder",
+        &mut job.target,
+        Some((job.auto_destination, job.source.is_dir())),
+    );
+    if manual {
+        job.auto_destination = false;
+    } else if enable_auto {
+        job.auto_destination = true;
+    }
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
