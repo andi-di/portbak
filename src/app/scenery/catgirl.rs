@@ -270,7 +270,6 @@ fn show_companion(ui: &mut egui::Ui, full_figure: bool) {
             Color32::WHITE,
         );
     }
-    response.on_hover_text("Click Midnight Neko for another expression");
     ui.add_space(4.0);
     ui.label(
         egui::RichText::new(expression.line())
