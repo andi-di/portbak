@@ -67,12 +67,12 @@ Minimizing keeps the application and scheduler running. Closing the window immed
 
 Each job is independent and has a persistent UUID. Jobs may share source folders or a destination parent directory; their managed backups must remain separate.
 
-- Settings has **Job settings** and **Theme** tabs. The automatic-destination checkbox appears only in Job settings, not in individual jobs.
+- Settings has **Job settings** and **Theme** tabs. Automatic destination and immediate-check options appear in both the settings template and individual jobs; new jobs inherit the template, then retain independent choices.
 - Display Windows drive and network paths without extended-length prefixes in path fields, the settings-file location, and restore details; preserve internal paths for file operations.
 - Persist editable new-job defaults for automatic destination, compression, scheduling, and retention in `portbak.json`; changes affect future jobs only.
 - On source selection, create `<app-dir>/backups/<job UUID>-<job name>`. An empty job name uses only the UUID, without a suffix. Replace characters unsafe in filenames with underscores; reject destinations within the source.
 - Automatic destinations always use the job name and follow job renames; move the existing destination with its backups, refuse collisions, and report failures.
-- Always show an **Auto updates** button beside the destination picker; indicate when active. With a valid source, it restores the generated destination and enables automatic updates without moving the manual destination’s contents. The global setting only supplies the initial state for new jobs.
+- Show a refresh icon beside each job’s **Auto destination folder** checkbox. Enable it with automatic destination checked and a valid source. Refresh restores the generated destination without moving manual-folder contents.
 - Choosing or typing a manual destination stops automatic updates for that job, including choosing the same folder. Older source-named automatic destinations migrate to job-name paths when opened for editing while idle, preserving backups. Ignore obsolete naming-choice fields.
 - Existing jobs retain their saved values when loading older configurations.
 
@@ -109,7 +109,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
 - Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
 - On enabling a schedule, plan its next future occurrence.
-- The global setting **Check immediately when enabled** starts unchecked and applies to existing and new jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
+- The per-job **Check immediately when enabled** option inherits the settings template when created; the template starts unchecked. Later template changes do not affect existing jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.
 - Persist scheduled due times across normal restarts.
 - If the saved due time is overdue after startup or resume, queue exactly one catch-up check. Do not queue one check for every missed occurrence.

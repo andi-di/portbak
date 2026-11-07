@@ -48,6 +48,7 @@ pub struct Job {
     pub enabled: bool,
     pub zip: bool,
     pub auto_destination: bool,
+    pub check_on_enable: bool,
     pub schedule: Schedule,
     pub hour: u32,
     pub minute: u32,
@@ -72,6 +73,7 @@ impl Default for Job {
             enabled: false,
             zip: false,
             auto_destination: false,
+            check_on_enable: false,
             schedule: Schedule::Interval,
             hour: 18,
             minute: 0,
@@ -312,6 +314,7 @@ impl JobDefaults {
     pub fn new_job(&self) -> Job {
         Job {
             auto_destination: self.auto_destination,
+            check_on_enable: self.check_on_enable,
             zip: self.zip,
             schedule: self.schedule,
             hour: self.hour,

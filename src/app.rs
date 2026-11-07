@@ -225,7 +225,7 @@ impl App {
         };
         if was_enabled && !job.enabled {
             self.remove_pending(id);
-        } else if !was_enabled && job.enabled && self.config.job_defaults.check_on_enable {
+        } else if !was_enabled && job.enabled && job.check_on_enable {
             self.enqueue(id);
         }
     }
@@ -609,18 +609,26 @@ mod tests {
     }
 
     #[test]
-    fn immediate_check_setting_applies_to_existing_jobs() {
-        let job = Job::default();
-        let id = job.id;
+    fn job_check_on_enable_is_independent_of_template_changes() {
         let mut config = Config::default();
-        config.jobs.push(job);
+        config.job_defaults.check_on_enable = true;
         let mut app = app_with(config, PathBuf::new());
-        app.config.job_defaults.check_on_enable = true;
+        app.add_job();
+        let id = app.selected.unwrap();
+        app.config.job_defaults.check_on_enable = false;
         let job = app.job_mut(id).unwrap();
+        assert!(job.check_on_enable);
+        let saved: Job = serde_json::from_str(&serde_json::to_string(job).unwrap()).unwrap();
+        assert!(saved.check_on_enable && saved.auto_destination);
         job.enabled = true;
         job.reschedule(Utc::now());
         app.job_activation_changed(id, false);
         assert_eq!(app.queue, VecDeque::from([id]));
+        app.queue.clear();
+        app.job_mut(id).unwrap().check_on_enable = false;
+        app.config.job_defaults.check_on_enable = true;
+        app.job_activation_changed(id, false);
+        assert!(app.queue.is_empty());
     }
 
     #[test]
@@ -647,7 +655,7 @@ mod tests {
         app.job_activation_changed(id, false);
         assert!(app.queue.is_empty());
         app.active = None;
-        app.config.job_defaults.check_on_enable = false;
+        app.job_mut(id).unwrap().check_on_enable = false;
         app.job_activation_changed(id, false);
         assert!(app.queue.is_empty());
         app.queue.push_back(id);
