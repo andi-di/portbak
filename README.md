@@ -86,6 +86,16 @@ cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.28 --locked
 
 The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux-gnu/release/portbak`. Check the actual glibc symbol versions with `readelf --version-info` and launch the release executable. Graphics drivers and desktop libraries must still be available on the target system.
 
+### App source layout
+
+`src/app.rs` owns application state and background operations. Modules under `src/app/` are grouped by responsibility:
+
+- `views/`: main window, job editor, settings, backup history, and shared view widgets.
+- `rendering/`: controls, icons, decorations, glass surfaces, and GPU effects.
+- `scenery/`: animated wallpaper, aquarium, bubbles, wildlife, and splashes.
+- `theme/`: style definitions and the `skins/` registry and presets.
+- `platform/`: platform integration, including the optional Wayland window icon.
+
 ### Linux UI smoke test
 
 ```sh

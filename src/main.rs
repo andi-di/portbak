@@ -54,7 +54,7 @@ fn startup() -> anyhow::Result<()> {
         options,
         Box::new(move |creation| {
             #[cfg(target_os = "linux")]
-            app::wayland_icon::install(creation, app_icon());
+            app::platform::wayland_icon::install(creation, app_icon());
             #[cfg(not(target_os = "linux"))]
             let _ = creation;
             Ok(Box::new(app::App::new(config, path, lock)))
