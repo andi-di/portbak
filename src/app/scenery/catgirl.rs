@@ -55,6 +55,7 @@ impl Expression {
 
     fn line(self) -> &'static str {
         match self {
+            Self::CatSmug => "You know you like having me around.",
             Self::Neutral => "Hmph. I suppose you can stay.",
             Self::Angry => "I wasn't waiting for you!",
             Self::Pout => "A little attention wouldn't hurt…",
