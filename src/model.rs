@@ -19,14 +19,6 @@ pub enum IntervalUnit {
 }
 
 impl IntervalUnit {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Seconds => "Seconds",
-            Self::Minutes => "Minutes",
-            Self::Hours => "Hours",
-        }
-    }
-
     pub fn maximum(self) -> u32 {
         match self {
             Self::Seconds => 31_536_000,
@@ -95,6 +87,16 @@ impl Default for Job {
 }
 
 impl Job {
+    pub fn interval_seconds(&self) -> u32 {
+        self.interval_value.clamp(1, self.interval_unit.maximum())
+            * self.interval_unit.seconds() as u32
+    }
+
+    pub fn set_interval_seconds(&mut self, seconds: u32) {
+        self.interval_value = seconds.clamp(1, IntervalUnit::Seconds.maximum());
+        self.interval_unit = IntervalUnit::Seconds;
+    }
+
     pub fn set_auto_destination(&mut self, app_dir: &std::path::Path) -> anyhow::Result<()> {
         let source = std::fs::canonicalize(&self.source)?;
         let name = source
@@ -160,11 +162,7 @@ impl Job {
 
     fn next_after_in<T: TimeZone>(&self, now: DateTime<Utc>, zone: &T) -> DateTime<Utc> {
         if self.schedule == Schedule::Interval {
-            return now
-                + Duration::seconds(
-                    i64::from(self.interval_value.clamp(1, self.interval_unit.maximum()))
-                        * self.interval_unit.seconds(),
-                );
+            return now + Duration::seconds(i64::from(self.interval_seconds()));
         }
         let date = now.with_timezone(zone).date_naive();
         for day in 0..9 {
@@ -319,6 +317,22 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mixed_interval_duration_preserves_seconds_and_enforces_bounds() {
+        let mut job = JobDefaults::default().new_job();
+        assert_eq!(job.interval_seconds(), 600);
+        job.set_interval_seconds(3600 + 2 * 60 + 3);
+        assert_eq!(job.interval_seconds(), 3723);
+        let now = Utc::now();
+        assert_eq!(job.next_after(now), now + Duration::seconds(3723));
+        let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
+        assert_eq!(saved.interval_seconds(), 3723);
+        job.set_interval_seconds(0);
+        assert_eq!(job.interval_seconds(), 1);
+        job.set_interval_seconds(u32::MAX);
+        assert_eq!(job.interval_seconds(), 31_536_000);
+    }
 
     #[test]
     fn new_jobs_use_saved_defaults_without_changing_existing_jobs() {

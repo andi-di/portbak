@@ -81,7 +81,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 | Schedule mode | Interval by default; display choices in order: Interval, Daily, Weekdays |
 | Local time | 18:00 by default; hours 0–23, minutes 0–59 |
 | Selected weekdays | All seven selected by default; used only in weekday mode |
-| Interval | 10 Minutes (00:10:00) by default; positive whole values with selectable Seconds (1–31,536,000), Minutes (1–525,600), or Hours (1–8,760) |
+| Interval | 00:10:00 by default; editable hours:minutes:seconds, from 00:00:01 to 8760:00:00 |
 | Compress as ZIP | Checkbox; checked by default |
 | Rolling retention | Enabled by default |
 | Maximum count | Checked by default at 20; positive whole number, supporting at least 1–100,000 |
@@ -95,7 +95,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 ### Modes
 
-1. **Interval:** check every configured number of seconds, minutes, or hours. Changing the unit preserves the numeric value, clamped to the new unit’s supported range. Store the value and selected unit independently.
+1. **Interval:** enter a duration as hours:minutes:seconds in jobs and new-job defaults. Minutes and seconds range from 00 to 59; allow hours above 23. Clamp the total to one second through 365 days. Preserve the duration of older saved value/unit settings.
 2. **Daily:** check once per day at the configured local time.
 3. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
 

@@ -2,8 +2,8 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_combo, centered_row, local_time, path_picker, retention_warnings,
-    DATE_MINUTE, DATE_TIME,
+    alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_MINUTE,
+    DATE_TIME,
 };
 use crate::app::{App, CachedHistory, HistoryMode};
 use crate::model::{IntervalUnit, Job, Schedule};
@@ -342,29 +342,32 @@ fn readout(ui: &mut egui::Ui, label: &str, value: &str, color: egui::Color32) {
 }
 
 fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
+    let total = job.interval_seconds();
+    let mut hours = total / 3600;
+    let mut minutes = total / 60 % 60;
+    let mut seconds = total % 60;
     centered_row(ui, |ui| {
         ui.label("Every");
-        ui.add(
-            egui::DragValue::new(&mut job.interval_value).range(1..=job.interval_unit.maximum()),
-        );
-        centered_combo(ui, |ui| {
-            egui::ComboBox::from_id_salt("interval_unit")
-                .selected_text(job.interval_unit.label())
-                .show_ui(ui, |ui| {
-                    pixel::popup(ui, |ui| {
-                        for unit in [
-                            IntervalUnit::Seconds,
-                            IntervalUnit::Minutes,
-                            IntervalUnit::Hours,
-                        ] {
-                            ui.selectable_value(&mut job.interval_unit, unit, unit.label());
-                        }
-                    })
-                })
-        });
-        // A smaller unit can lower the maximum below the current value.
-        job.interval_value = job.interval_value.clamp(1, job.interval_unit.maximum());
+        let mut changed = duration_field(ui, &mut hours, 8760, "Hours");
+        ui.label(":");
+        changed |= duration_field(ui, &mut minutes, 59, "Minutes");
+        ui.label(":");
+        changed |= duration_field(ui, &mut seconds, 59, "Seconds");
+        ui.label("(hh:mm:ss)");
+        if changed {
+            job.set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
+        }
     });
+}
+
+fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str) -> bool {
+    ui.add(
+        egui::DragValue::new(value)
+            .range(0..=maximum)
+            .custom_formatter(|value, _| format!("{:02}", value as u32)),
+    )
+    .on_hover_text(label)
+    .changed()
 }
 
 fn time_row(ui: &mut egui::Ui, job: &mut Job) {

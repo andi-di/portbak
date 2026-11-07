@@ -31,22 +31,6 @@ pub fn centered_row<R>(
     )
 }
 
-/// Gives a combo box a fixed box so it centers like the other controls in a `centered_row`.
-pub fn centered_combo<R>(
-    ui: &mut egui::Ui,
-    contents: impl FnOnce(&mut egui::Ui) -> R,
-) -> egui::InnerResponse<R> {
-    let height = ui
-        .text_style_height(&egui::TextStyle::Button)
-        .max(ui.spacing().icon_width)
-        + ui.spacing().button_padding.y * 2.0;
-    ui.allocate_ui_with_layout(
-        egui::vec2(ui.spacing().combo_width, height),
-        egui::Layout::top_down(egui::Align::Min),
-        contents,
-    )
-}
-
 /// A dim, upper-case field caption.
 pub fn caption(ui: &mut egui::Ui, text: &str) {
     let dim = Palette::of(ui).dim;
@@ -162,13 +146,8 @@ mod tests {
                 centered_row(ui, |ui| {
                     let label = ui.label("Every");
                     let value = ui.add(egui::DragValue::new(&mut 60));
-                    let unit = centered_combo(ui, |ui| {
-                        egui::ComboBox::from_id_salt("unit_test")
-                            .selected_text("Minutes")
-                            .show_ui(ui, |_| {})
-                    })
-                    .inner;
-                    for rect in [value.rect, unit.response.rect] {
+                    let seconds = ui.add(egui::DragValue::new(&mut 0));
+                    for rect in [value.rect, seconds.rect] {
                         assert!(
                             (label.rect.center().y - rect.center().y).abs() < 0.5,
                             "label {:?}, control {rect:?}",

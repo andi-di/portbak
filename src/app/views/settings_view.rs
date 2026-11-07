@@ -94,19 +94,6 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
         let mut job = defaults.new_job();
         super::editor::schedule_controls(ui, &mut job);
         defaults.update_schedule(&job);
-        if defaults.schedule == crate::model::Schedule::Interval {
-            let seconds = match defaults.interval_unit {
-                crate::model::IntervalUnit::Seconds => defaults.interval_value,
-                crate::model::IntervalUnit::Minutes => defaults.interval_value * 60,
-                crate::model::IntervalUnit::Hours => defaults.interval_value * 3600,
-            };
-            ui.label(format!(
-                "Interval: {:02}:{:02}:{:02}",
-                seconds / 3600,
-                seconds / 60 % 60,
-                seconds % 60
-            ));
-        }
     });
     pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         ui.add(PixelCheckbox::new(
