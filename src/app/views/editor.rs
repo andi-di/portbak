@@ -155,6 +155,7 @@ fn job_editor(
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
+    job_status(ui, job);
     if !job.enabled && permissions.backup_running {
         alert(
             ui,
@@ -173,9 +174,6 @@ fn job_editor(
         pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
             retention_settings(ui, job, summary)
         });
-    });
-    pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
-        status_panel(ui, job)
     });
     action
 }
@@ -575,28 +573,28 @@ fn optional_limit<T>(
     });
 }
 
-fn status_panel(ui: &mut egui::Ui, job: &Job) {
+fn job_status(ui: &mut egui::Ui, job: &Job) {
     let palette = Palette::of(ui);
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
-    let color = style::decorative_color(ui.ctx(), palette.gold);
-    readout(ui, "Last backup", &last_backup, color);
-    ui.add_space(2.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.label(
+            egui::RichText::new(format!("Last backup: {last_backup}"))
+                .small()
+                .color(palette.dim),
+        );
+        if !job.status.starts_with("Error") {
+            ui.label(
+                egui::RichText::new(format!("· {}", job.status))
+                    .small()
+                    .color(palette.dim),
+            );
+        }
+    });
     if job.status.starts_with("Error") {
         alert(ui, palette.bad, &job.status);
-    } else {
-        ui.add(egui::Label::new(&job.status).wrap());
     }
-    ui.add_space(8.0);
-    ui.label(
-        egui::RichText::new(
-            "Backups are full copies. Links are skipped. Each check reads all file contents. \
-             Restore from the Backups tab or by copying/extracting.",
-        )
-        .small()
-        .color(palette.dim),
-    );
 }
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {

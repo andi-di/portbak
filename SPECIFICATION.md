@@ -35,6 +35,7 @@ Provide:
 - A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result. Its divider remains at the selected width after dragging and is restored after restarting.
 - Clicking the selected job deselects it and returns to the start screen.
 - At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
+- Show the last backup time and latest result in a compact line below the job header; show errors prominently. Do not use a separate Status pane.
 - An editor for the selected job. Show a green status dot beside enabled job names in the job list, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
 - A **Light/Dark** toggle in the top toolbar next to **Settings**. On first launch without `portbak.json`, resolve the system appearance and persist **Light** or **Dark**; later launches use the saved choice. Resolve legacy **System** settings once, then persist the result.
