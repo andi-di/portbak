@@ -60,7 +60,7 @@ cargo fmt --check
 cargo build --release --locked
 ```
 
-The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow and librsvg’s `rsvg-convert`, available on Debian/Ubuntu as `librsvg2-bin`). The flat icon shows a yellow folder with a graphite anchor encircled by a green circular backup arrow on a transparent background. The renderer uses the SVG master directly.
+The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow and librsvg’s `rsvg-convert`, available on Debian/Ubuntu as `librsvg2-bin`). The flat icon shows a sand-colored folder with a dark petrol anchor encircled by a bold petrol circular backup arrow on a transparent background. The renderer uses the SVG master directly.
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 
