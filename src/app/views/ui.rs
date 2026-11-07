@@ -280,7 +280,7 @@ impl App {
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
-                ui.horizontal_top(|ui| {
+                ui.horizontal(|ui| {
                     let tint = if job.enabled {
                         palette.good
                     } else {
@@ -288,11 +288,17 @@ impl App {
                     };
                     let tint = style::decorative_color(ui.ctx(), tint);
                     sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if let Some(remaining) = job.countdown(Utc::now()) {
-                            ui.label(egui::RichText::new(remaining).small().color(palette.accent));
+                            style::well(ui.ctx()).show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(remaining.to_uppercase())
+                                        .font(style::label_font(ui.ctx()))
+                                        .color(palette.good),
+                                );
+                            });
                         }
-                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.add(
                                 egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
                                     .truncate(),
