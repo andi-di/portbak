@@ -500,4 +500,43 @@ mod tests {
             .width();
         assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
     }
+
+    #[test]
+    fn selected_job_renders_at_minimum_window_width_with_wide_sidebar() {
+        for skin in ["retro", "dark-fantasy"] {
+            for enabled in [false, true] {
+                let config = Config {
+                    skin: skin.into(),
+                    sidebar_width: 460.0,
+                    jobs: vec![Job {
+                        enabled,
+                        ..Job::default()
+                    }],
+                    ..Config::default()
+                };
+                let mut app = App::new(
+                    config,
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                let ctx = egui::Context::default();
+                app.ensure_skin(&ctx);
+                for width in [1100.0, 800.0, 750.0] {
+                    let input = egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width, 600.0),
+                        )),
+                        ..Default::default()
+                    };
+                    let _ = ctx.run(input, |ctx| {
+                        app.show_header(ctx);
+                        app.show_footer(ctx);
+                        app.show_job_list(ctx);
+                        app.show_job_editor(ctx);
+                    });
+                }
+            }
+        }
+    }
 }

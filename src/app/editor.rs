@@ -161,35 +161,44 @@ fn job_editor(
 
 /// The job's floppy, name, state lamp and the power switch for automatic backups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
+    if ui.available_width() < 620.0 {
+        ui.horizontal(|ui| job_identity(ui, job));
+        ui.add_space(8.0);
+        activation_button(ui, job, locked);
+    } else {
+        ui.horizontal(|ui| {
+            ui.allocate_ui(
+                egui::vec2((ui.available_width() - 320.0).max(0.0), 60.0),
+                |ui| {
+                    ui.horizontal(|ui| job_identity(ui, job));
+                },
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                activation_button(ui, job, locked);
+            });
+        });
+    }
+}
+
+fn job_identity(ui: &mut egui::Ui, job: &Job) {
     let palette = Palette::of(ui);
-    ui.horizontal(|ui| {
-        let tint = if job.enabled {
-            palette.good
-        } else {
-            palette.metal
-        };
-        sprites::show(ui, Sprite::Floppy, 5.0, tint);
-        ui.add_space(6.0);
-        let activation_width = 320.0;
-        ui.allocate_ui(
-            egui::vec2(ui.available_width() - activation_width, 60.0),
-            |ui| {
-                ui.vertical(|ui| {
-                    ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
-                    ui.horizontal(|ui| {
-                        let (color, text) = if job.enabled {
-                            (palette.good, "Automatic backups enabled")
-                        } else {
-                            (palette.dim, "Automatic backups disabled")
-                        };
-                        pixel::led(ui, color, job.enabled);
-                        ui.label(egui::RichText::new(text).color(color));
-                    });
-                });
-            },
-        );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            activation_button(ui, job, locked);
+    let tint = if job.enabled {
+        palette.good
+    } else {
+        palette.metal
+    };
+    sprites::show(ui, Sprite::Floppy, 5.0, tint);
+    ui.add_space(6.0);
+    ui.vertical(|ui| {
+        ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
+        ui.horizontal(|ui| {
+            let (color, text) = if job.enabled {
+                (palette.good, "Automatic backups enabled")
+            } else {
+                (palette.dim, "Automatic backups disabled")
+            };
+            pixel::led(ui, color, job.enabled);
+            ui.label(egui::RichText::new(text).color(color));
         });
     });
 }

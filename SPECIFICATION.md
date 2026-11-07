@@ -39,7 +39,7 @@ Provide:
 - A status area showing current activity, progress, and settings-save errors.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
 
 ### Job actions
 
@@ -276,6 +276,7 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Protected versions with exceeded limits | Keep protected and newest versions; delete only eligible unprotected versions; report remaining excess |
 | Protection consumes count/size budget | Warn at three remaining places or 20% remaining size budget, inclusive |
 | History crosses local midnight | Highlight the first listed version of each local day in both dialogs |
+| Narrow window with a wide job list | Selected job remains visible and usable without a crash |
 | Resize job list, then release and restart | Divider stays at the chosen width and is restored after restart |
 | Restart after normal edits | Settings, theme, next due time, and results restored |
 | Corrupt metadata or unsafe stored path | Explicit error; no destructive fallback |
