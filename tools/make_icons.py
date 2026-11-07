@@ -8,19 +8,19 @@ from pathlib import Path
 
 from PIL import Image
 
+PIXEL_GRID = 64
 PNG_SIZES = [16, 24, 32, 48, 64, 128, 256, 512, 1024]
 ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 OUT = Path(__file__).resolve().parent.parent / "assets" / "icon"
 
 
 def render(target):
-    side = target * 4
     result = subprocess.run(
-        ["rsvg-convert", "--width", str(side), "--height", str(side)],
+        ["rsvg-convert", "--width", str(PIXEL_GRID), "--height", str(PIXEL_GRID)],
         input=(OUT / "portbak.svg").read_bytes(), capture_output=True, check=True,
     )
     with Image.open(io.BytesIO(result.stdout)) as image:
-        return image.convert("RGBA").resize((target, target), Image.Resampling.LANCZOS)
+        return image.convert("RGBA").resize((target, target), Image.Resampling.NEAREST)
 
 
 def main():

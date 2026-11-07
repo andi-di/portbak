@@ -62,7 +62,7 @@ cargo fmt --check
 cargo build --release --locked
 ```
 
-The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow and librsvg’s `rsvg-convert`, available on Debian/Ubuntu as `librsvg2-bin`). The flat icon shows an amber folder (`#F2AA4C`) with a dark anchor, outline, and circular backup arrow (`#101820`) on a transparent background. The renderer uses the SVG master directly.
+The output is `target/release/portbak` on Linux or `target/release/portbak.exe` on Windows. The release profile uses size optimization, LTO, and stripped debug symbols. UI resources are embedded. Each platform requires its own build. The icon master is `assets/icon/portbak.svg`; regenerate the PNG sizes and `portbak.ico` with `python tools/make_icons.py` (requires Pillow and librsvg’s `rsvg-convert`, available on Debian/Ubuntu as `librsvg2-bin`). The retro gaming icon shows a gold folder (`#FFD23F`) and cyan backup arrow (`#2CE8F5`) with dark outlines (`#0E081D`) on a filled purple circle (`#2B1E52`) with a lighter purple rim (`#4C3B85`). The area outside the circle is transparent. The SVG uses a finer 64 × 64 pixel grid; exports use nearest-neighbor scaling to preserve sharp pixel edges.
 
 Debian/Ubuntu build dependencies include `build-essential pkg-config libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev`. Windows builds require Rust with the MSVC toolchain and Visual Studio C++ Build Tools.
 
