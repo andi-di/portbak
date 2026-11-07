@@ -1,4 +1,15 @@
+# Build output
+/dist/
 /target
+
+# Local app data
 /portbak.json
 /portbak.lock
-/dist/
+
+# Local working files
+/agent-local/
+/todos/
+
+# Temporary directories
+/temp/
+/tmp/
