@@ -195,21 +195,18 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
                     ui.horizontal(|ui| job_identity(ui, job));
                 },
             );
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                action = job_controls(ui, job, permissions);
-            });
+            action = job_controls(ui, job, permissions);
         });
     }
     action
 }
 
 fn job_controls(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
-    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-        activation_button(ui, job, permissions.locked);
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         let mut action = None;
         for (label, sprite, tone, candidate) in [
-            ("Check now", Sprite::Play, Tone::Accent, JobAction::Check),
             ("Remove job", Sprite::Trash, Tone::Danger, JobAction::Remove),
+            ("Check now", Sprite::Play, Tone::Accent, JobAction::Check),
         ] {
             let button = PixelButton::new(label)
                 .icon_only()
@@ -225,6 +222,7 @@ fn job_controls(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> 
                 action = Some(candidate);
             }
         }
+        activation_button(ui, job, permissions.locked);
         action
     })
     .inner

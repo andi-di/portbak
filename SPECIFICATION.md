@@ -34,7 +34,7 @@ Provide:
 
 - A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result. Its divider remains at the selected width after dragging and is restored after restarting.
 - Clicking the selected job deselects it and returns to the start screen.
-- Place **Check now** and **Remove job** beside the automatic-backup power button at the top of the job editor, with **Remove job** on the right.
+- Right-align the automatic-backup power, **Check now**, and **Remove job** buttons at the top of the job editor, with **Remove job** on the far right.
 - An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
 - A **Light/Dark** toggle in the top toolbar next to **Settings**. On first launch without `portbak.json`, resolve the system appearance and persist **Light** or **Dark**; later launches use the saved choice. Resolve legacy **System** settings once, then persist the result.
