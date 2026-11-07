@@ -156,7 +156,7 @@ fn job_editor(
     summary: Option<&CachedHistory>,
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
-    job_banner(ui, job, permissions.locked);
+    let action = job_banner(ui, job, permissions);
     if !job.enabled && permissions.backup_running {
         alert(
             ui,
@@ -176,30 +176,60 @@ fn job_editor(
             retention_settings(ui, job, summary)
         });
     });
-    pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
+    let status_action = pixel::section(ui, "Status", Sprite::Monitor, palette.gold, |ui| {
         status_panel(ui, job, permissions)
-    })
+    });
+    action.or(status_action)
 }
 
-/// The job's floppy, name, state lamp and the power switch for automatic backups.
-fn job_banner(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
+/// Keep job actions beside the identity, or below it in narrow windows.
+fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
+    let mut action = None;
     if ui.available_width() < 620.0 {
         ui.horizontal(|ui| job_identity(ui, job));
         ui.add_space(8.0);
-        activation_button(ui, job, locked);
+        action = job_controls(ui, job, permissions);
     } else {
         ui.horizontal(|ui| {
             ui.allocate_ui(
-                egui::vec2((ui.available_width() - 72.0).max(0.0), 60.0),
+                egui::vec2((ui.available_width() - 188.0).max(0.0), 60.0),
                 |ui| {
                     ui.horizontal(|ui| job_identity(ui, job));
                 },
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                activation_button(ui, job, locked);
+                action = job_controls(ui, job, permissions);
             });
         });
     }
+    action
+}
+
+fn job_controls(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
+    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        activation_button(ui, job, permissions.locked);
+        let mut action = None;
+        for (label, sprite, tone, candidate) in [
+            ("Check now", Sprite::Play, Tone::Accent, JobAction::Check),
+            ("Remove job", Sprite::Trash, Tone::Danger, JobAction::Remove),
+        ] {
+            let button = PixelButton::new(label)
+                .icon_only()
+                .sprite(sprite)
+                .tone(tone)
+                .min_size(egui::vec2(52.0, 52.0));
+            if ui
+                .add_enabled(!permissions.busy, button)
+                .on_hover_text(label)
+                .on_disabled_hover_text(label)
+                .clicked()
+            {
+                action = Some(candidate);
+            }
+        }
+        action
+    })
+    .inner
 }
 
 fn job_identity(ui: &mut egui::Ui, job: &Job) {
@@ -551,13 +581,6 @@ fn action_buttons(ui: &mut egui::Ui, permissions: &Permissions) -> Option<JobAct
     let can_open_history = can_edit && permissions.idle;
     let buttons = [
         (
-            "Check now",
-            Sprite::Play,
-            Tone::Accent,
-            can_edit,
-            JobAction::Check,
-        ),
-        (
             "Restore backup…",
             Sprite::Rewind,
             Tone::Plain,
@@ -570,13 +593,6 @@ fn action_buttons(ui: &mut egui::Ui, permissions: &Permissions) -> Option<JobAct
             Tone::Plain,
             can_open_history,
             JobAction::Manage,
-        ),
-        (
-            "Remove job",
-            Sprite::Trash,
-            Tone::Danger,
-            can_edit,
-            JobAction::Remove,
         ),
     ];
     let mut clicked = None;
