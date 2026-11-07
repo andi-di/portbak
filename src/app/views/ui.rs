@@ -265,7 +265,6 @@ impl App {
     fn job_card(&self, ui: &mut egui::Ui, job: &Job) -> bool {
         let palette = Palette::of(ui);
         let selected = self.selected == Some(job.id);
-        let running = self.active == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
         let card_id = ui.id().with(job.id);
         // The card's hover is only known after its contents, so wake the icon from last frame's.
@@ -277,7 +276,6 @@ impl App {
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         let width = ui.available_width() - CARD_SHADOW;
-        let mut lamp = egui::Rect::NOTHING;
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
@@ -290,48 +288,16 @@ impl App {
                     };
                     let tint = style::decorative_color(ui.ctx(), tint);
                     sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
-                    ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 2.0;
-                        ui.add(
-                            egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
-                                .truncate(),
-                        );
-                        ui.horizontal(|ui| {
-                            let (color, lit) = match (running, job.enabled) {
-                                (true, _) => (palette.gold, pixel::blink(ui, 0.25)),
-                                (false, true) => (palette.good, true),
-                                (false, false) => (palette.dim, false),
-                            };
-                            lamp = pixel::led(ui, color, lit).rect;
-                            ui.label(egui::RichText::new(self.activity(job)).small());
-                            if self.queue.contains(&job.id) {
-                                pixel::badge(ui, "Queued", palette.hot);
-                            }
-                        });
-                        if running {
-                            pixel::marquee(ui, ui.available_width().min(160.0), palette.gold);
-                        }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                         if let Some(remaining) = job.countdown(Utc::now()) {
-                            ui.horizontal(|ui| {
-                                sprites::show(ui, Sprite::Clock, 1.0, palette.paper);
-                                ui.label(
-                                    egui::RichText::new(format!("Next check in: {remaining}"))
-                                        .small()
-                                        .color(palette.accent),
-                                );
-                            });
+                            ui.label(egui::RichText::new(remaining).small().color(palette.accent));
                         }
-                        let status_color = if job.status.starts_with("Error") {
-                            palette.bad
-                        } else {
-                            palette.dim
-                        };
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(&job.status).small().color(status_color),
-                            )
-                            .wrap(),
-                        );
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                            ui.add(
+                                egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
+                                    .truncate(),
+                            );
+                        });
                     });
                 });
             });
@@ -339,22 +305,12 @@ impl App {
         let response = ui
             .interact(rect, card_id, egui::Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        pixel::tooltip(ui, lamp, card_id.with("lamp"), self.activity(job));
         ui.painter().set(
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),
         );
         ui.add_space(CARD_SHADOW + 4.0);
         response.clicked()
-    }
-
-    fn activity(&self, job: &Job) -> &'static str {
-        match (self.active == Some(job.id), self.restoring, job.enabled) {
-            (true, true, _) => "Restore running",
-            (true, false, _) => "Backup running",
-            (false, _, true) => "Schedule enabled",
-            (false, _, false) => "Schedule disabled",
-        }
     }
 }
 
