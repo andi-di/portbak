@@ -31,8 +31,11 @@ Larger action icons and borderless utility controls improve readability. Saya's
 pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
 A quiet moonlit rose garden has cursor-aware bats, falling petals and a sparse
-petal/crescent pointer trail. Turn these animations off in Settings > Theme to
-keep a still garden.
+petal/crescent pointer trail. Effects are always enabled in this look. Bats use
+smooth wing motion and face their direction of travel; varied petals tumble
+through the garden. The pointer has a faceted silver finish. Saya's sidebar
+expression stays while hovered and returns to neutral three seconds after the
+pointer leaves, with varied dialogue for each expression.
 
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 

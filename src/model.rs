@@ -370,7 +370,6 @@ pub struct Config {
     pub theme: Theme,
     /// Id of the chosen skin; unknown ids fall back to the default skin.
     pub skin: String,
-    pub midnight_neko_animations: bool,
     pub job_defaults: JobDefaults,
     pub sidebar_width: f32,
     pub jobs: Vec<Job>,
@@ -382,7 +381,6 @@ impl Default for Config {
             version: 1,
             theme: Theme::System,
             skin: "retro".into(),
-            midnight_neko_animations: true,
             job_defaults: JobDefaults::default(),
             sidebar_width: 290.0,
             jobs: vec![],
@@ -432,16 +430,6 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn midnight_neko_motion_defaults_on_and_saved_choice_survives_restart() {
-        let mut config: Config = serde_json::from_str("{}").unwrap();
-        assert!(config.midnight_neko_animations);
-        config.midnight_neko_animations = false;
-        let saved = serde_json::to_string(&config).unwrap();
-        let restored: Config = serde_json::from_str(&saved).unwrap();
-        assert!(!restored.midnight_neko_animations);
-    }
 
     #[test]
     fn protected_budget_option_defaults_off_and_is_inherited_independently() {

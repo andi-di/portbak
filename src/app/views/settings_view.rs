@@ -74,13 +74,6 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
                 for candidate in skins::ALL {
                     skin_card(ui, candidate, &mut config.skin);
                 }
-                if config.skin == "midnight-neko" {
-                    ui.add_space(10.0);
-                    ui.add(PixelCheckbox::new(
-                        &mut config.midnight_neko_animations,
-                        "Animate garden, bats and cursor effects",
-                    ));
-                }
             });
         }
     }
