@@ -37,6 +37,8 @@ through the garden. A faceted silver arrowhead and matching pointing gauntlet
 style the normal and clickable cursors. Saya's sidebar
 expression stays while hovered and returns to neutral three seconds after the
 pointer leaves, with varied dialogue for each expression.
+The footer's silver crescent and crimson gem animate during backup activity,
+with progress available in its tooltip.
 
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 

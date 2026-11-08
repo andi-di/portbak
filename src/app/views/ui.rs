@@ -180,6 +180,14 @@ impl App {
                                 .max_rect(rect)
                                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
                             |ui| {
+                                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                                    crate::app::rendering::gothic::activity(
+                                        ui.painter(),
+                                        rect,
+                                        active,
+                                    );
+                                    return;
+                                }
                                 pixel::led(
                                     ui,
                                     if active { palette.gold } else { palette.dim },

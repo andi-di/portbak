@@ -306,6 +306,58 @@ pub fn lamp(painter: &egui::Painter, rect: Rect, color: Color32) {
     diamond(painter, rect.center(), 4.0, color);
 }
 
+pub fn activity(painter: &egui::Painter, rect: Rect, active: bool) {
+    let palette = Palette::of_ctx(painter.ctx());
+    let time = painter.ctx().input(|input| input.time) as f32;
+    let center = egui::pos2(rect.left() + 13.0, rect.center().y);
+    let silver = if active {
+        palette.metal
+    } else {
+        mix(palette.metal, palette.sunken, 0.4)
+    };
+    let arc: Vec<_> = (0..25)
+        .map(|step| {
+            let angle = 0.65 + step as f32 / 24.0 * 5.0;
+            center + Vec2::angled(angle) * 9.0
+        })
+        .collect();
+    painter.add(egui::Shape::line(arc, Stroke::new(1.6_f32, silver)));
+    let pulse = if active {
+        0.35 + 0.2 * (time * 4.0).sin()
+    } else {
+        0.05
+    };
+    diamond(
+        painter,
+        center,
+        5.0,
+        mix(palette.accent, palette.hot, pulse),
+    );
+    painter.line_segment(
+        [center - egui::vec2(2.0, 2.0), center - egui::vec2(0.0, 3.5)],
+        Stroke::new(1.0_f32, palette.paper),
+    );
+    let start = egui::pos2(rect.left() + 28.0, rect.center().y);
+    let end = egui::pos2(rect.right() - 3.0, rect.center().y);
+    painter.line_segment([start, end], Stroke::new(0.8_f32, palette.outline));
+    for index in 0..5 {
+        diamond(painter, start.lerp(end, index as f32 / 4.0), 1.8, silver);
+    }
+    if active {
+        let orbit = center + Vec2::angled(time * 2.3) * 9.0;
+        diamond(painter, orbit, 2.2, palette.paper);
+        diamond(
+            painter,
+            start.lerp(end, (time * 0.45).fract()),
+            3.0,
+            palette.hot,
+        );
+        painter
+            .ctx()
+            .request_repaint_after(std::time::Duration::from_millis(50));
+    }
+}
+
 pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool, enabled: bool) {
     let palette = Palette::of_ctx(painter.ctx());
     painter.rect_filled(rect, 3, fill);
