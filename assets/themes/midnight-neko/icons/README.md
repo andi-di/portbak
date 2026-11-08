@@ -36,7 +36,7 @@ The current Saya job heads, normalization palette, previews and prompts live in
   mean automatic backups are disabled.
   Use the same fixed reference palette in both modes, with no white or silver
   outer contour. Favor broad faces and clear eyes. Keep status necks short and
-  tapered; the job-title avatar is head-only, without a choker or neck.
+  tapered, with clear separation between chin, pale neck and a thin choker.
 - Utility controls show their frame only on hover, keyboard focus or selection.
 - Validate enabled button text and icon contrast at 4.5:1 or higher across both
   palettes and normal, hovered and pressed states. Checkboxes use the same
