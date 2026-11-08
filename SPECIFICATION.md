@@ -46,7 +46,7 @@ Provide:
   - First successful backup: Celebrating; later backup: Smug; no changes: Bored expectant; failure: Sad.
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.
   - New job: Happy; Check now: Energetic; Remove job: Pouting; Settings: Curious; select job: Waiting; Dark mode: Happy; Light mode: Sleepy.
-- Midnight Neko shows a dedicated neutral Saya pixel head beside the job title.
+- Midnight Neko shows a dedicated neutral Saya pixel head beside the job title. All job heads use broad readable faces, the same reference palette in both modes, and no added pale border. The title head has no neck or choker.
 - Midnight Neko job cards use distinct Saya heads for jobs with automatic backups enabled (alert eyes and play badge) or disabled (closed eyes and pause badge).
 - Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered or during a cooldown. Keep expression and dialogue unchanged while hovered otherwise, deferring automatic and action reactions until the pointer leaves; return to neutral after three seconds away. The welcome figure stays static and does not react to clicks. Scale the sidebar figure to keep Saya visible in small windows.
   - Each expression, including neutral, has at least four matching dialogue lines. Pick a line on expression changes, keep it stable while visible, and avoid repeating that expression's previous line during the session.

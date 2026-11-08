@@ -4,8 +4,8 @@ Each function has its own transparent PNG; do not combine icons into a sprite
 sheet. Generation prompts and masters live locally under
 `agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
 The archive emblem and shield-shaped job controls are in `v3/`.
-The dedicated Saya job-title head and prompt live in
-`agent-local/refinements/characters/saya/pixel-head/job-title/`.
+The current Saya job heads, normalization palette, previews and prompts live in
+`agent-local/refinements/characters/saya/pixel-head/job-icons-v2/`.
 
 ## Resolution and size
 
@@ -34,7 +34,9 @@ The dedicated Saya job-title head and prompt live in
 - Job heads retain Saya's character colors. Alert open eyes and a play badge
   mean automatic backups are enabled; relaxed closed eyes and a pause badge
   mean automatic backups are disabled.
-  A narrow mode-specific contour separates the hair from the panel.
+  Use the same fixed reference palette in both modes, with no white or silver
+  outer contour. Favor broad faces and clear eyes. Keep status necks short and
+  tapered; the job-title avatar is head-only, without a choker or neck.
 - Utility controls show their frame only on hover, keyboard focus or selection.
 - Validate enabled button text and icon contrast at 4.5:1 or higher across both
   palettes and normal, hovered and pressed states. Checkboxes use the same

@@ -496,6 +496,58 @@ mod tests {
     }
 
     #[test]
+    fn saya_heads_keep_the_reference_palette_without_mode_specific_borders() {
+        let palette = [
+            [53, 37, 44],
+            [35, 24, 31],
+            [88, 66, 80],
+            [103, 29, 54],
+            [241, 208, 202],
+            [202, 155, 147],
+            [72, 97, 59],
+            [161, 175, 130],
+            [246, 232, 226],
+        ];
+        for (name, dark, light) in [
+            (
+                "active",
+                asset!("job-active", true).1,
+                asset!("job-active", false).1,
+            ),
+            (
+                "paused",
+                asset!("job-inactive", true).1,
+                asset!("job-inactive", false).1,
+            ),
+            (
+                "title",
+                asset!("job-title", true).1,
+                asset!("job-title", false).1,
+            ),
+        ] {
+            let dark = image::load_from_memory(dark).unwrap().to_rgba8();
+            let light = image::load_from_memory(light).unwrap().to_rgba8();
+            assert_eq!(dark.dimensions(), (128, 128));
+            assert!(
+                dark == light,
+                "{name} changes colors or contour between modes"
+            );
+            for pixel in dark.pixels().filter(|pixel| pixel[3] > 0) {
+                assert!(
+                    palette.contains(&[pixel[0], pixel[1], pixel[2]]),
+                    "{name}: unexpected palette color {pixel:?}"
+                );
+            }
+            if name != "paused" {
+                assert!(
+                    dark.pixels().any(|pixel| pixel.0 == [72, 97, 59, 255]),
+                    "{name}: missing moss-green eyes"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn icon_variants_match_geometry_and_contrast_control_surfaces() {
         let skin = crate::app::theme::skins::find("midnight-neko");
         for sprite in Sprite::ALL {
