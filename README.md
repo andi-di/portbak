@@ -24,6 +24,10 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Midnight Neko** in Settings. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
+Midnight Neko pairs Saya-inspired burgundy and plum-black surfaces with ivory,
+silver, and moss-green accents. Its individual pixel icons distinguish actions,
+backup types, scheduling options, and navigation in both light and dark modes.
+
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 
 On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.

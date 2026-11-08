@@ -364,9 +364,9 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
         let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Rewind),
-            (Schedule::Daily, "Daily", Sprite::Sun),
-            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
+            (Schedule::Interval, "Interval", Sprite::Interval),
+            (Schedule::Daily, "Daily", Sprite::Daily),
+            (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
         ];
         for (schedule, label, sprite) in modes {
             pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
@@ -595,7 +595,13 @@ fn job_status(ui: &mut egui::Ui, job: &Job) {
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
     ui.horizontal(|ui| {
-        pixel::choice(ui, backups, false, "Job settings", Some(Sprite::Folder));
+        pixel::choice(
+            ui,
+            backups,
+            false,
+            "Job settings",
+            Some(Sprite::JobSettings),
+        );
         pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);

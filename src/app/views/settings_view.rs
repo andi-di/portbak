@@ -47,7 +47,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
             pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let back = PixelButton::new("Back to jobs")
-                    .sprite(Sprite::Rewind)
+                    .sprite(Sprite::Back)
                     .tone(Tone::Accent);
                 ui.add(back).clicked()
             })
@@ -61,15 +61,15 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
             tab,
             SettingsTab::Jobs,
             "Job settings",
-            Some(Sprite::Folder),
+            Some(Sprite::JobSettings),
         );
-        pixel::choice(ui, tab, SettingsTab::Theme, "Theme", Some(Sprite::Monitor));
+        pixel::choice(ui, tab, SettingsTab::Theme, "Theme", Some(Sprite::Theme));
     });
     ui.add_space(14.0);
     match tab {
         SettingsTab::Jobs => job_defaults(ui, &mut config.job_defaults),
         SettingsTab::Theme => {
-            pixel::section(ui, "Theme", Sprite::Monitor, palette.hot, |ui| {
+            pixel::section(ui, "Theme", Sprite::Theme, palette.hot, |ui| {
                 caption(ui, "Look");
                 for candidate in skins::ALL {
                     skin_card(ui, candidate, &mut config.skin);

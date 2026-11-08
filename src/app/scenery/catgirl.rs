@@ -96,7 +96,6 @@ impl Expression {
 
 #[derive(Clone, Copy, Debug)]
 enum Source {
-    Expressions,
     Portraits,
     FullBody,
 }
@@ -104,9 +103,6 @@ enum Source {
 impl Source {
     fn bytes(self) -> &'static [u8] {
         match self {
-            Self::Expressions => {
-                include_bytes!("../../../assets/themes/midnight-neko/pixel-face.png")
-            }
             Self::Portraits => {
                 include_bytes!("../../../assets/themes/midnight-neko/portraits.png")
             }
@@ -176,22 +172,6 @@ fn cached_texture(
     result
 }
 
-fn texture(ctx: &egui::Context, source: Source, icon: bool) -> Result<egui::TextureHandle, String> {
-    cached_texture(
-        ctx,
-        egui::Id::new(format!("midnight_neko_{source:?}_{icon}")),
-        if icon {
-            egui::TextureOptions::NEAREST
-        } else {
-            egui::TextureOptions::LINEAR
-        },
-        || {
-            let image = source_image(ctx, source)?;
-            Ok(image.to_rgba8())
-        },
-    )
-}
-
 fn portrait_texture(
     ctx: &egui::Context,
     expression: Expression,
@@ -217,19 +197,6 @@ fn portrait_texture(
             Ok(crop)
         },
     )
-}
-
-pub fn paint_icon(painter: &egui::Painter, rect: Rect) {
-    if let Ok(texture) = texture(painter.ctx(), Source::Expressions, true) {
-        let size = texture.size_vec2();
-        let fitted = size * (rect.width() / size.x).min(rect.height() / size.y);
-        painter.image(
-            texture.id(),
-            Rect::from_center_size(rect.center(), fitted),
-            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
-    }
 }
 
 pub fn reserved_height(width: f32) -> f32 {

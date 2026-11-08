@@ -29,11 +29,18 @@ pub enum Sprite {
     Cursor,
     Plus,
     Gear,
+    Back,
+    JobSettings,
+    Theme,
+    FolderBackup,
+    Interval,
+    Daily,
+    Weekdays,
 }
 
 impl Sprite {
     #[cfg(test)]
-    pub const ALL: [Sprite; 18] = [
+    pub const ALL: [Sprite; 25] = [
         Sprite::Floppy,
         Sprite::Folder,
         Sprite::Clock,
@@ -52,22 +59,29 @@ impl Sprite {
         Sprite::Cursor,
         Sprite::Plus,
         Sprite::Gear,
+        Sprite::Back,
+        Sprite::JobSettings,
+        Sprite::Theme,
+        Sprite::FolderBackup,
+        Sprite::Interval,
+        Sprite::Daily,
+        Sprite::Weekdays,
     ];
 
     fn bitmap(self) -> Bitmap {
         match self {
             Sprite::Floppy => FLOPPY,
-            Sprite::Folder => FOLDER,
-            Sprite::Clock => CLOCK,
+            Sprite::Folder | Sprite::JobSettings | Sprite::FolderBackup => FOLDER,
+            Sprite::Clock | Sprite::Weekdays => CLOCK,
             Sprite::Shield => SHIELD,
             Sprite::Trash => TRASH,
-            Sprite::Rewind => REWIND,
+            Sprite::Rewind | Sprite::Back | Sprite::Interval => REWIND,
             Sprite::Play => PLAY,
             Sprite::Chest => CHEST,
             Sprite::Package => PACKAGE,
-            Sprite::Sun => SUN,
+            Sprite::Sun | Sprite::Daily => SUN,
             Sprite::Moon => MOON,
-            Sprite::Monitor => MONITOR,
+            Sprite::Monitor | Sprite::Theme => MONITOR,
             Sprite::Warning => WARNING,
             Sprite::Power => POWER,
             Sprite::Check => CHECK,
@@ -297,8 +311,8 @@ pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
             egui::vec2(width as f32, bitmap.len() as f32)
         }
         Finish::Engraved | Finish::Glass => glyphs::grid(sprite),
-        Finish::Gothic if sprite == Sprite::Floppy => egui::vec2(16.0, 16.0),
-        Finish::Modern | Finish::Gothic => glyphs::grid(sprite) * 0.8,
+        Finish::Gothic => egui::vec2(12.0, 12.0),
+        Finish::Modern => glyphs::grid(sprite) * 0.8,
     };
     grid * scale
 }
@@ -322,11 +336,7 @@ pub fn paint_awake(
         Finish::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
         Finish::Gothic => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
-            if sprite == Sprite::Floppy {
-                crate::app::scenery::catgirl::paint_icon(painter, rect);
-            } else {
-                crate::app::rendering::gothic::icon(painter, rect, sprite);
-            }
+            crate::app::rendering::gothic::icon(painter, rect, sprite);
         }
         Finish::Modern => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));

@@ -6,47 +6,24 @@ use crate::app::theme::style::{self, Palette};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
 pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
-    let cell = match sprite {
-        Sprite::Folder => 0,
-        Sprite::Clock => 1,
-        Sprite::Shield => 2,
-        Sprite::Trash => 3,
-        Sprite::Rewind => 4,
-        Sprite::Play => 5,
-        Sprite::Chest => 6,
-        Sprite::Package => 7,
-        Sprite::Sun => 8,
-        Sprite::Moon => 9,
-        Sprite::Monitor => 10,
-        Sprite::Warning => 11,
-        Sprite::Power => 12,
-        Sprite::Check => 13,
-        Sprite::Plus => 14,
-        Sprite::Gear => 15,
-        Sprite::Floppy | Sprite::Cursor => {
-            crate::app::scenery::catgirl::paint_icon(painter, rect);
-            return;
-        }
-    };
-    let id = egui::Id::new("midnight_neko_icons_v3");
+    let (name, bytes) = icon_asset(sprite);
+    let id = egui::Id::new(("saya_icon", name));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
-        let result = image::load_from_memory(include_bytes!(
-            "../../../assets/themes/midnight-neko/icons.png"
-        ))
-        .map(|image| {
-            let rgba = image.to_rgba8();
-            painter.ctx().load_texture(
-                "Midnight Neko icons",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [rgba.width() as usize, rgba.height() as usize],
-                    rgba.as_raw(),
-                ),
-                egui::TextureOptions::LINEAR,
-            )
-        })
-        .map_err(|error| format!("Could not load Gothic icons: {error}"));
+        let result = image::load_from_memory(bytes)
+            .map(|image| {
+                let rgba = image.to_rgba8();
+                painter.ctx().load_texture(
+                    name,
+                    egui::ColorImage::from_rgba_unmultiplied(
+                        [rgba.width() as usize, rgba.height() as usize],
+                        rgba.as_raw(),
+                    ),
+                    egui::TextureOptions::NEAREST,
+                )
+            })
+            .map_err(|error| format!("Could not load Saya icon {name}: {error}"));
         if let Err(error) = &result {
             eprintln!("{error}");
         }
@@ -56,13 +33,121 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
         result
     });
     if let Ok(texture) = texture {
-        let min = egui::pos2((cell % 4) as f32 / 4.0, (cell / 4) as f32 / 4.0);
         painter.image(
             texture.id(),
             rect,
-            Rect::from_min_max(min, min + Vec2::splat(0.25)),
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
             Color32::WHITE,
         );
+    }
+}
+
+fn icon_asset(sprite: Sprite) -> (&'static str, &'static [u8]) {
+    match sprite {
+        Sprite::Floppy => (
+            "job",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/job.png").as_slice(),
+        ),
+        Sprite::Folder => (
+            "choose-folder",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/choose-folder.png")
+                .as_slice(),
+        ),
+        Sprite::Clock => (
+            "schedule",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/schedule.png").as_slice(),
+        ),
+        Sprite::Shield => (
+            "protection",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/protection.png").as_slice(),
+        ),
+        Sprite::Trash => (
+            "remove-job",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/remove-job.png").as_slice(),
+        ),
+        Sprite::Rewind => (
+            "restore",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/restore.png").as_slice(),
+        ),
+        Sprite::Play => (
+            "check-now",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/check-now.png").as_slice(),
+        ),
+        Sprite::Chest => (
+            "backups",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/backups.png").as_slice(),
+        ),
+        Sprite::Package => (
+            "zip-backup",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/zip-backup.png").as_slice(),
+        ),
+        Sprite::Sun => (
+            "light",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/light.png").as_slice(),
+        ),
+        Sprite::Moon => (
+            "dark",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/dark.png").as_slice(),
+        ),
+        Sprite::Monitor => (
+            "open-location",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/open-location.png")
+                .as_slice(),
+        ),
+        Sprite::Warning => (
+            "warning",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/warning.png").as_slice(),
+        ),
+        Sprite::Power => (
+            "automatic",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/automatic.png").as_slice(),
+        ),
+        Sprite::Check => (
+            "checked",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/checked.png").as_slice(),
+        ),
+        Sprite::Cursor => (
+            "backup-date",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/backup-date.png").as_slice(),
+        ),
+        Sprite::Plus => (
+            "new-job",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/new-job.png").as_slice(),
+        ),
+        Sprite::Gear => (
+            "settings",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/settings.png").as_slice(),
+        ),
+        Sprite::Back => (
+            "back",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/back.png").as_slice(),
+        ),
+        Sprite::JobSettings => (
+            "job-settings",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/job-settings.png")
+                .as_slice(),
+        ),
+        Sprite::Theme => (
+            "theme",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/theme.png").as_slice(),
+        ),
+        Sprite::FolderBackup => (
+            "folder-backup",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/folder-backup.png")
+                .as_slice(),
+        ),
+        Sprite::Interval => (
+            "interval",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/interval.png").as_slice(),
+        ),
+        Sprite::Daily => (
+            "daily",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/daily.png").as_slice(),
+        ),
+        Sprite::Weekdays => (
+            "weekdays",
+            include_bytes!("../../../assets/themes/midnight-neko/icons/weekdays.png").as_slice(),
+        ),
     }
 }
 
@@ -266,4 +351,37 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite) {
                 );
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn icons_share_resolution_padding_and_visible_extent() {
+        let mut names = std::collections::HashSet::new();
+        for sprite in Sprite::ALL {
+            let (name, bytes) = icon_asset(sprite);
+            assert!(names.insert(name), "duplicate icon for {sprite:?}");
+            let image = image::load_from_memory(bytes).unwrap().to_rgba8();
+            assert_eq!(image.dimensions(), (128, 128), "{name}");
+            let mut bounds = (128, 128, 0, 0);
+            for (x, y, pixel) in image.enumerate_pixels() {
+                if pixel[3] != 0 {
+                    bounds.0 = bounds.0.min(x);
+                    bounds.1 = bounds.1.min(y);
+                    bounds.2 = bounds.2.max(x + 1);
+                    bounds.3 = bounds.3.max(y + 1);
+                }
+            }
+            let (left, top, right, bottom) = bounds;
+            assert!(
+                left >= 12 && top >= 12 && right <= 116 && bottom <= 116,
+                "{name}"
+            );
+            assert_eq!((right - left).max(bottom - top), 104, "{name}");
+            assert!(left.abs_diff(128 - right) <= 1, "{name}");
+            assert!(top.abs_diff(128 - bottom) <= 1, "{name}");
+        }
+    }
 }
