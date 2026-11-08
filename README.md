@@ -45,7 +45,8 @@ style the normal and clickable cursors. Saya's sidebar
 expression stays while hovered and returns to neutral three seconds after the
 pointer leaves, with varied dialogue for each expression. She also reacts on
 randomized timers, job and settings actions, and backup and restore outcomes;
-hovering freezes her reaction and dialogue until the pointer leaves.
+hovering holds her reaction and dialogue against automatic changes; direct clicks
+change her expression immediately.
 The footer's silver crescent and crimson gem animate during backup activity,
 with progress available in its tooltip.
 

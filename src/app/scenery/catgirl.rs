@@ -328,8 +328,11 @@ impl Companion {
         }
     }
 
-    fn request_expression(&mut self, expression: Expression, time: f64, random: u128) {
-        self.request_priority(expression, 1, time, random);
+    fn react_to_click(&mut self, time: f64, random: u128) {
+        self.pending = None;
+        self.pending_priority = 0;
+        self.set_expression(self.expression.next(random), time, random);
+        self.cooldown_until = time + 2.0;
     }
 
     fn request_priority(&mut self, expression: Expression, priority: u8, time: f64, random: u128) {
@@ -477,7 +480,7 @@ pub fn show(ui: &mut egui::Ui) {
     state.hold_while_hovered(response.hovered(), time);
     if response.clicked() {
         let random = uuid::Uuid::new_v4().as_u128();
-        state.request_expression(state.expression.next(random), time, random);
+        state.react_to_click(time, random);
     }
     state.tick(time, response.hovered(), uuid::Uuid::new_v4().as_u128());
 
@@ -526,16 +529,35 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn direct_click_reacts_immediately_even_during_hover_and_cooldown() {
+        use super::{Companion, Expression};
+        let mut state = Companion::default();
+        state.request_priority(Expression::Happy, 2, 0.0, 1);
+        state.hold_while_hovered(true, 0.1);
+        state.request_priority(Expression::Sad, 2, 0.1, 2);
+        state.react_to_click(0.2, 3);
+        let reaction = state.visible(0.2);
+        assert_ne!(reaction, Expression::Happy);
+        assert!(state.pending.is_none());
+        state.react_to_click(0.3, 4);
+        assert_ne!(state.visible(0.3), reaction);
+        let reaction = state.visible(0.3);
+        state.hold_while_hovered(true, 1.0);
+        state.tick(1.0, true, 5);
+        assert_eq!(state.visible(1.0), reaction);
+    }
+
+    #[test]
     fn outcomes_win_cooldowns_and_hover_defers_changes() {
         use super::{Companion, Expression};
         let mut state = Companion::default();
-        state.request_expression(Expression::Waiting, 0.0, 1);
+        state.request_priority(Expression::Waiting, 1, 0.0, 1);
         state.request_priority(Expression::Sad, 2, 0.5, 2);
-        state.request_expression(Expression::Cute, 1.0, 3);
+        state.request_priority(Expression::Cute, 1, 1.0, 3);
         assert_eq!(state.visible(1.0), Expression::Waiting);
         state.tick(2.0, false, 4);
         assert_eq!(state.visible(2.0), Expression::Sad);
-        state.request_expression(Expression::Curious, 2.5, 5);
+        state.request_priority(Expression::Curious, 1, 2.5, 5);
         state.next_random = Some(2.5);
         state.tick(3.0, false, 6);
         assert_eq!(state.visible(3.0), Expression::Sad);
@@ -564,7 +586,7 @@ mod tests {
         state.set_expression(expression, 40.0, 2000);
         state.hold_while_hovered(true, 41.0);
         state.next_random = Some(41.0);
-        state.request_expression(super::Expression::Curious, 41.0, 3000);
+        state.request_priority(super::Expression::Curious, 1, 41.0, 3000);
         let line = state.line(41.0);
         state.tick(41.0, true, 4000);
         assert_eq!(state.visible(41.0), expression);
