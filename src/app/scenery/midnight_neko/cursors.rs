@@ -8,30 +8,53 @@ const LIGHT: Color32 = Color32::from_rgb(249, 246, 241);
 const SHADE: Color32 = Color32::from_rgb(103, 92, 106);
 
 pub(super) fn paint(painter: &egui::Painter, tip: Pos2, cursor: egui::CursorIcon) -> bool {
+    let down = painter.ctx().input(|input| input.pointer.primary_down());
+    let id = egui::Id::new("saya_held_hand_cursor");
+    let held = painter.ctx().data_mut(|data| {
+        let held = down
+            && (cursor == egui::CursorIcon::PointingHand
+                || data.get_temp::<bool>(id).unwrap_or(false));
+        data.insert_temp(id, held);
+        held
+    });
     match cursor {
+        egui::CursorIcon::Default if held => hand(painter, tip, true),
         egui::CursorIcon::Default => arrow(painter, tip),
-        egui::CursorIcon::PointingHand => hand(painter, tip),
+        egui::CursorIcon::PointingHand => hand(painter, tip, held),
         _ => return false,
     }
     true
 }
 
-fn facet(painter: &egui::Painter, tip: Pos2, points: &[(f32, f32)], color: Color32) {
+fn hand_point(tip: Pos2, x: f32, y: f32, held: bool) -> Pos2 {
+    if held {
+        tip + egui::vec2(x * 0.96 + y * 0.025, y * 0.86)
+    } else {
+        tip + egui::vec2(x, y)
+    }
+}
+
+fn facet(painter: &egui::Painter, tip: Pos2, points: &[(f32, f32)], color: Color32, held: bool) {
+    let color = if held && color == Color32::from_rgb(107, 15, 31) {
+        Color32::from_rgb(183, 39, 66)
+    } else {
+        color
+    };
     painter.add(egui::Shape::convex_polygon(
         points
             .iter()
-            .map(|&(x, y)| tip + egui::vec2(x, y))
+            .map(|&(x, y)| hand_point(tip, x, y, held))
             .collect(),
         color,
         Stroke::NONE,
     ));
 }
 
-fn outline(painter: &egui::Painter, tip: Pos2, points: &[(f32, f32)]) {
+fn outline(painter: &egui::Painter, tip: Pos2, points: &[(f32, f32)], held: bool) {
     painter.add(egui::Shape::closed_line(
         points
             .iter()
-            .map(|&(x, y)| tip + egui::vec2(x, y))
+            .map(|&(x, y)| hand_point(tip, x, y, held))
             .collect(),
         Stroke::new(1.3_f32, RIM),
     ));
@@ -63,7 +86,7 @@ fn arrow(painter: &egui::Painter, tip: Pos2) {
     );
 }
 
-fn hand(painter: &egui::Painter, tip: Pos2) {
+fn hand(painter: &egui::Painter, tip: Pos2, held: bool) {
     facet(
         painter,
         tip,
@@ -75,12 +98,14 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
             (1.8, 1.0),
         ],
         LIGHT,
+        held,
     );
     facet(
         painter,
         tip,
         &[(0.6, 0.5), (1.8, 1.0), (1.8, 12.0), (0.6, 12.0)],
         SILVER,
+        held,
     );
     facet(
         painter,
@@ -95,6 +120,7 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
             (-5.0, 15.0),
         ],
         SILVER,
+        held,
     );
     for (x, y) in [(1.8, 7.0), (4.7, 7.7), (7.6, 8.4)] {
         facet(
@@ -108,11 +134,12 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
                 (x, y + 6.0),
             ],
             LIGHT,
+            held,
         );
         painter.line_segment(
             [
-                tip + egui::vec2(x + 2.4, y + 2.0),
-                tip + egui::vec2(x + 2.4, y + 5.0),
+                hand_point(tip, x + 2.4, y + 2.0, held),
+                hand_point(tip, x + 2.4, y + 5.0, held),
             ],
             Stroke::new(0.7_f32, SHADE),
         );
@@ -129,6 +156,7 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
             (-0.5, 16.0),
         ],
         LIGHT,
+        held,
     );
     facet(
         painter,
@@ -141,6 +169,7 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
             (-2.0, 20.0),
         ],
         SHADE,
+        held,
     );
     outline(
         painter,
@@ -169,12 +198,16 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
             (1.8, 8.0),
             (1.8, 1.0),
         ],
+        held,
     );
     let cuff = [(-2.0, 20.0), (8.0, 20.0), (8.0, 24.0), (-2.0, 24.0)];
-    facet(painter, tip, &cuff, Color32::from_rgb(103, 29, 54));
-    outline(painter, tip, &cuff);
+    facet(painter, tip, &cuff, Color32::from_rgb(103, 29, 54), held);
+    outline(painter, tip, &cuff, held);
     painter.line_segment(
-        [tip + egui::vec2(-1.0, 20.5), tip + egui::vec2(7.0, 20.5)],
+        [
+            hand_point(tip, -1.0, 20.5, held),
+            hand_point(tip, 7.0, 20.5, held),
+        ],
         Stroke::new(0.8_f32, LIGHT),
     );
     facet(
@@ -182,18 +215,65 @@ fn hand(painter: &egui::Painter, tip: Pos2) {
         tip,
         &[(3.0, 20.5), (5.0, 22.0), (3.0, 23.5), (1.0, 22.0)],
         LIGHT,
+        held,
     );
     facet(
         painter,
         tip,
         &[(3.0, 21.0), (4.0, 22.0), (3.0, 23.0), (2.0, 22.0)],
         Color32::from_rgb(107, 15, 31),
+        held,
     );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn held_hand_keeps_hotspot_and_persists_outside_the_button_until_release() {
+        let tip = egui::pos2(50.0, 50.0);
+        assert_eq!(hand_point(tip, 0.0, 0.0, true), tip);
+        assert!(hand_point(tip, 0.0, 24.0, true).y < hand_point(tip, 0.0, 24.0, false).y);
+        let context = egui::Context::default();
+        let frame = |events, cursor| {
+            context
+                .run_ui(
+                    egui::RawInput {
+                        events,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        assert!(paint(ui.painter(), tip, cursor));
+                    },
+                )
+                .shapes
+                .len()
+        };
+        let press = egui::Event::PointerButton {
+            pos: tip,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let pressed_shapes = frame(
+            vec![egui::Event::PointerMoved(tip), press],
+            egui::CursorIcon::PointingHand,
+        );
+        let dragged_shapes = frame(
+            vec![egui::Event::PointerMoved(tip + egui::vec2(100.0, 0.0))],
+            egui::CursorIcon::Default,
+        );
+        assert_eq!(pressed_shapes, dragged_shapes);
+        let release = egui::Event::PointerButton {
+            pos: tip,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let released_shapes = frame(vec![release], egui::CursorIcon::Default);
+        assert!(released_shapes < pressed_shapes);
+    }
 
     #[test]
     fn styles_arrow_and_hand_but_preserves_native_editing_cursors() {

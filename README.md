@@ -41,7 +41,8 @@ bats subdued. The estate also has falling petals and a sparse
 petal/crescent pointer trail. Effects are always enabled in this look. Bats use
 smooth wing motion and face their direction of travel; varied petals tumble
 through the garden. A faceted silver arrowhead and matching pointing gauntlet
-style the normal and clickable cursors. Saya's sidebar
+style the normal and clickable cursors, with a compressed hand pose while a
+click is held. Saya's sidebar
 expression stays while hovered and returns to neutral three seconds after the
 pointer leaves, with varied dialogue for each expression. She also reacts on
 randomized timers, job and settings actions, backup failures and restored backups;
