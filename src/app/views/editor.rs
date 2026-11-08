@@ -110,7 +110,11 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let palette = Palette::of(ui);
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
+        let bob = if Skin::of(ui.ctx()).effects.hearts || pixel::blink(ui, 0.6) {
+            0.0
+        } else {
+            6.0
+        };
         ui.add_space(bob);
         if Skin::of(ui.ctx()).effects.hearts {
             crate::app::scenery::catgirl::show_welcome(ui);

@@ -397,7 +397,11 @@ impl App {
 fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
-    let mascot = sprites::show(ui, skin.wording.mascot, 4.0, palette.hot);
+    let mascot = if skin.finish == Finish::Gothic {
+        crate::app::scenery::catgirl::show_header(ui)
+    } else {
+        sprites::show(ui, skin.wording.mascot, 4.0, palette.hot)
+    };
     if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [

@@ -1,0 +1,5 @@
+Version: 2
+Generator: built-in imagegen
+
+Correct raised RIGHT arm (viewer-left) with hand near chin. Existing elbow is too high and arm too short: upper arm descends from shoulder through bottom edge; elbow below crop, anatomically long forearm returns toward existing chin hand. Preserve subtle flirtatious closed smile and half-lidded gaze.
+Image 1 is the edit target, image 2 is the authoritative base reference for exact palette, identity, lighting and crisp pixel art. Adult Saya. Preserve face, expression, head orientation, hairstyle, clothing, jewelry, opaque neckline and bust proportions except explicitly requested changes. Match base burgundy, moss-green eyes, warm pale skin, plum-black hair and muted highlights without color drift. Same 1254x1254 square canvas and character/head scale, full cat ears through just below bust. No zoom or shrinking. Correct adult shoulder-elbow and elbow-wrist lengths; elbows may and should leave lower frame rather than compress arms. Five coherent attached digits, burgundy almond nails. Genuine transparent alpha, clean hair gaps. No haze, bloom, glow, backdrop, floor, shadow, checkerboard, text or symbols.
