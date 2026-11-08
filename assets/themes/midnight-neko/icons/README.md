@@ -2,7 +2,8 @@
 
 Each function has its own transparent PNG; do not combine icons into a sprite
 sheet. Generation prompts and masters live locally under
-`agent-local/refinements/characters/saya/ui-icons/v2/`, outside runtime assets.
+`agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
+The job-title archive emblem and shield-shaped job controls are in `v3/`.
 
 ## Resolution and size
 
@@ -20,7 +21,7 @@ sheet. Generation prompts and masters live locally under
 - Generate each functional silhouette individually. Derive the `dark/` (white)
   and `light/` (black) base masks from the same alpha mask so their
   geometry stays identical. The renderer adds a shallow inset silver bevel and
-  broad metallic shading: light silver for dark surfaces, dark silver for light
+  broad diagonal metallic reflections and stepped facets: light silver for dark surfaces, dark silver for light
   surfaces. Clamp shading toward the readable foreground wherever needed to
   preserve 4.5:1 contrast. Keep Saya status heads in their original colors.
   Buttons select the variant from their actual fill,

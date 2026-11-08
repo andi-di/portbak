@@ -96,21 +96,28 @@ fn silver_finish(image: &mut image::RgbaImage, light_silver: bool, fill: Color32
         // Inset bevels preserve the original silhouette and its transparent gaps.
         let upper_edge = !opaque(x - 3, y - 3);
         let lower_edge = !opaque(x + 3, y + 3);
-        let band = ((y as f32 / mask.height() as f32 - 0.42).abs() * 2.0).min(1.0);
+        let diagonal = (x as f32 * 0.35 + y as f32) / mask.height() as f32;
+        let reflection = (1.0 - (diagonal - 0.57).abs() / 0.13).clamp(0.0, 1.0);
+        let band = ((diagonal - 0.42).abs() * 2.0).min(1.0);
+        let inner_bevel = !opaque(x - 6, y - 6);
         let level = if light_silver {
             if upper_edge {
-                250.0
+                253.0
             } else if lower_edge {
-                164.0
+                155.0
+            } else if inner_bevel {
+                210.0
             } else {
-                229.0 - band * 43.0
+                209.0 - band * 34.0 + reflection * 35.0
             }
         } else if upper_edge {
-            100.0
+            104.0
         } else if lower_edge {
-            28.0
+            22.0
+        } else if inner_bevel {
+            47.0
         } else {
-            72.0 - band * 31.0
+            62.0 - band * 25.0 + reflection * 30.0
         };
         let level = level as u8;
         let mut color = Color32::from_rgb(level, level, level.saturating_add(5));
