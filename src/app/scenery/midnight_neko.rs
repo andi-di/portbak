@@ -112,8 +112,8 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                     for pixel in rgba.pixels_mut() {
                         let red = pixel[0].saturating_sub(pixel[1]) > 25;
                         let color = match (dark, red) {
-                            (true, false) => [68, 67, 72],
-                            (true, true) => [54, 49, 56],
+                            (true, false) => [56, 55, 60],
+                            (true, true) => [44, 40, 47],
                             (false, false) => [53, 30, 48],
                             (false, true) => [119, 31, 65],
                         };
@@ -395,9 +395,9 @@ pub fn paint_bats(painter: &egui::Painter) {
         };
         draw_moving(painter, rect, sprite, Color32::WHITE, SpritePose { ..pose });
         let (eyes, y) = if bat.perched {
-            ([56.5, 69.5], 92.5)
+            ([58.5, 67.5], 92.5)
         } else {
-            ([57.0, 69.0], 56.0)
+            ([59.0, 67.0], 56.0)
         };
         for x in eyes {
             let u = if bat.facing_left {
@@ -407,7 +407,7 @@ pub fn paint_bats(painter: &egui::Painter) {
             };
             let center = sprite_point(rect, u, y / 128.0, &pose);
             painter.rect_filled(
-                Rect::from_center_size(center, Vec2::splat(1.0)),
+                Rect::from_center_size(center, Vec2::splat(1.2)),
                 0,
                 Color32::from_rgb(137, 24, 43),
             );
