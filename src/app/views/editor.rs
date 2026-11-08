@@ -271,12 +271,17 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
             } else {
                 palette.metal
             };
-            sprites::show(
-                ui,
-                Sprite::Floppy,
-                5.0,
-                style::decorative_color(ui.ctx(), tint),
-            );
+            if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+                let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
+                crate::app::rendering::gothic::job_title_icon(ui.painter(), rect);
+            } else {
+                sprites::show(
+                    ui,
+                    Sprite::Floppy,
+                    5.0,
+                    style::decorative_color(ui.ctx(), tint),
+                );
+            }
             ui.add_space(6.0);
             ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
         },

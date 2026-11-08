@@ -56,6 +56,19 @@ pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color3
     paint_icon(painter, rect, name, bytes, dark, fill);
 }
 
+pub fn job_title_icon(painter: &egui::Painter, rect: Rect) {
+    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let (name, bytes) = asset!("job-title", dark);
+    paint_icon(
+        painter,
+        rect,
+        name,
+        bytes,
+        dark,
+        Palette::of_ctx(painter.ctx()).surface,
+    );
+}
+
 pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
     let dark = painter.ctx().global_style().visuals.dark_mode;
     let (name, bytes) = if active {
@@ -147,7 +160,7 @@ fn paint_icon(
         let result = image::load_from_memory(bytes)
             .map(|image| {
                 let mut rgba = image.to_rgba8();
-                if !matches!(name, "job-active" | "job-inactive") {
+                if !matches!(name, "job-active" | "job-inactive" | "job-title") {
                     silver_finish(&mut rgba, dark, fill);
                 }
                 painter.ctx().load_texture(

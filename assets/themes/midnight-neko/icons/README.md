@@ -3,7 +3,9 @@
 Each function has its own transparent PNG; do not combine icons into a sprite
 sheet. Generation prompts and masters live locally under
 `agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
-The job-title archive emblem and shield-shaped job controls are in `v3/`.
+The archive emblem and shield-shaped job controls are in `v3/`.
+The dedicated Saya job-title head and prompt live in
+`agent-local/refinements/characters/saya/pixel-head/job-title/`.
 
 ## Resolution and size
 
@@ -23,7 +25,7 @@ The job-title archive emblem and shield-shaped job controls are in `v3/`.
   geometry stays identical. The renderer adds a shallow inset silver bevel and
   broad diagonal metallic reflections and stepped facets: light silver for dark surfaces, dark silver for light
   surfaces. Clamp shading toward the readable foreground wherever needed to
-  preserve 4.5:1 contrast. Keep Saya status heads in their original colors.
+  preserve 4.5:1 contrast. Keep Saya status and job-title heads in their original colors.
   Buttons select the variant from their actual fill,
   including hover and pressed states; standalone icons follow the theme mode.
 - Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
