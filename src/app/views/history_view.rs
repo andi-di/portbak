@@ -1,7 +1,6 @@
-use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
+use crate::app::theme::style::{self, label_font, Palette};
 use crate::app::views::widgets::{
     alert, caption, display_path, format_bytes, local_time, retention_warnings, DATE, TIME,
 };
@@ -113,13 +112,7 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
             if backups.is_empty() {
                 ui.label("No saved backups for this job.");
             }
-            response = backup_list(
-                ui,
-                backups,
-                &mut dialog.selected,
-                dialog.saving,
-                dialog.source_display.is_some(),
-            );
+            response = backup_list(ui, backups, dialog.saving, dialog.source_display.is_some());
             retention_warnings(ui, &dialog.job, &records_of(backups));
         }
     }
@@ -239,7 +232,6 @@ fn day_starts<T: TimeZone>(backups: &[Backup], zone: &T) -> Vec<bool> {
 fn backup_list(
     ui: &mut egui::Ui,
     backups: &[Backup],
-    selected: &mut Option<String>,
     saving: bool,
     source_available: bool,
 ) -> HistoryResponse {
@@ -254,7 +246,7 @@ fn backup_list(
                     if first_of_day {
                         day_header(ui, backup);
                     }
-                    let row = selection_row(ui, backup, selected, saving, source_available);
+                    let row = backup_controls(ui, backup, saving, source_available);
                     if row.protection.is_some() {
                         response.protection = row.protection;
                     }
@@ -286,16 +278,13 @@ fn day_header(ui: &mut egui::Ui, backup: &Backup) {
     });
 }
 
-/// Paints a backup's row behind its contents; returns the row's interaction.
+/// Draws the backup details and its independent controls.
 fn backup_row<R>(
     ui: &mut egui::Ui,
     backup: &Backup,
-    selected: bool,
-    sense: egui::Sense,
     trailing: impl FnOnce(&mut egui::Ui) -> R,
-) -> (egui::Response, R) {
+) -> R {
     let palette = Palette::of(ui);
-    let background = ui.painter().add(egui::Shape::Noop);
     let mut size = egui::Rect::NOTHING;
     let frame = egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(10, 6))
@@ -310,56 +299,28 @@ fn backup_row<R>(
                 sprites::show(ui, sprite, 2.0, tint);
                 let text_width = (ui.available_width() - 144.0).max(40.0);
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
-                    size = backup_text(ui, backup, selected);
+                    size = backup_text(ui, backup);
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), trailing)
                     .inner
             })
             .inner
         });
-    let rect = frame.response.rect;
     let id = ui.id().with(&backup.record.name);
-    let selection_rect = egui::Rect::from_min_max(
-        rect.min,
-        egui::pos2((rect.right() - 144.0).max(rect.left()), rect.bottom()),
+    pixel::tooltip(
+        ui,
+        size,
+        id.with("size"),
+        &format!("{} bytes", backup.record.bytes),
     );
-    let response = ui.interact(selection_rect, id, sense);
-    let exact = format!("{} bytes", backup.record.bytes);
-    pixel::tooltip(ui, size, id.with("size"), &exact);
-    let enabled = ui.is_enabled();
-    let hovered = enabled && response.hovered();
-    if Skin::of(ui.ctx()).finish == Finish::Glass {
-        let tint = match (selected, hovered) {
-            (true, _) => Some(Tint::Accent),
-            (false, true) => Some(Tint::Hover),
-            (false, false) => None,
-        };
-        if let Some(tint) = tint {
-            ui.painter()
-                .set(background, glass::tile(ui.ctx(), rect, tint));
-        }
-        return (response, frame.inner);
-    }
-    let fill = match (selected, hovered) {
-        (true, _) => palette.accent,
-        (false, true) => palette.raised,
-        (false, false) => egui::Color32::TRANSPARENT,
-    };
-    let radius = style::control_radius(ui.ctx());
-    ui.painter()
-        .set(background, egui::Shape::rect_filled(rect, radius, fill));
-    (response, frame.inner)
+    frame.inner
 }
 
 /// The backup's time, kind and size; returns where the size is, for its exact-bytes tooltip.
-fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) -> egui::Rect {
+fn backup_text(ui: &mut egui::Ui, backup: &Backup) -> egui::Rect {
     let palette = Palette::of(ui);
     let record = &backup.record;
-    let (ink, dim) = if selected {
-        (palette.accent_ink, palette.accent_ink)
-    } else {
-        (palette.ink, palette.dim)
-    };
+    let (ink, dim) = (palette.ink, palette.dim);
     let mut size = egui::Rect::NOTHING;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
@@ -388,16 +349,14 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup, selected: bool) -> egui::Rect
     size
 }
 
-fn selection_row(
+fn backup_controls(
     ui: &mut egui::Ui,
     backup: &Backup,
-    selected: &mut Option<String>,
     saving: bool,
     source_available: bool,
 ) -> HistoryResponse {
     let mut restore = None;
-    let is_selected = selected.as_deref() == Some(backup.record.name.as_str());
-    let (row, change) = backup_row(ui, backup, is_selected, egui::Sense::click(), |ui| {
+    let change = backup_row(ui, backup, |ui| {
         let button = PixelButton::new("Restore backup")
             .icon_only()
             .sprite(Sprite::Rewind)
@@ -416,9 +375,6 @@ fn selection_row(
             .changed()
             .then(|| (backup.record.name.clone(), protected))
     });
-    if row.clicked() && backup.available && !saving && change.is_none() {
-        *selected = (!is_selected).then(|| backup.record.name.clone());
-    }
     HistoryResponse {
         restore,
         protection: change,
