@@ -14,6 +14,7 @@ const LIST_HEIGHT: f32 = 300.0;
 #[derive(Default)]
 struct HistoryResponse {
     restore: Option<String>,
+    reveal: Option<String>,
     protection: Option<(String, bool)>,
 }
 
@@ -61,6 +62,15 @@ impl App {
             });
         if let Some((name, protected)) = response.protection {
             self.save_protection(name, protected, &ctx);
+        }
+        if let Some(name) = response.reveal {
+            if let Some(history) = &mut self.backup_history {
+                if let Err(error) =
+                    crate::app::platform::reveal_backup(&history.job.target.join(name))
+                {
+                    history.error = format!("Could not open backup location: {error:#}");
+                }
+            }
         }
         if let Some(name) = response.restore {
             if let Some(history) = &mut self.backup_history {
@@ -250,6 +260,9 @@ fn backup_list(
                     if row.protection.is_some() {
                         response.protection = row.protection;
                     }
+                    if row.reveal.is_some() {
+                        response.reveal = row.reveal;
+                    }
                     if row.restore.is_some() {
                         response.restore = row.restore;
                     }
@@ -297,7 +310,7 @@ fn backup_row<R>(
                     (Sprite::Folder, palette.gold)
                 };
                 sprites::show(ui, sprite, 2.0, tint);
-                let text_width = (ui.available_width() - 144.0).max(40.0);
+                let text_width = (ui.available_width() - 184.0).max(40.0);
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
                     size = backup_text(ui, backup);
                 });
@@ -356,6 +369,7 @@ fn backup_controls(
     source_available: bool,
 ) -> HistoryResponse {
     let mut restore = None;
+    let mut reveal = None;
     let change = backup_row(ui, backup, |ui| {
         let button = PixelButton::new("Restore backup")
             .icon_only()
@@ -367,6 +381,18 @@ fn backup_controls(
             .clicked() {
                 restore = Some(backup.record.name.clone());
             }
+        let open = PixelButton::new("Open backup location")
+            .icon_only()
+            .sprite(Sprite::Folder)
+            .tone(Tone::Plain);
+        if ui
+            .add_enabled(backup.available, open)
+            .on_hover_text("Open backup location in file manager")
+            .on_disabled_hover_text("Backup is unavailable")
+            .clicked()
+        {
+            reveal = Some(backup.record.name.clone());
+        }
         let mut protected = backup.record.protected;
         let enabled = !saving && (backup.available || protected);
         let checkbox = PixelCheckbox::new(&mut protected, "Locked");
@@ -377,6 +403,7 @@ fn backup_controls(
     });
     HistoryResponse {
         restore,
+        reveal,
         protection: change,
     }
 }
