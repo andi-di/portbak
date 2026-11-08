@@ -497,6 +497,64 @@ mod tests {
     use crate::model::Config;
 
     #[test]
+    fn check_transitions_do_not_emit_widget_id_warnings() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let mut app = App::new(
+                    Config {
+                        jobs: vec![Job {
+                            name: "My job".into(),
+                            ..Job::default()
+                        }],
+                        ..Config::default()
+                    },
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                for frame in 0..8 {
+                    app.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
+                    app.progress = "Checking source files ...".into();
+                    app.config.jobs[0].status = if frame < 2 {
+                        "Not checked yet"
+                    } else {
+                        "No changes detected"
+                    }
+                    .into();
+                    let output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(1100.0, 960.0),
+                            )),
+                            ..Default::default()
+                        },
+                        |ui| {
+                            app.show_header(ui);
+                            app.show_footer(ui);
+                            app.show_job_list(ui);
+                            app.show_job_editor(ui);
+                        },
+                    );
+                    for shape in output.shapes {
+                        if let egui::Shape::Text(text) = shape.shape {
+                            assert!(
+                                !text.galley.text().contains("ID ")
+                                    && !text.galley.text().contains("Double use"),
+                                "{} {theme:?} frame={frame}: {}",
+                                skin.id,
+                                text.galley.text()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn toggling_job_keeps_name_layout_stable_without_id_clashes() {
         for skin in skins::ALL {
             for theme in [egui::Theme::Light, egui::Theme::Dark] {
