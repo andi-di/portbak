@@ -249,10 +249,10 @@ impl App {
                 }
                 ui.add_space(12.0);
                 let mascot_height =
-                    crate::app::scenery::catgirl::reserved_height(ui.available_width());
+                    crate::app::scenery::catgirl::reserved_height(ui.available_width())
+                        .min(ui.available_height() * 0.55);
                 let show_mascot = Skin::of(ui.ctx()).effects.hearts
-                    && (!self.config.jobs.is_empty() || self.settings_open)
-                    && ui.available_height() > mascot_height + 120.0;
+                    && (!self.config.jobs.is_empty() || self.settings_open);
                 let list_height = if show_mascot {
                     ui.available_height() - mascot_height
                 } else {

@@ -340,7 +340,10 @@ pub fn show(ui: &mut egui::Ui) {
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
-    let width = ui.available_width().min(340.0);
+    let width = ui
+        .available_width()
+        .min(340.0)
+        .min((ui.available_height() - 48.0).max(24.0));
 
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, width), egui::Sense::click());
 
