@@ -161,22 +161,56 @@ impl App {
                         egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
                     ui.painter().rect_filled(rule, 0.0, palette.outline);
                 }
-                let wording = &Skin::of(ui.ctx()).wording;
                 ui.horizontal(|ui| {
-                    if self.active.is_some() {
-                        pixel::led(ui, palette.gold, pixel::blink(ui, 0.25));
-                        pixel::display_label(ui, wording.busy, 10.0, palette.gold);
-                        pixel::marquee(ui, 180.0, palette.gold);
-                        ui.label(&self.progress);
-                    } else {
-                        pixel::led(ui, palette.good, true);
-                        let ready = blinking_cursor(ui, wording.ready, wording.cursor);
-                        pixel::display_label(ui, &ready, 10.0, palette.good);
-                        ui.label(
-                            egui::RichText::new("Scheduling runs while the app is open")
-                                .color(palette.dim),
+                    pixel::display_label(ui, Skin::of(ui.ctx()).wording.ready, 10.0, palette.good);
+                    ui.label(
+                        egui::RichText::new("Scheduling runs while the app is open")
+                            .color(palette.dim),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let (rect, response) =
+                            ui.allocate_exact_size(egui::vec2(112.0, 24.0), egui::Sense::hover());
+                        let recent = self
+                            .activity_until
+                            .is_some_and(|until| until > std::time::Instant::now());
+                        let active = self.active.is_some() || recent;
+                        ui.scope_builder(
+                            egui::UiBuilder::new()
+                                .id_salt("activity")
+                                .max_rect(rect)
+                                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                            |ui| {
+                                pixel::led(
+                                    ui,
+                                    if active { palette.gold } else { palette.dim },
+                                    active,
+                                );
+                                if active {
+                                    pixel::marquee(ui, 80.0, palette.gold);
+                                } else {
+                                    let (track, _) = ui.allocate_exact_size(
+                                        egui::vec2(80.0, 18.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().rect_stroke(
+                                        track,
+                                        style::control_radius(ui.ctx()),
+                                        egui::Stroke::new(1.0_f32, palette.dim),
+                                        egui::StrokeKind::Inside,
+                                    );
+                                }
+                            },
                         );
-                    }
+                        if active {
+                            response.on_hover_text(if self.active.is_some() {
+                                self.progress.as_str()
+                            } else {
+                                "Recent backup activity"
+                            });
+                        } else {
+                            response.on_hover_text("No backup or restore in progress");
+                        }
+                    });
                 });
                 if !self.error.is_empty() {
                     alert(ui, palette.bad, &self.error);
@@ -416,15 +450,6 @@ fn logo(ui: &mut egui::Ui) {
     });
 }
 
-/// `text` followed by a cursor that blinks, padded while hidden so the width stays put.
-fn blinking_cursor(ui: &egui::Ui, text: &str, cursor: &str) -> String {
-    if cursor.is_empty() || pixel::blink(ui, 0.5) {
-        format!("{text}{cursor}")
-    } else {
-        format!("{text}{}", " ".repeat(cursor.chars().count()))
-    }
-}
-
 fn card_shapes(
     ctx: &egui::Context,
     rect: egui::Rect,
@@ -514,6 +539,7 @@ mod tests {
                     std::path::PathBuf::new(),
                     tempfile::tempfile().unwrap(),
                 );
+                let mut footer_label = None;
                 for frame in 0..8 {
                     app.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
                     app.progress = "Checking source files ...".into();
@@ -540,6 +566,20 @@ mod tests {
                     );
                     for shape in output.shapes {
                         if let egui::Shape::Text(text) = shape.shape {
+                            if text.galley.text() == "Scheduling runs while the app is open" {
+                                let position = (text.pos, text.galley.size());
+                                if frame == 2 {
+                                    footer_label = Some(position);
+                                }
+                                if frame > 2 {
+                                    assert_eq!(
+                                        Some(position),
+                                        footer_label,
+                                        "{} {theme:?}: footer moved",
+                                        skin.id
+                                    );
+                                }
+                            }
                             assert!(
                                 !text.galley.text().contains("ID ")
                                     && !text.galley.text().contains("Double use"),

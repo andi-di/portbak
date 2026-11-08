@@ -58,8 +58,6 @@ pub static FRUTIGER_AERO: Skin = Skin {
         welcome_title: "A fresh start",
         welcome_prompt: "Create your first backup job",
         ready: "All clear",
-        busy: "Working",
-        cursor: "",
     },
 };
 

@@ -114,7 +114,7 @@ pub struct App {
     queue: VecDeque<Uuid>,
     active: Option<Uuid>,
     restoring: bool,
-    disabled_during_backup: bool,
+    activity_until: Option<Instant>,
     backup_history: Option<BackupHistory>,
     backups_tab: bool,
     settings_open: bool,
@@ -144,7 +144,7 @@ impl App {
             queue: VecDeque::new(),
             active: None,
             restoring: false,
-            disabled_during_backup: false,
+            activity_until: None,
             backup_history: None,
             backups_tab: false,
             settings_open: false,
@@ -239,9 +239,6 @@ impl App {
         };
         let enabled = job.enabled;
         let check_on_enable = job.check_on_enable;
-        if self.active == Some(id) && !self.restoring {
-            self.disabled_during_backup = was_enabled && !enabled;
-        }
         if was_enabled && !enabled {
             self.remove_pending(id);
         } else if !was_enabled && enabled && check_on_enable {
@@ -266,7 +263,7 @@ impl App {
 
     fn start_worker(&mut self, job: Job, operation: Operation, ctx: &egui::Context) {
         self.active = Some(job.id);
-        self.disabled_during_backup = false;
+        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
         self.restoring = matches!(operation, Operation::Restore(_));
         self.progress = if self.restoring {
             "Preparing restore …"
@@ -461,7 +458,7 @@ impl App {
         }
         self.active = None;
         self.restoring = false;
-        self.disabled_during_backup = false;
+        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
         self.progress.clear();
         self.persist();
         self.reload_summary(id, ctx);
@@ -978,24 +975,6 @@ mod tests {
         assert!(dialog(&app).backups.as_ref().unwrap().is_ok());
         assert!(app.active.is_none());
         assert!(app.config.jobs[0].enabled);
-    }
-
-    #[test]
-    fn disabled_backup_notice_requires_disabling_during_a_running_check() {
-        let (_directory, mut app, _name) = restore_fixture();
-        let id = app.config.jobs[0].id;
-        app.config.jobs[0].enabled = false;
-        app.active = Some(id);
-        assert!(!app.disabled_during_backup);
-        app.config.jobs[0].enabled = true;
-        app.job_activation_changed(id, false);
-        assert!(!app.disabled_during_backup);
-        app.config.jobs[0].enabled = false;
-        app.job_activation_changed(id, true);
-        assert!(app.disabled_during_backup);
-        app.config.jobs[0].enabled = true;
-        app.job_activation_changed(id, false);
-        assert!(!app.disabled_during_backup);
     }
 
     #[test]

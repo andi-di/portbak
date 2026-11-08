@@ -55,8 +55,6 @@ pub static RETRO: Skin = Skin {
         welcome_title: "INSERT DISK",
         welcome_prompt: "PRESS START",
         ready: "READY",
-        busy: "BUSY",
-        cursor: "_",
     },
 };
 

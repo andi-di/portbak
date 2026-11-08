@@ -51,8 +51,6 @@ pub static MODERN: Skin = Skin {
         welcome_title: "Your backups start here",
         welcome_prompt: "Create your first backup job",
         ready: "Ready",
-        busy: "Working",
-        cursor: "",
     },
 };
 const DARK: Palette = Palette {
