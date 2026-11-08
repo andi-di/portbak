@@ -326,3 +326,5 @@ Deliver the complete source project, runnable portable executables for both plat
 The initial version does not require cloud storage, encryption, compression formats other than ZIP, deduplication, incremental backups, file exclusion rules, live filesystem watching, system task integration, automatic startup, a tray icon, or guaranteed preservation of all filesystem metadata.
 
 When rebuilding from this document, implement the complete behavior and acceptance scenarios before adding optional features. Document any unavoidable platform limitation rather than silently changing backup or deletion rules.
+
+- Open the app with no backup job selected; select a job only on explicit user action.

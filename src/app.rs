@@ -138,7 +138,7 @@ impl App {
         }
         let (tx, rx) = mpsc::channel();
         Self {
-            selected: config.jobs.first().map(|job| job.id),
+            selected: None,
             config,
             path,
             queue: VecDeque::new(),
