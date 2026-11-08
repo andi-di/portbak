@@ -49,7 +49,7 @@ The size limit counts the sizes of stored backup files, or the archive size for 
 - ACLs, extended attributes, Windows streams, and timestamps are not guaranteed to be preserved. Folder copies on Unix preserve file permissions. ZIP archives provide portable content backups.
 - File names must be valid UTF-8. Backslashes in Unix file names are rejected with an error. Encryption is not provided.
 - A power failure or forced process termination may leave `.partial-*` entries or published backups that have not yet been recorded in the manifest. These are intentionally not deleted automatically. Settings and manifests are replaced atomically; complete protection against power loss at the storage level is not guaranteed.
-- The app works offline. Linux requires a graphical session with OpenGL and standard system libraries, including libc, X11/Wayland, and xkbcommon. The Linux build is not a fully static universal executable; build against a suitably old base system for older distributions. Linux folder selection uses XDG Desktop Portal and its desktop backend.
+- The app works offline. Linux requires a graphical session with OpenGL and standard system libraries, including libc, X11/Wayland, and xkbcommon. The Linux build is not a fully static universal executable; build against a suitably old base system for older distributions. Linux folder selection uses XDG Desktop Portal and its desktop backend. Opening backup locations or configured folders in the file manager requires `xdg-open` on Linux.
 
 ## Contributing and branch rules
 

@@ -56,9 +56,29 @@ pub fn display_path(path: &Path) -> String {
 
 pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
     let mut changed = false;
+    let error_id = ui.make_persistent_id((label, "open_folder_error"));
+    let mut open_error = ui
+        .ctx()
+        .data_mut(|data| data.get_temp::<String>(error_id))
+        .unwrap_or_default();
     caption(ui, label);
     centered_row(ui, |ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let open = PixelButton::new("Open folder in file manager")
+                .sprite(Sprite::Monitor)
+                .icon_only();
+            if ui
+                .add_enabled(!path.as_os_str().is_empty() && path.is_dir(), open)
+                .on_hover_text("Open folder in file manager")
+                .on_disabled_hover_text("Choose an existing folder first")
+                .clicked()
+            {
+                open_error = crate::app::platform::open_in_file_manager(path)
+                    .err()
+                    .map_or_else(String::new, |error| {
+                        format!("Could not open folder: {error:#}")
+                    });
+            }
             let choose = PixelButton::new("Choose folder …")
                 .sprite(Sprite::Folder)
                 .icon_only();
@@ -79,6 +99,14 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
             }
         });
     });
+    if changed {
+        open_error.clear();
+    }
+    if !open_error.is_empty() {
+        alert(ui, Palette::of(ui).bad, &open_error);
+    }
+    ui.ctx()
+        .data_mut(|data| data.insert_temp(error_id, open_error));
     changed
 }
 

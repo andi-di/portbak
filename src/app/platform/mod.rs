@@ -1,7 +1,7 @@
 #[cfg(target_os = "linux")]
 pub(crate) mod wayland_icon;
 
-pub(crate) fn reveal_backup(path: &std::path::Path) -> anyhow::Result<()> {
+pub(crate) fn open_in_file_manager(path: &std::path::Path) -> anyhow::Result<()> {
     use anyhow::Context;
     let path = std::fs::canonicalize(path).context("Backup is no longer available")?;
     #[cfg(windows)]

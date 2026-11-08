@@ -66,7 +66,7 @@ impl App {
         if let Some(name) = response.reveal {
             if let Some(history) = &mut self.backup_history {
                 if let Err(error) =
-                    crate::app::platform::reveal_backup(&history.job.target.join(name))
+                    crate::app::platform::open_in_file_manager(&history.job.target.join(name))
                 {
                     history.error = format!("Could not open backup location: {error:#}");
                 }
