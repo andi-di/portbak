@@ -383,7 +383,7 @@ fn backup_controls(
             }
         let open = PixelButton::new("Open backup location")
             .icon_only()
-            .sprite(Sprite::Folder)
+            .sprite(Sprite::Monitor)
             .tone(Tone::Plain);
         if ui
             .add_enabled(backup.available, open)

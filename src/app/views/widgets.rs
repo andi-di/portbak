@@ -65,7 +65,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
     centered_row(ui, |ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let open = PixelButton::new("Open folder in file manager")
-                .sprite(Sprite::Folder)
+                .sprite(Sprite::Monitor)
                 .icon_only();
             if ui
                 .add_enabled(!path.as_os_str().is_empty() && path.is_dir(), open)
