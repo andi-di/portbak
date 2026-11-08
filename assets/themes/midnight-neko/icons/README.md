@@ -18,8 +18,12 @@ sheet. Generation prompts and masters live locally under
 - Utility buttons render at 32 logical pixels; New job and Check now use 40.
   Job status heads render at 48 logical pixels.
 - Generate each functional silhouette individually. Derive the `dark/` (white)
-  and `light/` (black) PNGs from the same alpha mask so their
-  geometry stays identical. Buttons select the variant from their actual fill,
+  and `light/` (black) base masks from the same alpha mask so their
+  geometry stays identical. The renderer adds a shallow inset silver bevel and
+  broad metallic shading: light silver for dark surfaces, dark silver for light
+  surfaces. Clamp shading toward the readable foreground wherever needed to
+  preserve 4.5:1 contrast. Keep Saya status heads in their original colors.
+  Buttons select the variant from their actual fill,
   including hover and pressed states; standalone icons follow the theme mode.
 - Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
   Readability at 24 pixels takes priority over decorative detail. No fine
@@ -38,5 +42,5 @@ sheet. Generation prompts and masters live locally under
 Saya's plum-black (`#35252C`, `#2C1D23`), burgundy (`#671D36`), shaded silver
 (`#B5ABAB`), ivory (`#F1D0CA`), crimson (`#6B0F1F`), and moss green (`#48613B`).
 Keep character colors in the Saya heads and surrounding controls. Functional
-icons use one high-contrast color, bold silhouettes and crisp pixel clusters.
+icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.

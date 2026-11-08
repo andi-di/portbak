@@ -31,7 +31,14 @@ macro_rules! asset {
 pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, _tint: Color32) {
     let dark = painter.ctx().global_style().visuals.dark_mode;
     let (name, bytes) = icon_asset(sprite, dark);
-    paint_icon(painter, rect, name, bytes, dark);
+    paint_icon(
+        painter,
+        rect,
+        name,
+        bytes,
+        dark,
+        Palette::of_ctx(painter.ctx()).surface,
+    );
 }
 
 pub fn foreground(fill: Color32) -> Color32 {
@@ -46,7 +53,7 @@ pub fn foreground(fill: Color32) -> Color32 {
 pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color32) {
     let dark = foreground(fill) == Color32::WHITE;
     let (name, bytes) = icon_asset(sprite, dark);
-    paint_icon(painter, rect, name, bytes, dark);
+    paint_icon(painter, rect, name, bytes, dark, fill);
 }
 
 pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
@@ -56,17 +63,86 @@ pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
     } else {
         asset!("job-inactive", dark)
     };
-    paint_icon(painter, rect, name, bytes, dark);
+    paint_icon(
+        painter,
+        rect,
+        name,
+        bytes,
+        dark,
+        Palette::of_ctx(painter.ctx()).surface,
+    );
 }
 
-fn paint_icon(painter: &egui::Painter, rect: Rect, name: &str, bytes: &[u8], dark: bool) {
-    let id = egui::Id::new(("saya_icon_contrast", name, dark));
+fn contrast(a: Color32, b: Color32) -> f32 {
+    let a = super::modern::luminance(a);
+    let b = super::modern::luminance(b);
+    (a.max(b) + 0.05) / (a.min(b) + 0.05)
+}
+
+fn silver_finish(image: &mut image::RgbaImage, light_silver: bool, fill: Color32) {
+    let mask = image.clone();
+    let opaque = |x: i32, y: i32| {
+        x >= 0
+            && y >= 0
+            && x < mask.width() as i32
+            && y < mask.height() as i32
+            && mask.get_pixel(x as u32, y as u32)[3] != 0
+    };
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        if pixel[3] == 0 {
+            continue;
+        }
+        let (x, y) = (x as i32, y as i32);
+        // Inset bevels preserve the original silhouette and its transparent gaps.
+        let upper_edge = !opaque(x - 3, y - 3);
+        let lower_edge = !opaque(x + 3, y + 3);
+        let band = ((y as f32 / mask.height() as f32 - 0.42).abs() * 2.0).min(1.0);
+        let level = if light_silver {
+            if upper_edge {
+                250.0
+            } else if lower_edge {
+                164.0
+            } else {
+                229.0 - band * 43.0
+            }
+        } else if upper_edge {
+            100.0
+        } else if lower_edge {
+            28.0
+        } else {
+            72.0 - band * 31.0
+        };
+        let level = level as u8;
+        let mut color = Color32::from_rgb(level, level, level.saturating_add(5));
+        let ink = foreground(fill);
+        while contrast(color, fill) < 4.5 && color != ink {
+            color = mix(color, ink, 0.12);
+            if color.r().abs_diff(ink.r()) < 8 {
+                color = ink;
+            }
+        }
+        pixel.0[..3].copy_from_slice(&[color.r(), color.g(), color.b()]);
+    }
+}
+
+fn paint_icon(
+    painter: &egui::Painter,
+    rect: Rect,
+    name: &str,
+    bytes: &[u8],
+    dark: bool,
+    fill: Color32,
+) {
+    let id = egui::Id::new(("saya_icon_silver", name, dark, fill));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
-                let rgba = image.to_rgba8();
+                let mut rgba = image.to_rgba8();
+                if !matches!(name, "job-active" | "job-inactive") {
+                    silver_finish(&mut rgba, dark, fill);
+                }
                 painter.ctx().load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
@@ -426,7 +502,12 @@ mod tests {
                         mix(base, Color32::BLACK, 0.12),
                     ] {
                         let ink = foreground(fill);
-                        let image = if ink == Color32::WHITE { &dark } else { &light };
+                        let mut image = if ink == Color32::WHITE {
+                            dark.clone()
+                        } else {
+                            light.clone()
+                        };
+                        silver_finish(&mut image, ink == Color32::WHITE, fill);
                         for pixel in image.pixels().filter(|pixel| pixel[3] != 0) {
                             let color = Color32::from_rgb(pixel[0], pixel[1], pixel[2]);
                             assert!(contrast(fill, color) >= 4.5, "{sprite:?} / {fill:?}");
