@@ -185,20 +185,7 @@ impl App {
                                     if active { palette.gold } else { palette.dim },
                                     active,
                                 );
-                                if active {
-                                    pixel::marquee(ui, 80.0, palette.gold);
-                                } else {
-                                    let (track, _) = ui.allocate_exact_size(
-                                        egui::vec2(80.0, 18.0),
-                                        egui::Sense::hover(),
-                                    );
-                                    ui.painter().rect_stroke(
-                                        track,
-                                        style::control_radius(ui.ctx()),
-                                        egui::Stroke::new(1.0_f32, palette.dim),
-                                        egui::StrokeKind::Inside,
-                                    );
-                                }
+                                pixel::activity_track(ui, 80.0, palette.gold, active);
                             },
                         );
                         if active {

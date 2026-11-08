@@ -38,21 +38,23 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite) {
         });
 }
 
-pub fn progress(ui: &mut egui::Ui, width: f32, color: Color32) -> egui::Response {
+pub fn progress(ui: &mut egui::Ui, width: f32, color: Color32, active: bool) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::hover());
     let palette = Palette::of(ui);
     ui.painter().rect_filled(rect, 4, palette.raised);
-    let phase = (ui.input(|input| input.time) * 0.7).fract() as f32;
-    let segment = Rect::from_min_max(
-        egui::pos2(rect.left() + rect.width() * phase, rect.top()),
-        egui::pos2(
-            (rect.left() + rect.width() * phase + rect.width() * 0.3).min(rect.right()),
-            rect.bottom(),
-        ),
-    );
-    ui.painter().rect_filled(segment, 4, color);
-    ui.ctx()
-        .request_repaint_after(std::time::Duration::from_millis(30));
+    if active {
+        let phase = (ui.input(|input| input.time) * 0.7).fract() as f32;
+        let segment = Rect::from_min_max(
+            egui::pos2(rect.left() + rect.width() * phase, rect.top()),
+            egui::pos2(
+                (rect.left() + rect.width() * phase + rect.width() * 0.3).min(rect.right()),
+                rect.bottom(),
+            ),
+        );
+        ui.painter().rect_filled(segment, 4, color);
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(30));
+    }
     response
 }
 

@@ -658,11 +658,11 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     response
 }
 
-/// An indeterminate progress bar: a comet of lit cells sweeping through a sunken track.
-pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
+/// A themed activity track with identical geometry while idle and active.
+pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: bool) -> Response {
     let m = style::metrics(ui.ctx());
     if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-        return crate::app::rendering::modern::progress(ui, width, color);
+        return crate::app::rendering::modern::progress(ui, width, color, active);
     }
     const CELL: f32 = 8.0;
     const GAP: f32 = 2.0;
@@ -670,9 +670,11 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 18.0), Sense::hover());
     let painter = ui.painter();
-    ui.ctx().request_repaint_after(MARQUEE_FRAME);
+    if active {
+        ui.ctx().request_repaint_after(MARQUEE_FRAME);
+    }
     if Skin::of(ui.ctx()).finish == Finish::Glass {
-        glass::progress(painter, rect, color, ui.input(|input| input.time));
+        glass::progress(painter, rect, color, ui.input(|input| input.time), active);
         return response;
     }
     painter.rect_filled(rect, 0.0, palette.sunken);
@@ -686,7 +688,9 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let cells = ((track.width() + GAP) / (CELL + GAP)).floor().max(1.0) as usize;
     let step = (ui.input(|input| input.time) * 14.0) as usize % (cells + TRAIL);
     for cell in 0..cells {
-        let behind = step.checked_sub(cell).filter(|distance| *distance < TRAIL);
+        let behind = step
+            .checked_sub(cell)
+            .filter(|distance| active && *distance < TRAIL);
         let fill = match behind {
             Some(distance) => mix(color, palette.sunken, distance as f32 / TRAIL as f32),
             None => mix(palette.sunken, palette.outline, 0.4),
@@ -939,6 +943,31 @@ pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn activity_track_keeps_its_size_when_idle_in_every_theme() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let context = egui::Context::default();
+                style::install(&context, skin);
+                context.set_theme(theme);
+                let mut active_size = None;
+                let mut idle_size = None;
+                let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                    active_size = Some(
+                        activity_track(ui, 80.0, Palette::of(ui).gold, true)
+                            .rect
+                            .size(),
+                    );
+                    idle_size = Some(
+                        activity_track(ui, 80.0, Palette::of(ui).gold, false)
+                            .rect
+                            .size(),
+                    );
+                });
+                assert_eq!(active_size, idle_size, "{} {theme:?}", skin.id);
+            }
+        }
+    }
     use super::*;
     use crate::app::theme::skins;
 
