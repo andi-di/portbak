@@ -112,8 +112,8 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                     for pixel in rgba.pixels_mut() {
                         let red = pixel[0].saturating_sub(pixel[1]) > 25;
                         let color = match (dark, red) {
-                            (true, false) => [112, 110, 115],
-                            (true, true) => [88, 80, 88],
+                            (true, false) => [85, 84, 89],
+                            (true, true) => [67, 61, 68],
                             (false, false) => [53, 30, 48],
                             (false, true) => [119, 31, 65],
                         };
@@ -378,25 +378,40 @@ pub fn paint_bats(painter: &egui::Painter) {
         } else {
             Sprite::BatDown
         };
-        draw_moving(
-            painter,
-            Rect::from_center_size(bat.position, Vec2::splat(48.0 + (index % 5) as f32 * 2.0)),
-            sprite,
-            Color32::WHITE,
-            SpritePose {
-                mirrored: bat.facing_left,
-                flap: if bat.perched {
-                    0.0
-                } else {
-                    (time * 12.0 + index as f32).sin()
-                },
-                angle: if bat.perched {
-                    0.0
-                } else {
-                    (bat.velocity.y * 0.002).clamp(-0.12, 0.12)
-                },
+        let rect =
+            Rect::from_center_size(bat.position, Vec2::splat(48.0 + (index % 5) as f32 * 2.0));
+        let pose = SpritePose {
+            mirrored: bat.facing_left,
+            flap: if bat.perched {
+                0.0
+            } else {
+                (time * 12.0 + index as f32).sin()
             },
-        );
+            angle: if bat.perched {
+                0.0
+            } else {
+                (bat.velocity.y * 0.002).clamp(-0.12, 0.12)
+            },
+        };
+        draw_moving(painter, rect, sprite, Color32::WHITE, SpritePose { ..pose });
+        let (eyes, y) = if bat.perched {
+            ([56.5, 69.5], 92.5)
+        } else {
+            ([57.0, 69.0], 56.0)
+        };
+        for x in eyes {
+            let u = if bat.facing_left {
+                1.0 - x / 128.0
+            } else {
+                x / 128.0
+            };
+            let center = sprite_point(rect, u, y / 128.0, &pose);
+            painter.rect_filled(
+                Rect::from_center_size(center, Vec2::splat(1.7)),
+                0,
+                Color32::from_rgb(215, 58, 72),
+            );
+        }
     }
 }
 
