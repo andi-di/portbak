@@ -5,9 +5,9 @@ use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
-pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
+pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) {
     let (name, bytes) = icon_asset(sprite);
-    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let dark = u16::from(tint.r()) + u16::from(tint.g()) + u16::from(tint.b()) > 400;
     let id = egui::Id::new(("saya_icon_contrast", name, dark));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));

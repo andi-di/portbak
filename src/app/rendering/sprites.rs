@@ -336,7 +336,7 @@ pub fn paint_awake(
         Finish::Pixel => paint_bitmap(painter, origin, sprite.bitmap(), scale, tint),
         Finish::Gothic => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
-            crate::app::rendering::gothic::icon(painter, rect, sprite);
+            crate::app::rendering::gothic::icon(painter, rect, sprite, tint);
         }
         Finish::Modern => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
