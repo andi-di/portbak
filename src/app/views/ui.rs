@@ -263,6 +263,11 @@ impl App {
 
     /// Draws the job as a cartridge-like card; returns whether it was clicked.
     fn job_card(&self, ui: &mut egui::Ui, job: &Job) -> bool {
+        ui.push_id(job.id, |ui| self.job_card_contents(ui, job))
+            .inner
+    }
+
+    fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
         let palette = Palette::of(ui);
         let selected = self.selected == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
@@ -342,18 +347,22 @@ impl App {
                     egui::pos2(icon_rect.right() + gap, row.top()),
                     egui::pos2(name_right.max(icon_rect.right() + gap), row.bottom()),
                 );
-                ui.scope_builder(
-                    egui::UiBuilder::new()
-                        .id_salt((job.id, "name"))
-                        .max_rect(name_rect)
-                        .layout(egui::Layout::left_to_right(egui::Align::Center)),
-                    |ui| {
-                        ui.add(
-                            egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
-                                .truncate(),
-                        );
-                    },
+                let mut text = egui::text::LayoutJob::simple(
+                    job.name.clone(),
+                    egui::TextStyle::Body.resolve(ui.style()),
+                    palette.ink,
+                    name_rect.width(),
                 );
+                text.wrap.max_rows = 1;
+                text.wrap.break_anywhere = true;
+                let galley = ui.painter().layout_job(text);
+                let origin = egui::pos2(
+                    name_rect.left(),
+                    name_rect.center().y - galley.size().y / 2.0,
+                );
+                ui.painter()
+                    .with_clip_rect(name_rect.intersect(ui.clip_rect()))
+                    .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
         let response = ui
@@ -488,7 +497,7 @@ mod tests {
     use crate::model::Config;
 
     #[test]
-    fn disabling_job_keeps_name_layout_stable_across_frames() {
+    fn toggling_job_keeps_name_layout_stable_without_id_clashes() {
         for skin in skins::ALL {
             for theme in [egui::Theme::Light, egui::Theme::Dark] {
                 let ctx = egui::Context::default();
@@ -500,15 +509,19 @@ mod tests {
                     tempfile::tempfile().unwrap(),
                 );
                 let mut job = Job {
-                    name: "Artifact test job".into(),
+                    name: "Artifact test job with a long name".into(),
                     enabled: true,
                     next_run: Some(Utc::now() + chrono::Duration::minutes(10)),
                     ..Job::default()
                 };
                 let mut first_disabled = None;
-                for frame in 0..6 {
+                let mut enabled_name = None;
+                for frame in 0..9 {
                     if frame == 3 {
                         job.enabled = false;
+                    }
+                    if frame == 6 {
+                        job.enabled = true;
                     }
                     let output = ctx.run_ui(egui::RawInput::default(), |ui| {
                         ui.set_width(300.0);
@@ -527,8 +540,24 @@ mod tests {
                     if frame == 3 {
                         first_disabled = Some(name);
                     }
-                    if frame > 3 {
+                    assert!(
+                        !output.shapes.iter().any(|shape| match &shape.shape {
+                            egui::Shape::Text(text) =>
+                                text.galley.text().contains("ID ")
+                                    || text.galley.text().contains("Double use"),
+                            _ => false,
+                        }),
+                        "{} {theme:?}: widget-ID collision",
+                        skin.id
+                    );
+                    if frame == 2 {
+                        enabled_name = Some(name);
+                    }
+                    if frame > 3 && frame < 6 {
                         assert_eq!(Some(name), first_disabled, "{} {theme:?}", skin.id);
+                    }
+                    if frame >= 6 {
+                        assert_eq!(Some(name), enabled_name, "{} {theme:?}", skin.id);
                     }
                 }
             }
