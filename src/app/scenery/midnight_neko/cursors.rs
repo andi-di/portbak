@@ -46,11 +46,11 @@ fn arrow(painter: &egui::Painter, tip: Pos2) {
             Stroke::NONE,
         ));
     };
-    face(&[(0.0, 0.0), (-7.0, 28.0), (0.0, 21.0)], LIGHT);
-    face(&[(0.0, 0.0), (0.0, 21.0), (7.0, 28.0)], SILVER);
+    face(&[(0.0, 0.0), (-9.0, 28.0), (0.0, 21.0)], LIGHT);
+    face(&[(0.0, 0.0), (0.0, 21.0), (9.0, 28.0)], SILVER);
     face(&[(0.0, 3.0), (0.0, 21.0), (1.0, 22.0)], SHADE);
     painter.add(egui::Shape::closed_line(
-        vec![at(0.0, 0.0), at(-7.0, 28.0), at(0.0, 21.0), at(7.0, 28.0)],
+        vec![at(0.0, 0.0), at(-9.0, 28.0), at(0.0, 21.0), at(9.0, 28.0)],
         Stroke::new(1.3_f32, RIM),
     ));
     face(
