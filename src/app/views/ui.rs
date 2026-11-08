@@ -94,6 +94,12 @@ impl App {
                             .selected(self.settings_open);
                         if ui.add(settings).on_hover_text("Settings").clicked() {
                             self.settings_open = !self.settings_open;
+                            if self.settings_open {
+                                crate::app::scenery::catgirl::trigger(
+                                    ui.ctx(),
+                                    crate::app::scenery::catgirl::Action::Settings,
+                                );
+                            }
                         }
                         let dark = self.config.theme == Theme::Dark;
                         let (label, sprite) = if dark {
@@ -246,6 +252,10 @@ impl App {
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
+                    crate::app::scenery::catgirl::trigger(
+                        ui.ctx(),
+                        crate::app::scenery::catgirl::Action::NewJob,
+                    );
                 }
                 ui.add_space(12.0);
                 let mascot_height =
@@ -270,6 +280,12 @@ impl App {
                     });
                 if let Some(id) = clicked {
                     self.selected = (self.selected != Some(id)).then_some(id);
+                    if self.selected.is_some() {
+                        crate::app::scenery::catgirl::trigger(
+                            ui.ctx(),
+                            crate::app::scenery::catgirl::Action::SelectJob,
+                        );
+                    }
                     self.settings_open = false;
                 }
                 if show_mascot {

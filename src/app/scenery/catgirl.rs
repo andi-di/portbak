@@ -10,6 +10,45 @@ use std::time::Duration;
 
 const REACTION_SECONDS: f64 = 3.0;
 
+fn state_id() -> egui::Id {
+    egui::Id::new("saya_sidebar_companion")
+}
+
+#[derive(Clone, Copy)]
+pub enum Action {
+    NewJob,
+    CheckNow,
+    RemoveJob,
+    Settings,
+    SelectJob,
+}
+
+impl Action {
+    fn expression(self) -> Expression {
+        match self {
+            Self::NewJob => Expression::Happy,
+            Self::CheckNow => Expression::Energetic,
+            Self::RemoveJob => Expression::Pouting,
+            Self::Settings => Expression::Curious,
+            Self::SelectJob => Expression::Waiting,
+        }
+    }
+}
+
+pub fn trigger(ctx: &egui::Context, action: Action) {
+    if !crate::app::theme::style::Skin::of(ctx).effects.hearts {
+        return;
+    }
+    let time = ctx.input(|input| input.time);
+    let random = uuid::Uuid::new_v4().as_u128();
+    ctx.data_mut(|data| {
+        let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
+        state.request_expression(action.expression(), time, random);
+        data.insert_temp(state_id(), state);
+    });
+    ctx.request_repaint();
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 
 enum Expression {
@@ -222,12 +261,53 @@ impl Expression {
 struct Companion {
     expression: Expression,
     until: f64,
+    next_random: Option<f64>,
+    hovered: bool,
+    pending: Option<Expression>,
     displayed: Expression,
     line_indices: [Option<usize>; 27],
 }
 
 impl Companion {
+    fn schedule(&mut self, time: f64, random: u128) {
+        self.next_random = Some(time + 18.0 + (random as u64 % 37_001) as f64 / 1000.0);
+    }
+
+    fn tick(&mut self, time: f64, hovered: bool, random: u128) {
+        if !hovered {
+            if let Some(expression) = self.pending.take() {
+                self.set_expression(expression, time, random);
+                return;
+            }
+        }
+        match self.next_random {
+            None => self.schedule(time, random),
+            Some(deadline)
+                if time >= deadline && !hovered && self.visible(time) == Expression::Neutral =>
+            {
+                self.react(time, random)
+            }
+            _ => {}
+        }
+    }
+
+    fn request_expression(&mut self, expression: Expression, time: f64, random: u128) {
+        if self.hovered {
+            self.pending = Some(expression);
+        } else {
+            self.set_expression(expression, time, random);
+        }
+    }
+
+    fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
+        self.expression = expression;
+        self.until = time + REACTION_SECONDS;
+        self.select_line(expression, random.rotate_left(64));
+        self.schedule(time, random);
+    }
+
     fn hold_while_hovered(&mut self, hovered: bool, time: f64) {
+        self.hovered = hovered;
         if hovered && self.visible(time) != Expression::Neutral {
             self.until = time + REACTION_SECONDS;
         }
@@ -258,10 +338,7 @@ impl Companion {
     }
 
     fn react(&mut self, time: f64, random: u128) {
-        self.expression = self.expression.next(random);
-
-        self.until = time + REACTION_SECONDS;
-        self.select_line(self.expression, random.rotate_left(64));
+        self.set_expression(self.expression.next(random), time, random);
     }
 }
 
@@ -334,7 +411,7 @@ pub fn reserved_height(width: f32) -> f32 {
 pub fn show(ui: &mut egui::Ui) {
     let time = ui.input(|input| input.time);
 
-    let id = egui::Id::new("saya_sidebar_companion");
+    let id = state_id();
 
     let mut state: Companion = ui
         .ctx()
@@ -347,10 +424,12 @@ pub fn show(ui: &mut egui::Ui) {
 
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, width), egui::Sense::click());
 
-    if response.clicked() {
-        state.react(time, uuid::Uuid::new_v4().as_u128());
-    }
     state.hold_while_hovered(response.hovered(), time);
+    if response.clicked() {
+        let random = uuid::Uuid::new_v4().as_u128();
+        state.request_expression(state.expression.next(random), time, random);
+    }
+    state.tick(time, response.hovered(), uuid::Uuid::new_v4().as_u128());
 
     let expression = state.visible(time);
     if state.displayed != expression || state.line_indices[expression as usize].is_none() {
@@ -372,6 +451,10 @@ pub fn show(ui: &mut egui::Ui) {
             .request_repaint_after(Duration::from_secs_f64(state.until - time));
     }
 
+    if let Some(deadline) = state.next_random {
+        ui.ctx()
+            .request_repaint_after(Duration::from_secs_f64((deadline - time).max(0.25)));
+    }
     ui.ctx().data_mut(|data| data.insert_temp(id, state));
 }
 
@@ -392,6 +475,31 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn random_deadlines_vary_and_do_not_interrupt_hovered_reactions() {
+        let mut state = super::Companion::default();
+        state.tick(0.0, false, 1000);
+        assert_eq!(state.next_random, Some(19.0));
+        state.tick(18.9, false, 2000);
+        assert_eq!(state.visible(18.9), super::Expression::Neutral);
+        state.tick(19.0, false, 2000);
+        let expression = state.visible(19.0);
+        assert_ne!(expression, super::Expression::Neutral);
+        assert_eq!(state.next_random, Some(39.0));
+        state.set_expression(expression, 40.0, 2000);
+        state.hold_while_hovered(true, 41.0);
+        state.next_random = Some(41.0);
+        state.request_expression(super::Expression::Curious, 41.0, 3000);
+        let line = state.line(41.0);
+        state.tick(41.0, true, 4000);
+        assert_eq!(state.visible(41.0), expression);
+        assert_eq!(state.line(41.0), line);
+        state.hold_while_hovered(false, 41.1);
+        state.tick(41.1, false, 5000);
+        assert_eq!(state.visible(41.1), super::Expression::Curious);
+        assert!(state.next_random.unwrap() > 41.1 + 18.0);
+    }
+
     #[test]
     fn dialogue_varies_without_repeating_each_expressions_previous_line() {
         let mut state = super::Companion::default();

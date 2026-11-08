@@ -88,11 +88,20 @@ impl App {
             });
         if add {
             self.add_job();
+            crate::app::scenery::catgirl::trigger(
+                &ctx,
+                crate::app::scenery::catgirl::Action::NewJob,
+            );
         }
         if let Some((id, was_enabled)) = activation {
             self.job_activation_changed(id, was_enabled);
         }
         if let Some((id, action)) = action {
+            let reaction = match action {
+                JobAction::Check => crate::app::scenery::catgirl::Action::CheckNow,
+                JobAction::Remove => crate::app::scenery::catgirl::Action::RemoveJob,
+            };
+            crate::app::scenery::catgirl::trigger(&ctx, reaction);
             self.apply(id, action);
         }
     }
