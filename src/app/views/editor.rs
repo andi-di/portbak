@@ -435,12 +435,22 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
                 .min_decimals(0),
         );
         if show_next_check {
+            ui.add_space(12.0);
             let next = if job.has_runnable_schedule() {
                 local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
             } else {
                 "Select at least one weekday".into()
             };
-            ui.label(format!("Next check: {next}"));
+            style::well(ui.ctx())
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(next.to_uppercase())
+                            .font(style::label_font(ui.ctx()))
+                            .color(Palette::of(ui).good),
+                    );
+                })
+                .response
+                .on_hover_text("Next check according to the current schedule");
         }
     });
 }
