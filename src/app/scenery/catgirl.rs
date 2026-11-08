@@ -21,9 +21,6 @@ pub enum Action {
     RemoveJob,
     Settings,
     SelectJob,
-    BackupCompleted,
-    FirstBackup,
-    NoChanges,
     Failed,
     AutomaticEnabled,
     AutomaticDisabled,
@@ -37,12 +34,7 @@ pub enum Action {
 impl Action {
     fn priority(self) -> u8 {
         match self {
-            Self::BackupCompleted
-            | Self::FirstBackup
-            | Self::NoChanges
-            | Self::Failed
-            | Self::RestoreCompleted
-            | Self::ProtectionEnabled => 2,
+            Self::Failed | Self::RestoreCompleted | Self::ProtectionEnabled => 2,
             _ => 1,
         }
     }
@@ -54,9 +46,6 @@ impl Action {
             Self::RemoveJob => Expression::Pouting,
             Self::Settings => Expression::Curious,
             Self::SelectJob => Expression::Waiting,
-            Self::BackupCompleted => Expression::Smug,
-            Self::FirstBackup => Expression::Celebrating,
-            Self::NoChanges => Expression::BoredExpectant,
             Self::Failed => Expression::Sad,
             Self::AutomaticEnabled => Expression::Energetic,
             Self::AutomaticDisabled => Expression::Pouting,
