@@ -8,7 +8,6 @@ use eframe::egui;
 use std::path::{Path, PathBuf};
 
 pub const DATE_TIME: &str = "%d.%m.%Y %H:%M:%S";
-pub const DATE_MINUTE: &str = "%d.%m.%Y %H:%M";
 pub const DATE: &str = "%a %d.%m.%Y";
 pub const TIME: &str = "%H:%M:%S";
 
