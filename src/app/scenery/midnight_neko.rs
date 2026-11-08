@@ -112,8 +112,8 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                     for pixel in rgba.pixels_mut() {
                         let red = pixel[0].saturating_sub(pixel[1]) > 25;
                         let color = match (dark, red) {
-                            (true, false) => [174, 139, 161],
-                            (true, true) => [208, 111, 144],
+                            (true, false) => [112, 110, 115],
+                            (true, true) => [88, 80, 88],
                             (false, false) => [53, 30, 48],
                             (false, true) => [119, 31, 65],
                         };
