@@ -31,7 +31,7 @@ struct Permissions {
     busy: bool,
     /// Activation cannot change during a restore or while the Backups tab is open.
     locked: bool,
-    backup_running: bool,
+    finishing_disabled_backup: bool,
 }
 
 impl App {
@@ -44,7 +44,9 @@ impl App {
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
-            backup_running: self.active == Some(id) && !self.restoring,
+            finishing_disabled_backup: self.active == Some(id)
+                && !self.restoring
+                && self.disabled_during_backup,
         });
         let can_add = self.can_add_job();
         let selected = self.selected;
@@ -155,7 +157,7 @@ fn job_editor(
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
     job_status(ui, job);
-    if !job.enabled && permissions.backup_running {
+    if !job.enabled && permissions.finishing_disabled_backup {
         alert(
             ui,
             palette.gold,
