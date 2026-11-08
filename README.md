@@ -32,18 +32,20 @@ controls improve readability. Buttons choose icon contrast for their own fill.
 Alert and resting Saya heads distinguish jobs with automatic backups enabled or disabled. Saya's
 pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
-A quiet moonlit rose garden has larger cursor-aware bats that hang from the top
-edge on individual timers, scatter into separate roaming areas, and return to
+An asymmetric vampire estate places a castle and winding stairs at lower right,
+with a silver crescent, drifting clouds and mist, distant mountains, thorn roses
+and subtly flickering windows. Larger cursor-aware bats sometimes circle a tower
+and hang from the top edge on individual timers, scatter into separate roaming areas, and return to
 roost after randomized delays. Their near-black light-mode and black dark-mode colors keep the
-bats subdued. The garden also has falling petals and a sparse
+bats subdued. The estate also has falling petals and a sparse
 petal/crescent pointer trail. Effects are always enabled in this look. Bats use
 smooth wing motion and face their direction of travel; varied petals tumble
 through the garden. A faceted silver arrowhead and matching pointing gauntlet
 style the normal and clickable cursors. Saya's sidebar
 expression stays while hovered and returns to neutral three seconds after the
 pointer leaves, with varied dialogue for each expression. She also reacts on
-randomized timers, job and settings actions, and backup and restore outcomes; hovering freezes her reaction
-and dialogue until the pointer leaves.
+randomized timers, job and settings actions, and backup and restore outcomes;
+hovering freezes her reaction and dialogue until the pointer leaves.
 The footer's silver crescent and crimson gem animate during backup activity,
 with progress available in its tooltip.
 

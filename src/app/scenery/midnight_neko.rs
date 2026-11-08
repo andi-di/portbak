@@ -1,6 +1,7 @@
 //! Moonlit roses, cursor-aware bats and sparse petal/crescent trails.
 
 mod cursors;
+mod estate;
 
 use crate::app::rendering::ornaments::noise;
 use crate::app::theme::style::Palette;
@@ -16,7 +17,8 @@ const LIFETIME: f32 = 1.0;
 
 #[derive(Clone, Copy)]
 enum Sprite {
-    Garden,
+    Castle,
+    Moon,
     BatDown,
     Perched,
     Petal,
@@ -29,9 +31,13 @@ enum Sprite {
 impl Sprite {
     fn asset(self) -> (&'static str, &'static [u8]) {
         match self {
-            Self::Garden => (
-                "garden",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/garden.png"),
+            Self::Castle => (
+                "castle",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/castle.png"),
+            ),
+            Self::Moon => (
+                "moon",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/moon.png"),
             ),
             Self::BatDown => (
                 "bat_down",
@@ -104,7 +110,12 @@ fn state_id() -> egui::Id {
 fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandle> {
     let (name, bytes) = sprite.asset();
     let dark = painter.ctx().global_style().visuals.dark_mode;
-    let id = egui::Id::new(("saya_scenery", name, dark));
+    let phase = if matches!(sprite, Sprite::Castle) {
+        painter.ctx().input(|input| (input.time * 0.7) as u32 % 8)
+    } else {
+        0
+    };
+    let id = egui::Id::new(("saya_scenery", name, dark, phase));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
@@ -121,6 +132,18 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                             (false, true) => [119, 31, 65],
                         };
                         pixel.0[..3].copy_from_slice(&color);
+                    }
+                }
+                if matches!(sprite, Sprite::Castle) {
+                    let height = rgba.height();
+                    for (x, y, pixel) in rgba.enumerate_pixels_mut() {
+                        if y < height * 2 / 3 && pixel[0].saturating_sub(pixel[1]) > 35 {
+                            let flicker = noise(x / 16 + y / 16 * 100, phase) > 0.85;
+                            if flicker {
+                                pixel[0] = pixel[0].saturating_add(35);
+                                pixel[1] = pixel[1].saturating_add(12);
+                            }
+                        }
                     }
                 }
                 painter.ctx().load_texture(
@@ -212,6 +235,12 @@ fn home(screen: Rect, index: usize, size: f32) -> Pos2 {
 }
 
 fn flight_target(screen: Rect, index: usize, bat: &Bat, time: f32) -> Pos2 {
+    if index.is_multiple_of(3) && (time + noise(bat.seed, 51) * 100.0).rem_euclid(53.0) < 9.0 {
+        let castle = estate::castle_rect(screen);
+        let center = castle.min + castle.size() * egui::vec2(0.45, 0.25);
+        let angle = time * 1.4 + noise(bat.seed, 52) * std::f32::consts::TAU;
+        return center + egui::vec2(angle.cos() * 75.0, angle.sin() * 28.0);
+    }
     // Separate territories prevent scattered bats from gathering into one flock.
     let phase = time * 0.3 + noise(bat.seed, 11) * 6.0;
     let x = (index % 4) as f32 + 0.5 + phase.sin() * 0.3;
@@ -374,13 +403,7 @@ pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
 pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
     let ctx = painter.ctx();
     let screen = ctx.content_rect();
-    let dark = ctx.global_style().visuals.dark_mode;
-    draw(
-        painter,
-        screen,
-        Sprite::Garden,
-        Color32::WHITE.gamma_multiply(if dark { 0.16 } else { 0.12 }),
-    );
+    estate::paint(painter);
     let time = ctx.input(|input| input.time) as f32;
     paint_bats(painter);
     for index in 0..PETAL_COUNT {
