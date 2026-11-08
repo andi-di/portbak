@@ -32,27 +32,35 @@ All application-owned interface text, errors, defaults, comments, and documentat
 
 Provide:
 
-- A job list with job name, schedule enabled/disabled state, running/queued indication, and latest result. Its divider remains at the selected width after dragging and is restored after restarting.
-- An editor for the selected job. Show a green status dot beside enabled job names in both the list and the detail heading, including while waiting for the next check. Hide it when automatic backups are disabled; an inactive job running a manual check does not show the dot.
+- A job list showing only each job’s icon, name, and right-aligned next-check countdown in one vertically centered row. Box the countdown like the scheduling readout, without a text prefix; hide it when scheduling is disabled. Its divider remains at the selected width after dragging and is restored after restarting.
+- Clicking the selected job deselects it and returns to the start screen.
+- At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
+- Show the last backup time and latest result in a compact status row below the job header; show errors prominently. Do not use a separate Status pane.
+- An editor for the selected job.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
+- Place an icon-only open-in-file-manager button beside each job source and destination folder chooser. Enable it only for an existing folder; provide a tooltip and report launch failures.
 - A **Light/Dark** toggle in the top toolbar next to **Settings**. On first launch without `portbak.json`, resolve the system appearance and persist **Light** or **Dark**; later launches use the saved choice. Resolve legacy **System** settings once, then persist the result.
 - A look selector in the settings view: **Retro** (pixel fonts and arcade colors), **Dark Fantasy** (serif capitals, engraved icons, forged plate buttons, crimson on black, drifting embers), **Modern** (neutral Zinc surfaces, blue accents, sans-serif typography, rounded controls and simple line icons; job counts, ZIP icons, last-backup readouts and job icons use neutral text colors) and **Frutiger Aero** (glossy icons, clear glass and gel buttons on frosted glass panes, dialogs, menus and tooltips that blur what lies behind them (with OpenGL 3; tinted see-through glass otherwise), with bevelled edges, reflections and shimmer, over an animated scene: sunburst and lens flare or stars and aurora by night, clouds, a spinning glass globe, gulls, schooling fish in five shapes and two colors each that chase and gulp bubbles, breathe bubbles and flee the pointer (pufferfish blow up), falling leaves, hills, a rolling sea and rising bubbles that pop under the pointer; clicks send a refracting shockwave (plain ripples without OpenGL 3) and the pointer trails bubbles), and **Midnight Neko** (opaque matte charcoal/crimson panels in Dark mode and pale-stone panels in Light mode, silver lace-like corner filigree, thorn-and-diamond borders, crescent motifs, subtly patterned panels, flat controls, serif headings, and a matching pixel-art black-haired catgirl face icon. One adult black-haired, green-eyed gothic catgirl uses her upper-body avatar only in the spacious welcome view; use close-up portraits in the sidebar when space permits. Use fresh transparent, equal-cell sprite atlases with consistent character framing. Jobs use only expression portraits; welcome-screen reactions always remain upper-body. Do not draw a portrait frame or backdrop. Clicking her selects one of fourteen illustrated reactions/poses without repeating the previous selection: angry, annoyed puffed-cheek pout, cat-smug `:3`, excited, happy, surprised, superior, heart eyes, cold stare, sleepy with drool, bored, cheek resting on a hand with a sideways glance, wide-eyed yandere with tiny pupils, or shy. Each lasts four seconds before returning to the neutral default. Preserve the detailed illustrated eyes; no cursor-tracking overlays. Small muted ash motes and garnet/silver diamond sparks drift slowly; forty-five may pass in front of panels, fading near the pointer. A moderately dense diamond-and-spark cursor trail fades over 0.7 seconds and adds small click bursts. Decorations do not intercept input; only the companion portrait accepts clicks). Default: **Retro**. Each look has a light and a dark variant that follows the theme selector. Persist the selection; an unknown saved look falls back to the default.
-- A status area showing current activity, progress, and settings-save errors.
+- A footer with steady text and a dedicated, right-aligned activity indicator in a fixed space. Keep it active for 750 ms after checks finish so fast operations remain visible; expose progress in its tooltip. Show settings-save errors clearly; omit the settings-file path.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to an 1100 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to a 1280 × 960 logical-pixel window, with room below the job controls.
 
 The application remains a single distributable executable with an embedded icon. On Windows, use the app icon for the executable in Explorer and shortcuts as well as the app window. Under Linux, offer that icon directly to X11 and to Wayland compositors supporting window-icon pixel data. Missing support, icon setup errors, or an unresponsive icon negotiation must not block startup, show an error dialog, or prevent normal use; retain the compositor default icon. Do not install desktop entries or extract icon files.
 
 ### Job actions
 
-- **New job**: create and select a new independent job.
+- **New job**: create and select a new independent job in its settings tab, including while browsing backups. Disable during restoration or while saving backup protection; preserve existing jobs when leaving their history.
 - **Check now**: queue a check regardless of whether automatic scheduling is enabled. This is not an unconditional backup command.
-- **Restore backup…**: when no operation is active or queued, asynchronously list this job's recorded versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Pause automatic starts while the dialog is open. Show the full resolved source path, selected version, and an explicit warning that all current source contents will be replaced. Require a red **Replace contents and restore** confirmation; cancellation changes nothing.
-- **Manage backups…**: beside Restore, open the same history overview when no operation is running or queued, without requiring an available source folder. Pause automatic starts while open. Show each saved version’s protection checkbox and save changes in the background. Disable further edits and closing while saving; report errors without pretending the protection changed. Closing preserves job activation. Missing versions are marked unavailable, but existing protection can be removed.
-- At the default main-window size, the restore dialog must show its instructions, full source path, selected-version details, warning, and action buttons without outer scrolling in every look, both before and after selecting a backup. The backup list may scroll independently. Keep outer scrolling available for smaller windows or unusually long content.
-- In both history dialogs, subtly highlight the first list entry of each local calendar day, newest first. Keep selection and protection independently recognizable. Wrap job action buttons on narrow windows.
-- Show retention capacity warnings in the management overview and job details; refresh after protection changes, limit changes, and backup completion.
+- Each job has **Job settings** and **Backups** tabs. The Backups tab replaces restoration and management overview dialogs; load recorded versions asynchronously when no operation is active or queued. Pause automatic starts while browsing backups; leaving the tab preserves job activation.
+- List saved versions newest first with date, name, size, and folder/ZIP type. Mark missing versions unavailable. Each entry has a **Locked** checkbox protecting it from retention deletion; save changes in the background, disable further edits while saving, and report failures without displaying unsaved protection. Missing versions may be unlocked. Browsing and protection do not require an available source folder.
+- Each backup row has an icon-only button to open its location in the system file manager. Open folder backups directly; select ZIP backups in Windows Explorer or open their parent folder on Linux. Disable for unavailable backups and report launch failures.
+- Backup rows are not selectable. Each row has an icon-only restore button with a tooltip. Clicking it opens a confirmation modal for that backup, showing the resolved source path, version, replacement warning, **Cancel**, and a red **Replace contents and restore** button. Only confirmation starts restoration; Cancel, Escape, or backdrop dismissal changes neither source nor activation. Require an available backup and source folder to restore.
+- Keep the Backups tab usable in narrow windows in every look. Allow the backup list and the surrounding content to scroll; wrap long names and paths.
+- With no destination selected, prompt the user to choose one in Job settings instead of loading history or showing a filesystem error.
+- Size restore confirmation to avoid scrolling at the default window size; allow scrolling in smaller windows. Place **Cancel** on the left and the restore confirmation button on the right.
+- In the Backups tab, subtly highlight the first list entry of each local calendar day, newest first. Keep protection clearly recognizable. Wrap job action buttons on narrow windows.
+- Show retention capacity warnings in the Backups tab and job details; refresh after protection changes, limit changes, and backup completion.
 - On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits and manual starts while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
@@ -76,10 +84,11 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 - Each job has an **Auto destination folder** checkbox. Checking it restores automatic destination updates without moving manual-folder contents.
 - Choosing or typing a manual destination unchecks **Auto destination folder**, including choosing the same folder. Older source-named automatic destinations migrate to job-name paths when opened for editing while idle, preserving backups. Ignore obsolete naming-choice fields.
 - Existing jobs retain their saved values when loading older configurations.
+- Enable automatic backups only after both source and destination folders are chosen.
 
 | Setting | Behavior and default |
 | --- | --- |
-| Name | Editable display name, limited to 50 characters; default **New job** |
+| Name | Editable display name, limited to 50 characters; initially empty |
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
 | Destination folder | Automatic destination enabled by default; generated on source selection; manually editable |
 | Automatic scheduling | Disabled by default |
@@ -99,6 +108,8 @@ Also persist the next scheduled check, last successful backup time, and latest j
 ## 5. Scheduling
 
 ### Modes
+
+- In Daily and Weekdays job settings, show the next check in a boxed readout without a label, with spacing after the local-time controls, based on the current schedule even while disabled. Vertically center controls and readout in every theme; always display minutes with two digits. In Weekdays mode, place day selection above local time.
 
 1. **Interval:** enter a duration as hours:minutes:seconds in jobs and new-job defaults. Minutes and seconds range from 00 to 59; allow hours above 23. Clamp the total to one second through 365 days. Preserve the duration of older saved value/unit settings.
 2. **Daily:** check once per day at the configured local time.
@@ -201,7 +212,7 @@ A backup operation must proceed in this order:
 6. Publish the verified backup under its final name and persist its successful record.
 7. Only then apply rolling retention.
 
-Display the current phase and useful progress, such as files processed and current relative path. Report unavailable folders, unreadable files, write failures, insufficient space, verification mismatches, and source changes clearly.
+Expose the current phase and useful progress, such as files processed and current relative path, in the footer activity indicator’s tooltip. Report unavailable folders, unreadable files, write failures, insufficient space, verification mismatches, and source changes clearly.
 
 On failure before successful publication/recording, do not advance the comparison baseline or delete previous successful backups. Clean up temporary output where possible. If retention fails after a successful backup, retain the new backup and report successful creation with a separate cleanup warning.
 
@@ -291,7 +302,7 @@ Use temporary fixtures for automated tests and keep real user data untouched.
 | Restore completes or fails | Job remains disabled; history and last backup time unchanged |
 | Protected versions with exceeded limits | Keep protected and newest versions; delete only eligible unprotected versions; report remaining excess |
 | Protection consumes count/size budget | Warn at three remaining places or 20% remaining size budget, inclusive |
-| History crosses local midnight | Highlight the first listed version of each local day in both dialogs |
+| History crosses local midnight | Highlight the first listed version of each local day in the Backups tab |
 | Narrow window with a wide job list | Selected job remains visible and usable without a crash |
 | Resize job list, then release and restart | Divider stays at the chosen width and is restored after restart |
 | Restart after normal edits | Settings, theme, next due time, and results restored |

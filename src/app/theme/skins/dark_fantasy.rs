@@ -58,8 +58,6 @@ pub static DARK_FANTASY: Skin = Skin {
         welcome_title: "THE VAULT LIES EMPTY",
         welcome_prompt: "KINDLE THE FIRST FLAME",
         ready: "KINDLED",
-        busy: "FORGING",
-        cursor: "",
     },
 };
 

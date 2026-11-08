@@ -4,7 +4,7 @@ use crate::app::rendering::pixel::{self, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
-use crate::app::views::widgets::{alert, display_path};
+use crate::app::views::widgets::alert;
 use crate::app::App;
 use crate::model::{Job, Theme};
 use chrono::Utc;
@@ -36,12 +36,13 @@ impl eframe::App for App {
         self.show_header(ui);
         self.show_footer(ui);
         self.show_job_list(ui);
+        self.close_inactive_history();
         if self.settings_open {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
         }
-        self.show_history(&ctx);
+        self.close_inactive_history();
         if self.config != before {
             self.dirty = true;
         }
@@ -160,31 +161,47 @@ impl App {
                         egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
                     ui.painter().rect_filled(rule, 0.0, palette.outline);
                 }
-                let wording = &Skin::of(ui.ctx()).wording;
                 ui.horizontal(|ui| {
-                    if self.active.is_some() {
-                        pixel::led(ui, palette.gold, pixel::blink(ui, 0.25));
-                        pixel::display_label(ui, wording.busy, 10.0, palette.gold);
-                        pixel::marquee(ui, 180.0, palette.gold);
-                        ui.label(&self.progress);
-                    } else {
-                        pixel::led(ui, palette.good, true);
-                        let ready = blinking_cursor(ui, wording.ready, wording.cursor);
-                        pixel::display_label(ui, &ready, 10.0, palette.good);
-                        ui.label(
-                            egui::RichText::new("Scheduling runs while the app is open")
-                                .color(palette.dim),
+                    pixel::display_label(ui, Skin::of(ui.ctx()).wording.ready, 10.0, palette.good);
+                    ui.label(
+                        egui::RichText::new("Scheduling runs while the app is open")
+                            .color(palette.dim),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let (rect, response) =
+                            ui.allocate_exact_size(egui::vec2(112.0, 24.0), egui::Sense::hover());
+                        let recent = self
+                            .activity_until
+                            .is_some_and(|until| until > std::time::Instant::now());
+                        let active = self.active.is_some() || recent;
+                        ui.scope_builder(
+                            egui::UiBuilder::new()
+                                .id_salt("activity")
+                                .max_rect(rect)
+                                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                            |ui| {
+                                pixel::led(
+                                    ui,
+                                    if active { palette.gold } else { palette.dim },
+                                    active,
+                                );
+                                pixel::activity_track(ui, 80.0, palette.gold, active);
+                            },
                         );
-                    }
+                        if active {
+                            response.on_hover_text(if self.active.is_some() {
+                                self.progress.as_str()
+                            } else {
+                                "Recent backup activity"
+                            });
+                        } else {
+                            response.on_hover_text("No backup or restore in progress");
+                        }
+                    });
                 });
                 if !self.error.is_empty() {
                     alert(ui, palette.bad, &self.error);
                 }
-                ui.label(
-                    egui::RichText::new(format!("SETTINGS  {}", display_path(&self.path)))
-                        .small()
-                        .color(palette.dim),
-                );
             });
     }
 
@@ -219,7 +236,7 @@ impl App {
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
-                if ui.add_enabled(!self.scheduling_paused(), new_job).clicked() {
+                if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
                 }
                 ui.add_space(12.0);
@@ -243,8 +260,8 @@ impl App {
                             }
                         }
                     });
-                if clicked.is_some() {
-                    self.selected = clicked;
+                if let Some(id) = clicked {
+                    self.selected = (self.selected != Some(id)).then_some(id);
                     self.settings_open = false;
                 }
                 if show_mascot {
@@ -262,9 +279,13 @@ impl App {
 
     /// Draws the job as a cartridge-like card; returns whether it was clicked.
     fn job_card(&self, ui: &mut egui::Ui, job: &Job) -> bool {
+        ui.push_id(job.id, |ui| self.job_card_contents(ui, job))
+            .inner
+    }
+
+    fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
         let palette = Palette::of(ui);
         let selected = self.selected == Some(job.id);
-        let running = self.active == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
         let card_id = ui.id().with(job.id);
         // The card's hover is only known after its contents, so wake the icon from last frame's.
@@ -276,84 +297,99 @@ impl App {
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         let width = ui.available_width() - CARD_SHADOW;
-        let mut lamp = egui::Rect::NOTHING;
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
-                ui.horizontal_top(|ui| {
-                    let tint = if job.enabled {
-                        palette.good
-                    } else {
-                        palette.metal
-                    };
-                    let tint = style::decorative_color(ui.ctx(), tint);
-                    sprites::show_awake(ui, Sprite::Floppy, 3.0, tint, wake);
-                    ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 2.0;
-                        ui.add(
-                            egui::Label::new(egui::RichText::new(&job.name).color(palette.ink))
-                                .truncate(),
-                        );
-                        ui.horizontal(|ui| {
-                            let (color, lit) = match (running, job.enabled) {
-                                (true, _) => (palette.gold, pixel::blink(ui, 0.25)),
-                                (false, true) => (palette.good, true),
-                                (false, false) => (palette.dim, false),
-                            };
-                            lamp = pixel::led(ui, color, lit).rect;
-                            ui.label(egui::RichText::new(self.activity(job)).small());
-                            if self.queue.contains(&job.id) {
-                                pixel::badge(ui, "Queued", palette.hot);
-                            }
-                        });
-                        if running {
-                            pixel::marquee(ui, ui.available_width().min(160.0), palette.gold);
-                        }
-                        if let Some(remaining) = job.countdown(Utc::now()) {
-                            ui.horizontal(|ui| {
-                                sprites::show(ui, Sprite::Clock, 1.0, palette.paper);
+                let countdown = job.countdown(Utc::now()).map(|value| value.to_uppercase());
+                let well = style::well(ui.ctx());
+                let countdown_size = countdown.as_ref().map_or(egui::Vec2::ZERO, |text| {
+                    ui.painter()
+                        .layout_no_wrap(text.clone(), style::label_font(ui.ctx()), palette.good)
+                        .size()
+                        + well.total_margin().sum()
+                });
+                let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 3.0);
+                let row_height = icon_size
+                    .y
+                    .max(countdown_size.y)
+                    .max(ui.text_style_height(&egui::TextStyle::Body));
+                let (row, _) = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width(), row_height),
+                    egui::Sense::hover(),
+                );
+                let icon_rect = egui::Rect::from_center_size(
+                    egui::pos2(row.left() + icon_size.x / 2.0, row.center().y),
+                    icon_size,
+                );
+                let tint = if job.enabled {
+                    palette.good
+                } else {
+                    palette.metal
+                };
+                sprites::paint_awake(
+                    ui.painter(),
+                    icon_rect.min,
+                    Sprite::Floppy,
+                    3.0,
+                    style::decorative_color(ui.ctx(), tint),
+                    wake,
+                );
+                let gap = ui.spacing().item_spacing.x;
+                let name_right = if let Some(remaining) = countdown {
+                    let rect = egui::Rect::from_center_size(
+                        egui::pos2(row.right() - countdown_size.x / 2.0, row.center().y),
+                        countdown_size,
+                    );
+                    ui.scope_builder(
+                        egui::UiBuilder::new()
+                            .id_salt((job.id, "countdown"))
+                            .max_rect(rect),
+                        |ui| {
+                            well.show(ui, |ui| {
                                 ui.label(
-                                    egui::RichText::new(format!("Next check in: {remaining}"))
-                                        .small()
-                                        .color(palette.accent),
+                                    egui::RichText::new(remaining)
+                                        .font(style::label_font(ui.ctx()))
+                                        .color(palette.good),
                                 );
                             });
-                        }
-                        let status_color = if job.status.starts_with("Error") {
-                            palette.bad
-                        } else {
-                            palette.dim
-                        };
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(&job.status).small().color(status_color),
-                            )
-                            .wrap(),
-                        );
-                    });
-                });
+                        },
+                    );
+                    rect.left() - gap
+                } else {
+                    row.right()
+                };
+                let name_rect = egui::Rect::from_min_max(
+                    egui::pos2(icon_rect.right() + gap, row.top()),
+                    egui::pos2(name_right.max(icon_rect.right() + gap), row.bottom()),
+                );
+                let mut text = egui::text::LayoutJob::simple(
+                    job.name.clone(),
+                    egui::TextStyle::Body.resolve(ui.style()),
+                    palette.ink,
+                    name_rect.width(),
+                );
+                text.wrap.max_rows = 1;
+                text.wrap.break_anywhere = true;
+                let galley = ui.painter().layout_job(text);
+                let origin = egui::pos2(
+                    name_rect.left(),
+                    name_rect.center().y - galley.size().y / 2.0,
+                );
+                ui.painter()
+                    .with_clip_rect(name_rect.intersect(ui.clip_rect()))
+                    .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
         let response = ui
             .interact(rect, card_id, egui::Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        pixel::tooltip(ui, lamp, card_id.with("lamp"), self.activity(job));
         ui.painter().set(
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),
         );
         ui.add_space(CARD_SHADOW + 4.0);
         response.clicked()
-    }
-
-    fn activity(&self, job: &Job) -> &'static str {
-        match (self.active == Some(job.id), self.restoring, job.enabled) {
-            (true, true, _) => "Restore running",
-            (true, false, _) => "Backup running",
-            (false, _, true) => "Schedule enabled",
-            (false, _, false) => "Schedule disabled",
-        }
     }
 }
 
@@ -394,15 +430,6 @@ fn logo(ui: &mut egui::Ui) {
             ui.label(egui::RichText::new(tagline).color(palette.accent));
         }
     });
-}
-
-/// `text` followed by a cursor that blinks, padded while hidden so the width stays put.
-fn blinking_cursor(ui: &egui::Ui, text: &str, cursor: &str) -> String {
-    if cursor.is_empty() || pixel::blink(ui, 0.5) {
-        format!("{text}{cursor}")
-    } else {
-        format!("{text}{}", " ".repeat(cursor.chars().count()))
-    }
 }
 
 fn card_shapes(
@@ -475,6 +502,147 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     use super::*;
     use crate::model::Config;
+
+    #[test]
+    fn check_transitions_do_not_emit_widget_id_warnings() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let mut app = App::new(
+                    Config {
+                        jobs: vec![Job {
+                            name: "My job".into(),
+                            ..Job::default()
+                        }],
+                        ..Config::default()
+                    },
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                let mut footer_label = None;
+                for frame in 0..8 {
+                    app.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
+                    app.progress = "Checking source files ...".into();
+                    app.config.jobs[0].status = if frame < 2 {
+                        "Not checked yet"
+                    } else {
+                        "No changes detected"
+                    }
+                    .into();
+                    let output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(1100.0, 960.0),
+                            )),
+                            ..Default::default()
+                        },
+                        |ui| {
+                            app.show_header(ui);
+                            app.show_footer(ui);
+                            app.show_job_list(ui);
+                            app.show_job_editor(ui);
+                        },
+                    );
+                    for shape in output.shapes {
+                        if let egui::Shape::Text(text) = shape.shape {
+                            if text.galley.text() == "Scheduling runs while the app is open" {
+                                let position = (text.pos, text.galley.size());
+                                if frame == 2 {
+                                    footer_label = Some(position);
+                                }
+                                if frame > 2 {
+                                    assert_eq!(
+                                        Some(position),
+                                        footer_label,
+                                        "{} {theme:?}: footer moved",
+                                        skin.id
+                                    );
+                                }
+                            }
+                            assert!(
+                                !text.galley.text().contains("ID ")
+                                    && !text.galley.text().contains("Double use"),
+                                "{} {theme:?} frame={frame}: {}",
+                                skin.id,
+                                text.galley.text()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn toggling_job_keeps_name_layout_stable_without_id_clashes() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let app = App::new(
+                    Config::default(),
+                    std::path::PathBuf::new(),
+                    tempfile::tempfile().unwrap(),
+                );
+                let mut job = Job {
+                    name: "Artifact test job with a long name".into(),
+                    enabled: true,
+                    next_run: Some(Utc::now() + chrono::Duration::minutes(10)),
+                    ..Job::default()
+                };
+                let mut first_disabled = None;
+                let mut enabled_name = None;
+                for frame in 0..9 {
+                    if frame == 3 {
+                        job.enabled = false;
+                    }
+                    if frame == 6 {
+                        job.enabled = true;
+                    }
+                    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                        ui.set_width(300.0);
+                        app.job_card(ui, &job);
+                    });
+                    let name = output
+                        .shapes
+                        .iter()
+                        .find_map(|shape| match &shape.shape {
+                            egui::Shape::Text(text) if text.galley.text() == job.name => {
+                                Some((text.pos, text.galley.size(), shape.clip_rect))
+                            }
+                            _ => None,
+                        })
+                        .expect("job name must be rendered");
+                    if frame == 3 {
+                        first_disabled = Some(name);
+                    }
+                    assert!(
+                        !output.shapes.iter().any(|shape| match &shape.shape {
+                            egui::Shape::Text(text) =>
+                                text.galley.text().contains("ID ")
+                                    || text.galley.text().contains("Double use"),
+                            _ => false,
+                        }),
+                        "{} {theme:?}: widget-ID collision",
+                        skin.id
+                    );
+                    if frame == 2 {
+                        enabled_name = Some(name);
+                    }
+                    if frame > 3 && frame < 6 {
+                        assert_eq!(Some(name), first_disabled, "{} {theme:?}", skin.id);
+                    }
+                    if frame >= 6 {
+                        assert_eq!(Some(name), enabled_name, "{} {theme:?}", skin.id);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn initial_system_appearance_is_saved_and_ignores_later_os_changes() {

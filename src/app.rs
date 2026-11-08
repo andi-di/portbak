@@ -51,12 +51,6 @@ struct LoadedHistory {
     source: Option<PathBuf>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum HistoryMode {
-    Restore,
-    Manage,
-}
-
 /// Backup records of one job, valid only while the job keeps this destination.
 struct CachedHistory {
     target: PathBuf,
@@ -68,35 +62,35 @@ struct PendingSummary {
     request: Uuid,
 }
 
-struct HistoryDialog {
-    /// Identifies this dialog so results for a closed or reopened dialog are ignored.
+struct BackupHistory {
+    /// Ignore asynchronous results from a previous history view.
     request: Uuid,
     job: Job,
     backups: Option<Result<Vec<Backup>, String>>,
     selected: Option<String>,
     source_display: Option<PathBuf>,
-    mode: HistoryMode,
     saving: bool,
+    confirming_restore: bool,
     error: String,
 }
 
-impl HistoryDialog {
-    fn new(job: Job, mode: HistoryMode) -> Self {
+impl BackupHistory {
+    fn new(job: Job) -> Self {
         Self {
             request: Uuid::new_v4(),
             job,
             backups: None,
             selected: None,
             source_display: None,
-            mode,
             saving: false,
+            confirming_restore: false,
             error: String::new(),
         }
     }
 
     /// The selected backup, if it can be restored right now.
     fn restorable_selection(&self) -> Option<String> {
-        if self.mode != HistoryMode::Restore || self.saving {
+        if self.saving || self.source_display.is_none() {
             return None;
         }
         let name = self.selected.as_ref()?;
@@ -120,7 +114,9 @@ pub struct App {
     queue: VecDeque<Uuid>,
     active: Option<Uuid>,
     restoring: bool,
-    history_dialog: Option<HistoryDialog>,
+    activity_until: Option<Instant>,
+    backup_history: Option<BackupHistory>,
+    backups_tab: bool,
     settings_open: bool,
     settings_tab: views::settings_view::SettingsTab,
     history_cache: HashMap<Uuid, CachedHistory>,
@@ -148,7 +144,9 @@ impl App {
             queue: VecDeque::new(),
             active: None,
             restoring: false,
-            history_dialog: None,
+            activity_until: None,
+            backup_history: None,
+            backups_tab: false,
             settings_open: false,
             settings_tab: views::settings_view::SettingsTab::default(),
             history_cache: HashMap::new(),
@@ -176,9 +174,17 @@ impl App {
         self.active.is_none() && self.queue.is_empty()
     }
 
-    /// A restore or an open history dialog must not race with scheduled backups.
+    /// Restoration and browsing backups must not race with scheduled backups.
     fn scheduling_paused(&self) -> bool {
-        self.restoring || self.history_dialog.is_some()
+        self.restoring || self.backup_history.is_some()
+    }
+
+    fn can_add_job(&self) -> bool {
+        !self.restoring
+            && !self
+                .backup_history
+                .as_ref()
+                .is_some_and(|history| history.saving)
     }
 
     fn is_busy(&self, id: Uuid) -> bool {
@@ -203,9 +209,14 @@ impl App {
     }
 
     fn add_job(&mut self) {
+        if !self.can_add_job() {
+            return;
+        }
         let job = self.config.job_defaults.new_job();
         self.selected = Some(job.id);
         self.settings_open = false;
+        self.backups_tab = false;
+        self.backup_history = None;
         self.config.jobs.push(job);
     }
 
@@ -226,9 +237,11 @@ impl App {
         let Some(job) = self.job(id) else {
             return;
         };
-        if was_enabled && !job.enabled {
+        let enabled = job.enabled;
+        let check_on_enable = job.check_on_enable;
+        if was_enabled && !enabled {
             self.remove_pending(id);
-        } else if !was_enabled && job.enabled && job.check_on_enable {
+        } else if !was_enabled && enabled && check_on_enable {
             self.enqueue(id);
         }
     }
@@ -250,6 +263,7 @@ impl App {
 
     fn start_worker(&mut self, job: Job, operation: Operation, ctx: &egui::Context) {
         self.active = Some(job.id);
+        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
         self.restoring = matches!(operation, Operation::Restore(_));
         self.progress = if self.restoring {
             "Preparing restore …"
@@ -278,19 +292,22 @@ impl App {
         });
     }
 
-    fn open_history(&mut self, id: Uuid, mode: HistoryMode, ctx: &egui::Context) {
-        if !self.is_idle() || self.history_dialog.is_some() {
+    fn open_history(&mut self, id: Uuid, ctx: &egui::Context) {
+        if !self.is_idle() || self.backup_history.is_some() {
             return;
         }
         let Some(job) = self.job(id).cloned() else {
             return;
         };
-        let dialog = HistoryDialog::new(job.clone(), mode);
+        if job.target.as_os_str().is_empty() {
+            return;
+        }
+        let dialog = BackupHistory::new(job.clone());
         let request = dialog.request;
-        self.history_dialog = Some(dialog);
+        self.backup_history = Some(dialog);
         self.spawn_task(ctx, move || Event::HistoryLoaded {
             request,
-            result: load_history(&job, mode).map_err(describe),
+            result: load_history(&job).map_err(describe),
         });
     }
 
@@ -299,7 +316,7 @@ impl App {
         if !self.is_idle() {
             return;
         }
-        let Some(dialog) = &self.history_dialog else {
+        let Some(dialog) = &self.backup_history else {
             return;
         };
         let Some(name) = dialog.restorable_selection() else {
@@ -315,15 +332,15 @@ impl App {
         if !self.persist() {
             return;
         }
-        self.history_dialog = None;
+        self.backup_history = None;
         self.start_worker(job, Operation::Restore(name), ctx);
     }
 
     fn save_protection(&mut self, name: String, protected: bool, ctx: &egui::Context) {
-        let Some(dialog) = &mut self.history_dialog else {
+        let Some(dialog) = &mut self.backup_history else {
             return;
         };
-        if dialog.mode != HistoryMode::Manage || dialog.saving {
+        if dialog.saving {
             return;
         }
         dialog.saving = true;
@@ -441,19 +458,20 @@ impl App {
         }
         self.active = None;
         self.restoring = false;
+        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
         self.progress.clear();
         self.persist();
         self.reload_summary(id, ctx);
     }
 
-    fn open_dialog(&mut self, request: Uuid) -> Option<&mut HistoryDialog> {
-        self.history_dialog
+    fn pending_history(&mut self, request: Uuid) -> Option<&mut BackupHistory> {
+        self.backup_history
             .as_mut()
             .filter(|dialog| dialog.request == request)
     }
 
     fn history_loaded(&mut self, request: Uuid, result: Result<LoadedHistory, String>) {
-        let Some(dialog) = self.open_dialog(request) else {
+        let Some(dialog) = self.pending_history(request) else {
             return;
         };
         let loaded = match result {
@@ -477,7 +495,7 @@ impl App {
         protected: bool,
         result: Result<(), String>,
     ) {
-        let Some(dialog) = self.open_dialog(request) else {
+        let Some(dialog) = self.pending_history(request) else {
             return;
         };
         dialog.saving = false;
@@ -536,7 +554,7 @@ impl App {
     }
 
     fn start_next_queued(&mut self, ctx: &egui::Context) {
-        if self.active.is_some() || self.history_dialog.is_some() {
+        if self.active.is_some() || self.backup_history.is_some() {
             return;
         }
         let Some(id) = self.queue.pop_front() else {
@@ -566,12 +584,11 @@ fn run_operation(
     }
 }
 
-fn load_history(job: &Job, mode: HistoryMode) -> anyhow::Result<LoadedHistory> {
+fn load_history(job: &Job) -> anyhow::Result<LoadedHistory> {
     let backups = engine::history::list(job)?;
-    let source = match mode {
-        HistoryMode::Restore => Some(std::fs::canonicalize(&job.source)?),
-        HistoryMode::Manage => None,
-    };
+    let source = std::fs::canonicalize(&job.source)
+        .ok()
+        .filter(|source| source.is_dir());
     Ok(LoadedHistory { backups, source })
 }
 
@@ -740,8 +757,8 @@ mod tests {
         }
     }
 
-    fn dialog(app: &App) -> &HistoryDialog {
-        app.history_dialog.as_ref().unwrap()
+    fn dialog(app: &App) -> &BackupHistory {
+        app.backup_history.as_ref().unwrap()
     }
 
     fn restore_fixture() -> (tempfile::TempDir, App, String) {
@@ -771,11 +788,11 @@ mod tests {
 
     fn select_restore(app: &mut App, name: &str) {
         let job = app.config.jobs[0].clone();
-        let mut dialog = HistoryDialog::new(job.clone(), HistoryMode::Restore);
+        let mut dialog = BackupHistory::new(job.clone());
         dialog.source_display = Some(job.source.clone());
         dialog.backups = Some(Ok(engine::history::list(&job).unwrap()));
         dialog.selected = Some(name.to_owned());
-        app.history_dialog = Some(dialog);
+        app.backup_history = Some(dialog);
     }
 
     #[test]
@@ -794,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn history_dialog_pauses_scheduling_and_cancel_changes_nothing() {
+    fn backup_history_pauses_scheduling_and_cancel_changes_nothing() {
         let (_directory, mut app, name) = restore_fixture();
         let due = app.config.jobs[0].next_run;
         select_restore(&mut app, &name);
@@ -803,9 +820,71 @@ mod tests {
         app.enqueue(app.config.jobs[0].id);
         assert!(app.active.is_none());
         assert!(app.queue.is_empty());
-        app.history_dialog = None;
+        app.backups_tab = false;
+        app.close_inactive_history();
+        assert!(app.backup_history.is_none());
         assert!(app.config.jobs[0].enabled);
         assert_eq!(app.config.jobs[0].next_run, due);
+    }
+
+    #[test]
+    fn new_job_leaves_backups_and_preserves_existing_job() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        app.backups_tab = true;
+        let original = app.config.jobs[0].clone();
+        assert!(app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 2);
+        assert!(app.config.jobs[0] == original);
+        assert_eq!(app.selected, Some(app.config.jobs[1].id));
+        assert!(!app.backups_tab);
+        assert!(app.backup_history.is_none());
+        assert!(!app.scheduling_paused());
+    }
+
+    #[test]
+    fn backup_history_without_destination_does_not_start_filesystem_work() {
+        let (_directory, mut app, _name) = restore_fixture();
+        app.config.jobs[0].target.clear();
+        let context = egui::Context::default();
+        app.open_history(app.config.jobs[0].id, &context);
+        assert!(app.backup_history.is_none());
+        assert!(app.rx.try_recv().is_err());
+        assert!(app.error.is_empty());
+        assert!(!app.scheduling_paused());
+    }
+
+    #[test]
+    fn new_job_waits_for_restore_and_protection_save() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        app.backup_history.as_mut().unwrap().saving = true;
+        assert!(!app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 1);
+        app.backup_history.as_mut().unwrap().saving = false;
+        app.restoring = true;
+        assert!(!app.can_add_job());
+        app.add_job();
+        assert_eq!(app.config.jobs.len(), 1);
+    }
+
+    #[test]
+    fn leaving_history_waits_for_protection_save_and_discards_stale_results() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        let request = dialog(&app).request;
+        app.backup_history.as_mut().unwrap().saving = true;
+        app.selected = None;
+        app.close_inactive_history();
+        assert!(app.backup_history.is_some());
+        app.protection_saved(request, &name, true, Ok(()));
+        app.close_inactive_history();
+        assert!(app.backup_history.is_none());
+        app.history_loaded(request, Err("Stale response".into()));
+        assert!(app.backup_history.is_none());
+        assert!(app.config.jobs[0].enabled);
     }
 
     #[test]
@@ -836,10 +915,10 @@ mod tests {
         let (_directory, mut app, name) = restore_fixture();
         let context = egui::Context::default();
         select_restore(&mut app, &name);
-        app.history_dialog.as_mut().unwrap().selected = None;
+        app.backup_history.as_mut().unwrap().selected = None;
         app.confirm_restore(&context);
         assert!(app.active.is_none());
-        app.history_dialog.as_mut().unwrap().selected = Some(name);
+        app.backup_history.as_mut().unwrap().selected = Some(name);
         app.active = Some(Uuid::new_v4());
         app.confirm_restore(&context);
         assert!(app.config.jobs[0].enabled);
@@ -847,7 +926,7 @@ mod tests {
         app.path = app.path.join("missing/config.json");
         app.confirm_restore(&context);
         assert!(app.active.is_none());
-        assert!(app.history_dialog.is_some());
+        assert!(app.backup_history.is_some());
         assert!(!app.error.is_empty());
     }
 
@@ -855,10 +934,7 @@ mod tests {
     fn manager_saves_protection_and_reports_errors_without_changing_activation() {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
-        app.history_dialog.as_mut().unwrap().mode = HistoryMode::Manage;
         let context = egui::Context::default();
-        app.confirm_restore(&context);
-        assert!(app.active.is_none());
         app.save_protection(name.clone(), true, &context);
         tick_until(&mut app, &context, |app| !dialog(app).saving);
         assert!(!dialog(&app).saving);
@@ -894,7 +970,7 @@ mod tests {
         let (_directory, mut app, _name) = restore_fixture();
         app.config.jobs[0].source.push("missing");
         let context = egui::Context::default();
-        app.open_history(app.config.jobs[0].id, HistoryMode::Manage, &context);
+        app.open_history(app.config.jobs[0].id, &context);
         tick_until(&mut app, &context, |app| dialog(app).backups.is_some());
         assert!(dialog(&app).backups.as_ref().unwrap().is_ok());
         assert!(app.active.is_none());

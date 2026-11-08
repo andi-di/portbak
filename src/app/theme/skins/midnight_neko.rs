@@ -56,8 +56,6 @@ pub static MIDNIGHT_NEKO: Skin = Skin {
         welcome_title: "Your files, forever cherished",
         welcome_prompt: "Create your first backup job",
         ready: "Keeping watch",
-        busy: "Working",
-        cursor: "",
     },
 };
 

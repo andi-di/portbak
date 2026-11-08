@@ -556,20 +556,6 @@ pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -
     response
 }
 
-/// Body text with the skin's halo behind it, like captions glowing on Aero glass.
-pub fn glowing_label(ui: &mut egui::Ui, text: &str, color: Color32) -> Response {
-    let glow = Skin::of(ui.ctx()).typography.display_glow;
-    let font = TextStyle::Body.resolve(ui.style());
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text.to_owned(), font.clone(), color);
-    let (rect, response) = ui.allocate_exact_size(galley.size(), Sense::hover());
-    let origin = rect.min.round();
-    halo(ui.painter(), origin, text, &font, glow);
-    ui.painter().galley(origin, galley, color);
-    response
-}
-
 /// A soft halo of `radius` pixels around text, lifting it off a busy backdrop: light behind the
 /// dark ink of light palettes, dark behind the light ink of dark ones. 0 paints nothing.
 pub fn halo(painter: &egui::Painter, origin: Pos2, text: &str, font: &egui::FontId, radius: f32) {
@@ -672,11 +658,11 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     response
 }
 
-/// An indeterminate progress bar: a comet of lit cells sweeping through a sunken track.
-pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
+/// A themed activity track with identical geometry while idle and active.
+pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: bool) -> Response {
     let m = style::metrics(ui.ctx());
     if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-        return crate::app::rendering::modern::progress(ui, width, color);
+        return crate::app::rendering::modern::progress(ui, width, color, active);
     }
     const CELL: f32 = 8.0;
     const GAP: f32 = 2.0;
@@ -684,9 +670,11 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 18.0), Sense::hover());
     let painter = ui.painter();
-    ui.ctx().request_repaint_after(MARQUEE_FRAME);
+    if active {
+        ui.ctx().request_repaint_after(MARQUEE_FRAME);
+    }
     if Skin::of(ui.ctx()).finish == Finish::Glass {
-        glass::progress(painter, rect, color, ui.input(|input| input.time));
+        glass::progress(painter, rect, color, ui.input(|input| input.time), active);
         return response;
     }
     painter.rect_filled(rect, 0.0, palette.sunken);
@@ -700,7 +688,9 @@ pub fn marquee(ui: &mut egui::Ui, width: f32, color: Color32) -> Response {
     let cells = ((track.width() + GAP) / (CELL + GAP)).floor().max(1.0) as usize;
     let step = (ui.input(|input| input.time) * 14.0) as usize % (cells + TRAIL);
     for cell in 0..cells {
-        let behind = step.checked_sub(cell).filter(|distance| *distance < TRAIL);
+        let behind = step
+            .checked_sub(cell)
+            .filter(|distance| active && *distance < TRAIL);
         let fill = match behind {
             Some(distance) => mix(color, palette.sunken, distance as f32 / TRAIL as f32),
             None => mix(palette.sunken, palette.outline, 0.4),
@@ -857,69 +847,6 @@ fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
     ctx.layer_painter(layer).add(mesh);
 }
 
-/// A centered pixel window with its own title bar over a dimmed backdrop.
-pub fn dialog<R>(
-    ctx: &egui::Context,
-    window: egui::Window<'_>,
-    title: &str,
-    sprite: Sprite,
-    band: Color32,
-    contents: impl FnOnce(&mut egui::Ui) -> R,
-) -> Option<R> {
-    paint_backdrop(ctx);
-    let glassy = Skin::of(ctx).finish == Finish::Glass;
-    let mut frame = egui::Frame::window(&ctx.global_style()).inner_margin(0);
-    if glassy {
-        // The pane is painted inside the window so it can carry reflections and a halo.
-        frame = frame.fill(Color32::TRANSPARENT).stroke(Stroke::NONE);
-    }
-    window
-        .title_bar(false)
-        .frame(frame)
-        .show(ctx, |ui| {
-            let backing = ui.painter().add(egui::Shape::Noop);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            title_bar(ui, title, sprite, band);
-            let inner = egui::Frame::new()
-                .inner_margin(egui::Margin::same(18))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 8.0;
-                    contents(ui)
-                })
-                .inner;
-            if glassy {
-                let rect = ui.min_rect();
-                ui.painter().set(backing, dialog_pane(ctx, rect));
-            }
-            inner
-        })
-        .and_then(|response| response.inner)
-}
-
-/// A row of status text; glass skins set it on a small frosted capsule so it reads over the sky.
-pub fn status_row<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let ctx = ui.ctx().clone();
-    if Skin::of(&ctx).finish != Finish::Glass {
-        return ui.horizontal(contents).inner;
-    }
-    let backing = ui.painter().add(egui::Shape::Noop);
-    let framed = egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(10, 3))
-        .show(ui, |ui| ui.horizontal(contents).inner);
-    let rect = framed.response.rect;
-    let clear = Glaze::clear(&ctx);
-    // Mostly frost: a light tint calms the sky behind the text without hiding it.
-    let glaze = Glaze {
-        opacity: (clear.opacity * 1.5).min(1.0),
-        ..clear
-    };
-    ui.painter().set(
-        backing,
-        glass::pane(&ctx, rect, rect.height() / 2.0, &glaze),
-    );
-    framed.inner
-}
-
 /// A tooltip with `text` while the pointer rests on `rect`. Its hover zone is registered when
 /// this is called, so call it after a clickable card or row laid over the same spot, which would
 /// otherwise take the hover; the zone senses no clicks, so the card stays clickable.
@@ -948,32 +875,6 @@ pub fn popup<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) ->
     let radius = f32::from(ui.visuals().menu_corner_radius.nw);
     painter.set(backing, glass::pane(&ctx, rect, radius, &glaze));
     inner
-}
-
-/// A dialog's glass: denser than panels so its text reads over the scene, with an aqua halo.
-fn dialog_pane(ctx: &egui::Context, rect: Rect) -> Vec<egui::Shape> {
-    let palette = Palette::of_ctx(ctx);
-    let clear = Glaze::clear(ctx);
-    let glaze = Glaze {
-        opacity: (clear.opacity * 1.6).min(1.0),
-        glow: Some(palette.hot.gamma_multiply(0.7)),
-        ..clear
-    };
-    glass::pane(ctx, rect, style::metrics(ctx).radius as f32, &glaze)
-}
-
-/// Dims the panels behind an open dialog without blocking them; call after all panels.
-pub fn paint_backdrop(ctx: &egui::Context) {
-    let palette = Palette::of_ctx(ctx);
-    // Glass skins wash the scene in a bright haze instead of darkening it.
-    let veil = if Skin::of(ctx).finish == Finish::Glass {
-        palette.background.gamma_multiply(0.35)
-    } else {
-        Color32::from_black_alpha(140)
-    };
-    // Panels share the background layer; painting last there covers them but stays below windows.
-    ctx.layer_painter(egui::LayerId::background())
-        .rect_filled(ctx.content_rect(), 0.0, veil);
 }
 
 /// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.
@@ -1042,6 +943,31 @@ pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn activity_track_keeps_its_size_when_idle_in_every_theme() {
+        for skin in skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let context = egui::Context::default();
+                style::install(&context, skin);
+                context.set_theme(theme);
+                let mut active_size = None;
+                let mut idle_size = None;
+                let _ = context.run_ui(egui::RawInput::default(), |ui| {
+                    active_size = Some(
+                        activity_track(ui, 80.0, Palette::of(ui).gold, true)
+                            .rect
+                            .size(),
+                    );
+                    idle_size = Some(
+                        activity_track(ui, 80.0, Palette::of(ui).gold, false)
+                            .rect
+                            .size(),
+                    );
+                });
+                assert_eq!(active_size, idle_size, "{} {theme:?}", skin.id);
+            }
+        }
+    }
     use super::*;
     use crate::app::theme::skins;
 
@@ -1122,19 +1048,6 @@ mod tests {
             });
         }
         assert!(zone_hovered && card_clickable);
-    }
-
-    #[test]
-    fn status_rows_return_their_contents_under_every_skin() {
-        let context = egui::Context::default();
-        for skin in skins::ALL {
-            style::install(&context, skin);
-            let _ = context.run_ui(egui::RawInput::default(), |ui| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
-                    assert!(status_row(ui, |ui| ui.label("Enabled").rect.height() > 0.0));
-                });
-            });
-        }
     }
 
     #[test]

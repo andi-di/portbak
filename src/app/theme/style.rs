@@ -46,9 +46,6 @@ pub struct Wording {
     pub welcome_title: &'static str,
     pub welcome_prompt: &'static str,
     pub ready: &'static str,
-    pub busy: &'static str,
-    /// Blinks after the ready text; empty for none.
-    pub cursor: &'static str,
 }
 
 /// Colors by role, so widgets never hard-code a color.
