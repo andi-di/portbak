@@ -357,11 +357,7 @@ impl App {
                     palette.metal
                 };
                 if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
-                    crate::app::rendering::gothic::job_icon(
-                        ui.painter(),
-                        icon_rect,
-                        self.active == Some(job.id),
-                    );
+                    crate::app::rendering::gothic::job_icon(ui.painter(), icon_rect, job.enabled);
                 } else {
                     sprites::paint_awake(
                         ui.painter(),

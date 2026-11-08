@@ -25,7 +25,8 @@ sheet. Generation prompts and masters live locally under
   Readability at 24 pixels takes priority over decorative detail. No fine
   engraving, interior gems, ribbons, gradients or multiple nested symbols.
 - Job heads retain Saya's character colors. Alert open eyes and a play badge
-  mean a running job; relaxed closed eyes and a pause badge mean an idle job.
+  mean automatic backups are enabled; relaxed closed eyes and a pause badge
+  mean automatic backups are disabled.
   A narrow mode-specific contour separates the hair from the panel.
 - Utility controls show their frame only on hover, keyboard focus or selection.
 - Validate enabled button text and icon contrast at 4.5:1 or higher across both
