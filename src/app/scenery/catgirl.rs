@@ -8,7 +8,7 @@ use eframe::egui::{self, Color32, Pos2, Rect};
 
 use std::time::Duration;
 
-const REACTION_SECONDS: f64 = 4.0;
+const REACTION_SECONDS: f64 = 3.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 
@@ -227,6 +227,11 @@ struct Companion {
 }
 
 impl Companion {
+    fn hold_while_hovered(&mut self, hovered: bool, time: f64) {
+        if hovered && self.visible(time) != Expression::Neutral {
+            self.until = time + REACTION_SECONDS;
+        }
+    }
     fn select_line(&mut self, expression: Expression, random: u128) {
         let index = expression as usize;
         let count = expression.lines().len();
@@ -342,6 +347,7 @@ pub fn show(ui: &mut egui::Ui) {
     if response.clicked() {
         state.react(time, uuid::Uuid::new_v4().as_u128());
     }
+    state.hold_while_hovered(response.hovered(), time);
 
     let expression = state.visible(time);
     if state.displayed != expression || state.line_indices[expression as usize].is_none() {
@@ -441,5 +447,21 @@ mod tests {
         assert_ne!(state.visible(10.1), Expression::Neutral);
 
         assert_eq!(state.visible(14.0), Expression::Neutral);
+    }
+
+    #[test]
+    fn hovering_holds_expression_and_line_until_three_seconds_after_leaving() {
+        let mut state = Companion::default();
+        state.react(10.0, 4);
+        let expression = state.visible(10.0);
+        let line = state.line(10.0);
+        state.hold_while_hovered(true, 12.5);
+        state.hold_while_hovered(true, 15.0);
+        assert_eq!(state.visible(17.9), expression);
+        assert_eq!(state.line(17.9), line);
+        state.hold_while_hovered(false, 17.9);
+        assert_eq!(state.visible(18.0), Expression::Neutral);
+        state.hold_while_hovered(true, 19.0);
+        assert_eq!(state.visible(19.0), Expression::Neutral);
     }
 }
