@@ -1,5 +1,7 @@
 //! Saya's static welcome figure and individually refined sidebar expressions.
 
+mod dialogue;
+
 use crate::app::theme::style::Palette;
 
 use eframe::egui::{self, Color32, Pos2, Rect};
@@ -104,64 +106,6 @@ impl Expression {
             .collect();
 
         choices[(random % choices.len() as u128) as usize]
-    }
-
-    fn line(self) -> &'static str {
-        match self {
-            Self::Neutral => "Hmph. I suppose you can stay.",
-
-            Self::Angry => "I wasn't waiting for you!",
-
-            Self::Bored => "Still here. Still keeping watch.",
-
-            Self::BoredExpectant => "Go on. I'm listening.",
-
-            Self::Celebrating => "Naturally, everything went according to my plan.",
-
-            Self::Curious => "What have you brought me, Human?",
-
-            Self::Cute => "Don't call me cute.",
-
-            Self::Dominant => "Your files are under my protection, Mortal.",
-
-            Self::Embarrassed => "You needn't stare, Human.",
-
-            Self::Energetic => "Shall we get to work?",
-
-            Self::Excited => "You came back! I mean… good timing!",
-
-            Self::Flirty => "You do enjoy my company, Human.",
-
-            Self::Flustered => "Nya?! You startled me!",
-
-            Self::Happy => "It's nice having you around.",
-
-            Self::InLove => "Maybe I missed you. Just a little.",
-
-            Self::Killer => "Nothing gets past me. Nothing.",
-
-            Self::Meek => "Perhaps you could stay a little longer.",
-
-            Self::Pleading => "You will return, will you not?",
-
-            Self::Pouting => "A little attention would not hurt…",
-
-            Self::Praying => "May your files remain safe.",
-
-            Self::Question => "Might I ask you something?",
-
-            Self::Sad => "Do take care of yourself, Human.",
-
-            Self::Seductive => "I seem to have your attention.",
-
-            Self::Shy => "You noticed me…?",
-
-            Self::Sleepy => "Five more minutes… nya…",
-
-            Self::Smug => "Of course I noticed. I notice everything.",
-
-            Self::Waiting => "I was merely passing the time.",
-        }
     }
 
     fn bytes(self) -> &'static [u8] {
@@ -278,9 +222,28 @@ impl Expression {
 struct Companion {
     expression: Expression,
     until: f64,
+    displayed: Expression,
+    line_indices: [Option<usize>; 27],
 }
 
 impl Companion {
+    fn select_line(&mut self, expression: Expression, random: u128) {
+        let index = expression as usize;
+        let count = expression.lines().len();
+        let previous = self.line_indices[index];
+        let mut choice = (random % (count - usize::from(previous.is_some())) as u128) as usize;
+        if previous.is_some_and(|old| choice >= old) {
+            choice += 1;
+        }
+        self.line_indices[index] = Some(choice);
+        self.displayed = expression;
+    }
+
+    fn line(&self, time: f64) -> &'static str {
+        let expression = self.visible(time);
+        expression.lines()[self.line_indices[expression as usize].unwrap_or(0)]
+    }
+
     fn visible(&self, time: f64) -> Expression {
         if time < self.until {
             self.expression
@@ -293,6 +256,7 @@ impl Companion {
         self.expression = self.expression.next(random);
 
         self.until = time + REACTION_SECONDS;
+        self.select_line(self.expression, random.rotate_left(64));
     }
 }
 
@@ -380,13 +344,16 @@ pub fn show(ui: &mut egui::Ui) {
     }
 
     let expression = state.visible(time);
+    if state.displayed != expression || state.line_indices[expression as usize].is_none() {
+        state.select_line(expression, uuid::Uuid::new_v4().as_u128());
+    }
 
     paint(ui, rect, &format!("{expression:?}"), expression.bytes());
 
     ui.add_space(4.0);
 
     ui.label(
-        egui::RichText::new(expression.line())
+        egui::RichText::new(state.line(time))
             .small()
             .color(Palette::of(ui).dim),
     );
@@ -416,6 +383,30 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dialogue_varies_without_repeating_each_expressions_previous_line() {
+        let mut state = super::Companion::default();
+        for expression in super::Expression::REACTIONS
+            .into_iter()
+            .chain([super::Expression::Neutral])
+        {
+            let lines = expression.lines();
+            assert!(lines.len() >= 4);
+            let unique: std::collections::HashSet<_> = lines.iter().collect();
+            assert_eq!(unique.len(), lines.len());
+            for previous in 0..lines.len() {
+                let mut reached = std::collections::HashSet::new();
+                for seed in 0..lines.len() - 1 {
+                    state.line_indices[expression as usize] = Some(previous);
+                    state.select_line(expression, seed as u128);
+                    let selected = state.line_indices[expression as usize].unwrap();
+                    assert_ne!(selected, previous);
+                    reached.insert(selected);
+                }
+                assert_eq!(reached.len(), lines.len() - 1);
+            }
+        }
+    }
 
     use super::*;
 
