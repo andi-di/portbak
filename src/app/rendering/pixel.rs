@@ -99,6 +99,23 @@ impl Widget for PixelButton {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
+        let icon_scale = if gothic {
+            if matches!(self.sprite, Some(Sprite::Plus | Sprite::Play)) {
+                40.0 / 12.0
+            } else {
+                32.0 / 12.0
+            }
+        } else {
+            ICON_SCALE
+        };
+        let utility = gothic
+            && self.icon_only
+            && self.tone == Tone::Plain
+            && matches!(
+                self.sprite,
+                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
+            );
         let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
         let text = if self.icon_only {
             String::new()
@@ -110,7 +127,7 @@ impl Widget for PixelButton {
             .painter()
             .layout_no_wrap(text.clone(), font, Color32::PLACEHOLDER);
         let icon = self.sprite.map_or(Vec2::ZERO, |sprite| {
-            sprites::size(ui.ctx(), sprite, ICON_SCALE)
+            sprites::size(ui.ctx(), sprite, icon_scale)
         });
         let gap = if icon.x > 0.0 && !text.is_empty() {
             8.0
@@ -118,7 +135,10 @@ impl Widget for PixelButton {
             0.0
         };
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
-        let padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
+        let mut padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
+        if gothic {
+            padding.y = padding.y.min(6.0);
+        }
         let finish = Skin::of(ui.ctx()).finish;
         // Plates and gels press straight down, so they only need room below.
         let margin = if finish == Finish::Pixel {
@@ -163,7 +183,9 @@ impl Widget for PixelButton {
         let face = if modern {
             let face = Rect::from_min_size(rect.min, face_size);
             if finish == Finish::Gothic {
-                gothic::control(painter, face, fill, response.has_focus(), enabled);
+                if !utility || hovered || sunk || response.has_focus() {
+                    gothic::control(painter, face, fill, response.has_focus(), enabled);
+                }
             } else {
                 crate::app::rendering::modern::control(
                     painter,
@@ -224,7 +246,7 @@ impl Widget for PixelButton {
             };
             let top = cursor.y + (content.y - icon.y) / 2.0;
             let origin = egui::pos2(cursor.x, top);
-            sprites::paint_awake(painter, origin, sprite, ICON_SCALE, tint, glow);
+            sprites::paint_awake(painter, origin, sprite, icon_scale, tint, glow);
             cursor.x += icon.x + gap;
         }
         let top = cursor.y + (content.y - galley.size().y) / 2.0;
@@ -408,9 +430,12 @@ pub fn choice<T: PartialEq>(
 /// Total height of a `PixelButton` with a single text line, including its shadow.
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
-    ui.text_style_height(&TextStyle::Button)
-        + (ui.spacing().button_padding.y + m.border * 2.0) * 2.0
-        + m.lift
+    let content = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        ui.text_style_height(&TextStyle::Button).max(40.0)
+    } else {
+        ui.text_style_height(&TextStyle::Button)
+    };
+    content + (ui.spacing().button_padding.y + m.border * 2.0) * 2.0 + m.lift
 }
 
 /// A framed panel with a striped title bar, like a window on an old desktop.

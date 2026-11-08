@@ -14,6 +14,10 @@ the icons into a sprite sheet.
   measuring bounds; preserve intentional internal transparent gaps.
 - Keep the same canvas and occupied-area rule for replacements and new icons.
   Check readability at 24, 32, and 48 pixels before use.
+- Utility buttons render at 32 logical pixels; New job and Check now use 40.
+  Rendering reduces the artwork to high-contrast ivory/silver, burgundy and moss
+  tones in Dark mode, and dark plum outlines on pale fills in Light mode.
+- Utility controls show their frame only on hover, keyboard focus or selection.
 
 ## Visual direction
 

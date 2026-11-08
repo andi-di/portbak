@@ -7,13 +7,19 @@ use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
 pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
     let (name, bytes) = icon_asset(sprite);
-    let id = egui::Id::new(("saya_icon", name));
+    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let id = egui::Id::new(("saya_icon_contrast", name, dark));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
-                let rgba = image.to_rgba8();
+                let mut rgba = image.to_rgba8();
+                for pixel in rgba.pixels_mut() {
+                    let [r, g, b, alpha] = pixel.0;
+                    let color = icon_color(r, g, b, dark);
+                    pixel.0 = [color.r(), color.g(), color.b(), alpha];
+                }
                 painter.ctx().load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
@@ -39,6 +45,32 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite) {
             Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
             Color32::WHITE,
         );
+    }
+}
+
+fn icon_color(r: u8, g: u8, b: u8, dark: bool) -> Color32 {
+    if g > r && g > b {
+        if dark {
+            Color32::from_rgb(169, 195, 141)
+        } else {
+            Color32::from_rgb(54, 79, 43)
+        }
+    } else if r.saturating_sub(g) > 30 && g < 120 {
+        if dark {
+            Color32::from_rgb(184, 100, 124)
+        } else {
+            Color32::from_rgb(103, 29, 54)
+        }
+    } else if r > 120 && g > 100 {
+        if dark {
+            Color32::from_rgb(241, 208, 202)
+        } else {
+            Color32::from_rgb(53, 37, 44)
+        }
+    } else if dark {
+        Color32::from_rgb(81, 60, 71)
+    } else {
+        Color32::from_rgb(219, 195, 199)
     }
 }
 
