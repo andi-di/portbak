@@ -112,8 +112,8 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                     for pixel in rgba.pixels_mut() {
                         let red = pixel[0].saturating_sub(pixel[1]) > 25;
                         let color = match (dark, red) {
-                            (true, false) => [85, 84, 89],
-                            (true, true) => [67, 61, 68],
+                            (true, false) => [68, 67, 72],
+                            (true, true) => [54, 49, 56],
                             (false, false) => [53, 30, 48],
                             (false, true) => [119, 31, 65],
                         };
@@ -407,9 +407,9 @@ pub fn paint_bats(painter: &egui::Painter) {
             };
             let center = sprite_point(rect, u, y / 128.0, &pose);
             painter.rect_filled(
-                Rect::from_center_size(center, Vec2::splat(1.7)),
+                Rect::from_center_size(center, Vec2::splat(1.0)),
                 0,
-                Color32::from_rgb(215, 58, 72),
+                Color32::from_rgb(137, 24, 43),
             );
         }
     }
