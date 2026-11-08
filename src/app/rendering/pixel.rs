@@ -813,6 +813,7 @@ pub fn paint_scenery(ui: &egui::Ui) {
     let effects = &Skin::of(ui.ctx()).effects;
     let palette = Palette::of(ui);
     if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        midnight_neko::paint_scene(ui.painter(), Palette::of(ui));
         gothic::pattern(ui.painter(), ui.clip_rect());
     }
     if effects.grid {

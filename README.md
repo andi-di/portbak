@@ -27,6 +27,12 @@ Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Midnight
 Midnight Neko pairs Saya-inspired burgundy and plum-black surfaces with ivory,
 silver, and moss-green accents. Its individual pixel icons distinguish actions,
 backup types, scheduling options, and navigation in both light and dark modes.
+Larger action icons and borderless utility controls improve readability. Saya's
+pixel head marks the header; her static full-body figure appears on the welcome
+screen, while the sidebar cycles through her refined expressions when clicked.
+A quiet moonlit rose garden has cursor-aware bats, falling petals and a sparse
+petal/crescent pointer trail. Turn these animations off in Settings > Theme to
+keep a still garden.
 
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 

@@ -31,6 +31,10 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        crate::app::scenery::midnight_neko::set_animations(
+            &ctx,
+            self.config.midnight_neko_animations,
+        );
         pixel::paint_underlay(&ctx);
         let before = self.config.clone();
         self.show_header(ui);

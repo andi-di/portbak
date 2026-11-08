@@ -2,11 +2,18 @@
 
 Theme assets:
 
-- `upper-body.png`: scythe-free waist-up reactions for the main screen.
-- `portraits.png`: natural head-and-shoulders reactions for the jobs view.
-- `pixel-face.png`: previous transparent pixel-art mascot, retained until the
-  companion-artwork refurbishment.
+- `saya-full-body.png`: static pixel-art welcome figure.
+- `saya-head.png`: compact pixel portrait beside the application name.
+- `expressions/`: all 27 refined pixel busts for the sidebar; click to show one
+  of the 26 non-neutral expressions for four seconds without immediate repeats.
+- `scenery/`: moonlit rose garden, bat flight/perching sprites, petal and crescent.
 - `icons/`: individually generated Saya-inspired interface icons and prompts.
   See its README for the shared resolution and visible-size rules.
 
-All use transparent backgrounds. Character images retain their original proportions when fitted into the view; faces are not forced into identical positions. Character sprite atlases use equal cells. No app-drawn picture frame or backdrop is added. Each matching `*-prompt.md` file contains one self-contained final generation prompt. Edit history and intermediate prompts are not retained here.
+All use transparent backgrounds and preserve their proportions. Expressions are
+individual 512 × 512 PNGs. The welcome figure is static and has no click reaction.
+Prompts are stored alongside assets; refinement masters remain in agent-local.
+
+Scenery remains behind controls. Bats avoid the pointer and scatter on clicks;
+one approaches at a distance. Petals and crescents fade quickly. The Theme tab's
+animation toggle freezes the garden and disables moving sprites and trails.
