@@ -4,7 +4,7 @@ use crate::app::rendering::pixel::{self, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
-use crate::app::views::widgets::{alert, display_path};
+use crate::app::views::widgets::alert;
 use crate::app::App;
 use crate::model::{Job, Theme};
 use chrono::Utc;
@@ -202,11 +202,6 @@ impl App {
                 if !self.error.is_empty() {
                     alert(ui, palette.bad, &self.error);
                 }
-                ui.label(
-                    egui::RichText::new(format!("SETTINGS  {}", display_path(&self.path)))
-                        .small()
-                        .color(palette.dim),
-                );
             });
     }
 
