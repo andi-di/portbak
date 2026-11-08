@@ -44,7 +44,7 @@ fn startup() -> anyhow::Result<()> {
     let config = load_config(&path)?;
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1100.0, 960.0])
+            .with_inner_size([1280.0, 960.0])
             .with_min_inner_size([800.0, 600.0])
             .with_icon(app_icon()),
         ..Default::default()
