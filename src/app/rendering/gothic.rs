@@ -5,21 +5,68 @@ use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};
 
-pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) {
-    let (name, bytes) = icon_asset(sprite);
-    let dark = u16::from(tint.r()) + u16::from(tint.g()) + u16::from(tint.b()) > 400;
+macro_rules! asset {
+    ($name:literal, $dark:expr) => {
+        (
+            $name,
+            if $dark {
+                include_bytes!(concat!(
+                    "../../../assets/themes/midnight-neko/icons/dark/",
+                    $name,
+                    ".png"
+                ))
+                .as_slice()
+            } else {
+                include_bytes!(concat!(
+                    "../../../assets/themes/midnight-neko/icons/light/",
+                    $name,
+                    ".png"
+                ))
+                .as_slice()
+            },
+        )
+    };
+}
+
+pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, _tint: Color32) {
+    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let (name, bytes) = icon_asset(sprite, dark);
+    paint_icon(painter, rect, name, bytes, dark);
+}
+
+pub fn foreground(fill: Color32) -> Color32 {
+    let luminance = super::modern::luminance(fill);
+    if (luminance + 0.05) / 0.05 > 1.05 / (luminance + 0.05) {
+        Color32::BLACK
+    } else {
+        Color32::WHITE
+    }
+}
+
+pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color32) {
+    let dark = foreground(fill) == Color32::WHITE;
+    let (name, bytes) = icon_asset(sprite, dark);
+    paint_icon(painter, rect, name, bytes, dark);
+}
+
+pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
+    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let (name, bytes) = if active {
+        asset!("job-active", dark)
+    } else {
+        asset!("job-inactive", dark)
+    };
+    paint_icon(painter, rect, name, bytes, dark);
+}
+
+fn paint_icon(painter: &egui::Painter, rect: Rect, name: &str, bytes: &[u8], dark: bool) {
     let id = egui::Id::new(("saya_icon_contrast", name, dark));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
-                let mut rgba = image.to_rgba8();
-                for pixel in rgba.pixels_mut() {
-                    let [r, g, b, alpha] = pixel.0;
-                    let color = icon_color(r, g, b, dark);
-                    pixel.0 = [color.r(), color.g(), color.b(), alpha];
-                }
+                let rgba = image.to_rgba8();
                 painter.ctx().load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
@@ -48,138 +95,33 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
     }
 }
 
-fn icon_color(r: u8, g: u8, b: u8, dark: bool) -> Color32 {
-    if g > r && g > b {
-        if dark {
-            Color32::from_rgb(169, 195, 141)
-        } else {
-            Color32::from_rgb(54, 79, 43)
-        }
-    } else if r.saturating_sub(g) > 30 && g < 120 {
-        if dark {
-            Color32::from_rgb(184, 100, 124)
-        } else {
-            Color32::from_rgb(103, 29, 54)
-        }
-    } else if r > 120 && g > 100 {
-        if dark {
-            Color32::from_rgb(241, 208, 202)
-        } else {
-            Color32::from_rgb(53, 37, 44)
-        }
-    } else if dark {
-        Color32::from_rgb(81, 60, 71)
-    } else {
-        Color32::from_rgb(219, 195, 199)
-    }
-}
-
-fn icon_asset(sprite: Sprite) -> (&'static str, &'static [u8]) {
+fn icon_asset(sprite: Sprite, dark: bool) -> (&'static str, &'static [u8]) {
     match sprite {
-        Sprite::Floppy => (
-            "job",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/job.png").as_slice(),
-        ),
-        Sprite::Folder => (
-            "choose-folder",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/choose-folder.png")
-                .as_slice(),
-        ),
-        Sprite::Clock => (
-            "schedule",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/schedule.png").as_slice(),
-        ),
-        Sprite::Shield => (
-            "protection",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/protection.png").as_slice(),
-        ),
-        Sprite::Trash => (
-            "remove-job",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/remove-job.png").as_slice(),
-        ),
-        Sprite::Rewind => (
-            "restore",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/restore.png").as_slice(),
-        ),
-        Sprite::Play => (
-            "check-now",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/check-now.png").as_slice(),
-        ),
-        Sprite::Chest => (
-            "backups",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/backups.png").as_slice(),
-        ),
-        Sprite::Package => (
-            "zip-backup",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/zip-backup.png").as_slice(),
-        ),
-        Sprite::Sun => (
-            "light",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/light.png").as_slice(),
-        ),
-        Sprite::Moon => (
-            "dark",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/dark.png").as_slice(),
-        ),
-        Sprite::Monitor => (
-            "open-location",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/open-location.png")
-                .as_slice(),
-        ),
-        Sprite::Warning => (
-            "warning",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/warning.png").as_slice(),
-        ),
-        Sprite::Power => (
-            "automatic",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/automatic.png").as_slice(),
-        ),
-        Sprite::Check => (
-            "checked",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/checked.png").as_slice(),
-        ),
-        Sprite::Cursor => (
-            "backup-date",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/backup-date.png").as_slice(),
-        ),
-        Sprite::Plus => (
-            "new-job",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/new-job.png").as_slice(),
-        ),
-        Sprite::Gear => (
-            "settings",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/settings.png").as_slice(),
-        ),
-        Sprite::Back => (
-            "back",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/back.png").as_slice(),
-        ),
-        Sprite::JobSettings => (
-            "job-settings",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/job-settings.png")
-                .as_slice(),
-        ),
-        Sprite::Theme => (
-            "theme",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/theme.png").as_slice(),
-        ),
-        Sprite::FolderBackup => (
-            "folder-backup",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/folder-backup.png")
-                .as_slice(),
-        ),
-        Sprite::Interval => (
-            "interval",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/interval.png").as_slice(),
-        ),
-        Sprite::Daily => (
-            "daily",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/daily.png").as_slice(),
-        ),
-        Sprite::Weekdays => (
-            "weekdays",
-            include_bytes!("../../../assets/themes/midnight-neko/icons/weekdays.png").as_slice(),
-        ),
+        Sprite::Floppy => asset!("job", dark),
+        Sprite::Folder => asset!("choose-folder", dark),
+        Sprite::Clock => asset!("schedule", dark),
+        Sprite::Shield => asset!("protection", dark),
+        Sprite::Trash => asset!("remove-job", dark),
+        Sprite::Rewind => asset!("restore", dark),
+        Sprite::Play => asset!("check-now", dark),
+        Sprite::Chest => asset!("backups", dark),
+        Sprite::Package => asset!("zip-backup", dark),
+        Sprite::Sun => asset!("light", dark),
+        Sprite::Moon => asset!("dark", dark),
+        Sprite::Monitor => asset!("open-location", dark),
+        Sprite::Warning => asset!("warning", dark),
+        Sprite::Power => asset!("automatic", dark),
+        Sprite::Check => asset!("checked", dark),
+        Sprite::Cursor => asset!("backup-date", dark),
+        Sprite::Plus => asset!("new-job", dark),
+        Sprite::Gear => asset!("settings", dark),
+        Sprite::Back => asset!("back", dark),
+        Sprite::JobSettings => asset!("job-settings", dark),
+        Sprite::Theme => asset!("theme", dark),
+        Sprite::FolderBackup => asset!("folder-backup", dark),
+        Sprite::Interval => asset!("interval", dark),
+        Sprite::Daily => asset!("daily", dark),
+        Sprite::Weekdays => asset!("weekdays", dark),
     }
 }
 
@@ -441,11 +383,66 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite) {
 mod tests {
     use super::*;
 
+    fn contrast(a: Color32, b: Color32) -> f32 {
+        let luminance = |color: Color32| {
+            let linear = |value: u8| {
+                let value = f32::from(value) / 255.0;
+                if value <= 0.04045 {
+                    value / 12.92
+                } else {
+                    ((value + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
+        };
+        let (a, b) = (luminance(a), luminance(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    #[test]
+    fn icon_variants_match_geometry_and_contrast_control_surfaces() {
+        let skin = crate::app::theme::skins::find("midnight-neko");
+        for sprite in Sprite::ALL {
+            let light = image::load_from_memory(icon_asset(sprite, false).1)
+                .unwrap()
+                .to_rgba8();
+            let dark = image::load_from_memory(icon_asset(sprite, true).1)
+                .unwrap()
+                .to_rgba8();
+            assert_eq!(light.dimensions(), dark.dimensions());
+            assert!(light.pixels().zip(dark.pixels()).all(|(a, b)| a[3] == b[3]));
+            for palette in [&skin.light, &skin.dark] {
+                for base in [
+                    palette.surface,
+                    palette.raised,
+                    palette.highlight,
+                    palette.accent,
+                    palette.good,
+                    palette.bad,
+                ] {
+                    for fill in [
+                        base,
+                        mix(base, Color32::WHITE, 0.18),
+                        mix(base, Color32::BLACK, 0.12),
+                    ] {
+                        let ink = foreground(fill);
+                        let image = if ink == Color32::WHITE { &dark } else { &light };
+                        for pixel in image.pixels().filter(|pixel| pixel[3] != 0) {
+                            let color = Color32::from_rgb(pixel[0], pixel[1], pixel[2]);
+                            assert!(contrast(fill, color) >= 4.5, "{sprite:?} / {fill:?}");
+                        }
+                        assert!(contrast(fill, ink) >= 4.5);
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn icons_share_resolution_padding_and_visible_extent() {
         let mut names = std::collections::HashSet::new();
         for sprite in Sprite::ALL {
-            let (name, bytes) = icon_asset(sprite);
+            let (name, bytes) = icon_asset(sprite, true);
             assert!(names.insert(name), "duplicate icon for {sprite:?}");
             let image = image::load_from_memory(bytes).unwrap().to_rgba8();
             assert_eq!(image.dimensions(), (128, 128), "{name}");

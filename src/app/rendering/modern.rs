@@ -196,7 +196,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
     }
 }
 
-fn luminance(color: Color32) -> f32 {
+pub(super) fn luminance(color: Color32) -> f32 {
     let channel = |value: u8| {
         let value = f32::from(value) / 255.0;
         if value <= 0.04045 {

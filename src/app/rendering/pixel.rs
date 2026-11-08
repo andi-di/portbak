@@ -223,7 +223,9 @@ impl Widget for PixelButton {
             }
             face
         };
-        let ink = if modern && self.tone == Tone::Plain && !self.selected {
+        let ink = if gothic && enabled {
+            gothic::foreground(fill)
+        } else if modern && self.tone == Tone::Plain && !self.selected {
             if enabled {
                 palette.ink
             } else {
@@ -240,13 +242,17 @@ impl Widget for PixelButton {
         if let Some(sprite) = self.sprite {
             let tint = match (enabled, self.tone, self.selected) {
                 (false, ..) => palette.dim,
-                (true, Tone::Plain, false) if finish == Finish::Gothic => palette.metal,
+                (true, Tone::Plain, false) if finish == Finish::Gothic => ink,
                 (true, Tone::Plain, false) => palette.accent,
                 _ => ink,
             };
             let top = cursor.y + (content.y - icon.y) / 2.0;
             let origin = egui::pos2(cursor.x, top);
-            sprites::paint_awake(painter, origin, sprite, icon_scale, tint, glow);
+            if gothic {
+                gothic::icon_on(painter, Rect::from_min_size(origin, icon), sprite, fill);
+            } else {
+                sprites::paint_awake(painter, origin, sprite, icon_scale, tint, glow);
+            }
             cursor.x += icon.x + gap;
         }
         let top = cursor.y + (content.y - galley.size().y) / 2.0;
@@ -393,7 +399,11 @@ impl Widget for PixelCheckbox<'_> {
             } else {
                 palette.dim
             };
-            sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
+            if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                gothic::icon_on(painter, square.shrink(1.0), Sprite::Check, palette.accent);
+            } else {
+                sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
+            }
         }
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =

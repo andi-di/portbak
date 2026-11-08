@@ -317,7 +317,12 @@ impl App {
                         .size()
                         + well.total_margin().sum()
                 });
-                let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 3.0);
+                let icon_size =
+                    if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+                        egui::Vec2::splat(48.0)
+                    } else {
+                        sprites::size(ui.ctx(), Sprite::Floppy, 3.0)
+                    };
                 let row_height = icon_size
                     .y
                     .max(countdown_size.y)
@@ -335,14 +340,22 @@ impl App {
                 } else {
                     palette.metal
                 };
-                sprites::paint_awake(
-                    ui.painter(),
-                    icon_rect.min,
-                    Sprite::Floppy,
-                    3.0,
-                    style::decorative_color(ui.ctx(), tint),
-                    wake,
-                );
+                if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+                    crate::app::rendering::gothic::job_icon(
+                        ui.painter(),
+                        icon_rect,
+                        self.active == Some(job.id),
+                    );
+                } else {
+                    sprites::paint_awake(
+                        ui.painter(),
+                        icon_rect.min,
+                        Sprite::Floppy,
+                        3.0,
+                        style::decorative_color(ui.ctx(), tint),
+                        wake,
+                    );
+                }
                 let gap = ui.spacing().item_spacing.x;
                 let name_right = if let Some(remaining) = countdown {
                     let rect = egui::Rect::from_center_size(

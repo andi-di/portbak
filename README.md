@@ -27,7 +27,9 @@ Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Midnight
 Midnight Neko pairs Saya-inspired burgundy and plum-black surfaces with ivory,
 silver, and moss-green accents. Its individual pixel icons distinguish actions,
 backup types, scheduling options, and navigation in both light and dark modes.
-Larger action icons and borderless utility controls improve readability. Saya's
+Simple bold silhouettes, high-contrast light/dark variants and borderless utility
+controls improve readability. Buttons choose icon contrast for their own fill.
+Alert and resting Saya heads distinguish running and idle jobs. Saya's
 pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
 A quiet moonlit rose garden has larger cursor-aware bats that hang from the top
