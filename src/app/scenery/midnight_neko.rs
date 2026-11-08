@@ -65,12 +65,16 @@ impl Sprite {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct Bat {
     position: Pos2,
     velocity: Vec2,
     perched: bool,
     facing_left: bool,
+    return_at: f32,
+    leave_at: f32,
+    cycle: u32,
+    seed: u32,
 }
 
 #[derive(Clone, Default)]
@@ -96,13 +100,26 @@ fn state_id() -> egui::Id {
 
 fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandle> {
     let (name, bytes) = sprite.asset();
-    let id = egui::Id::new(("saya_scenery", name));
+    let dark = painter.ctx().global_style().visuals.dark_mode;
+    let id = egui::Id::new(("saya_scenery", name, dark));
     let cached: Option<Result<egui::TextureHandle, String>> =
         painter.ctx().data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
-                let rgba = image.to_rgba8();
+                let mut rgba = image.to_rgba8();
+                if matches!(sprite, Sprite::BatDown | Sprite::Perched) {
+                    for pixel in rgba.pixels_mut() {
+                        let red = pixel[0].saturating_sub(pixel[1]) > 25;
+                        let color = match (dark, red) {
+                            (true, false) => [174, 139, 161],
+                            (true, true) => [208, 111, 144],
+                            (false, false) => [53, 30, 48],
+                            (false, true) => [119, 31, 65],
+                        };
+                        pixel.0[..3].copy_from_slice(&color);
+                    }
+                }
                 painter.ctx().load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
@@ -183,13 +200,28 @@ fn petal(seed: u32) -> Sprite {
 
 fn home(screen: Rect, index: usize) -> Pos2 {
     egui::pos2(
-        screen.left() + screen.width() * if index.is_multiple_of(2) { 0.08 } else { 0.92 },
-        screen.top() + screen.height() * (0.10 + index as f32 / (BAT_COUNT - 1) as f32 * 0.76),
+        screen.left() + screen.width() * (index as f32 + 0.5) / BAT_COUNT as f32,
+        screen.top() + 23.0_f32.min(screen.height() * 0.5),
     )
 }
 
+fn flight_target(screen: Rect, index: usize, bat: &Bat, time: f32) -> Pos2 {
+    // Separate territories prevent scattered bats from gathering into one flock.
+    let phase = time * 0.3 + noise(bat.seed, 11) * 6.0;
+    let x = (index % 4) as f32 + 0.5 + phase.sin() * 0.3;
+    let y = (index / 4) as f32 + 0.5 + (phase * 0.8).cos() * 0.3;
+    screen.min + egui::vec2(screen.width() * x / 4.0, screen.height() * y / 3.0)
+}
+
+fn postpone_roost(bat: &mut Bat, time: f32) {
+    bat.cycle = bat.cycle.wrapping_add(1);
+    bat.return_at = time + 14.0 + noise(bat.seed, bat.cycle) * 24.0;
+    bat.perched = false;
+}
+
 fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: f32, screen: Rect) {
-    let mut desired = (target - bat.position).normalized() * 30.0;
+    let mut desired =
+        (target - bat.position).normalized() * (target.distance(bat.position) * 2.0).min(65.0);
     if let Some(pointer) = pointer {
         let away = bat.position - pointer;
         let radius = if pressed {
@@ -210,8 +242,12 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
         bat.facing_left = bat.velocity.x < 0.0;
     }
     bat.position += bat.velocity * dt;
-    bat.position.x = bat.position.x.clamp(screen.left(), screen.right());
-    bat.position.y = bat.position.y.clamp(screen.top(), screen.bottom());
+    let bounds = screen.shrink2(egui::vec2(
+        24.0_f32.min(screen.width() * 0.5),
+        23.0_f32.min(screen.height() * 0.5),
+    ));
+    bat.position.x = bat.position.x.clamp(bounds.left(), bounds.right());
+    bat.position.y = bat.position.y.clamp(bounds.top(), bounds.bottom());
 }
 
 fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pressed: bool) {
@@ -220,32 +256,55 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
         .map_or(0.0, |previous| (time - previous).clamp(0.0, 0.05));
     state.last_time = Some(time);
     if state.bats.is_empty() {
+        let seed = uuid::Uuid::new_v4().as_u128() as u32;
         state.bats = (0..BAT_COUNT)
-            .map(|index| Bat {
-                position: home(screen, index),
-                velocity: Vec2::ZERO,
-                perched: true,
-                facing_left: false,
+            .map(|index| {
+                let mut bat = Bat {
+                    seed: seed.wrapping_add(index as u32 * 17),
+                    ..Default::default()
+                };
+                bat.position = flight_target(screen, index, &bat, time);
+                postpone_roost(&mut bat, time - 10.0);
+                bat
             })
             .collect();
     }
+    let positions: Vec<Pos2> = state.bats.iter().map(|bat| bat.position).collect();
     for (index, bat) in state.bats.iter_mut().enumerate() {
-        let phase = time * 0.2 + index as f32 * 1.7;
-        let roost = home(screen, index);
-        let resting = (time + index as f32 * 3.1).rem_euclid(24.0) > 15.0;
-        let target = if resting {
-            roost
-        } else if index == 0 && pointer.is_some() {
-            pointer.unwrap() + egui::vec2(120.0, -90.0)
+        let radius = if pressed {
+            CLICK_REACTION_RADIUS
         } else {
-            egui::pos2(
-                screen.center().x + phase.sin() * screen.width() * 0.43,
-                screen.center().y + (phase * 0.7).cos() * screen.height() * 0.36,
-            )
+            REACTION_RADIUS
         };
-        bat.perched = resting && bat.position.distance(roost) < 8.0;
-        if bat.perched {
+        let threatened = pointer.is_some_and(|pointer| pointer.distance(bat.position) < radius);
+        if threatened {
+            postpone_roost(bat, time);
+        }
+        if bat.perched && time >= bat.leave_at {
+            postpone_roost(bat, time);
+        }
+        let roost = home(screen, index);
+        let returning = time >= bat.return_at;
+        let mut target = if returning {
+            roost
+        } else {
+            flight_target(screen, index, bat, time)
+        };
+        if returning && !threatened && bat.position.distance(roost) < 5.0 {
+            if !bat.perched {
+                bat.leave_at = time + 8.0 + noise(bat.seed, bat.cycle + 91) * 18.0;
+            }
+            bat.perched = true;
+            bat.position = roost;
             bat.velocity = Vec2::ZERO;
+            continue;
+        }
+        bat.perched = false;
+        for (other, position) in positions.iter().enumerate() {
+            let away = bat.position - *position;
+            if !returning && other != index && away.length() < 65.0 {
+                target += away.normalized() * (65.0 - away.length());
+            }
         }
         steer(bat, target, pointer, pressed, dt, screen);
     }
@@ -284,29 +343,7 @@ pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
         Color32::WHITE.gamma_multiply(if dark { 0.16 } else { 0.12 }),
     );
     let time = ctx.input(|input| input.time) as f32;
-    let state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
-    for (index, bat) in state.bats.iter().enumerate() {
-        let sprite = if bat.perched {
-            Sprite::Perched
-        } else {
-            Sprite::BatDown
-        };
-        draw_moving(
-            painter,
-            Rect::from_center_size(bat.position, Vec2::splat(36.0 + (index % 5) as f32 * 2.0)),
-            sprite,
-            Color32::WHITE.gamma_multiply(0.42),
-            SpritePose {
-                mirrored: bat.facing_left,
-                flap: if bat.perched {
-                    0.0
-                } else {
-                    (time * 12.0 + index as f32).sin()
-                },
-                angle: (bat.velocity.y * 0.002).clamp(-0.12, 0.12),
-            },
-        );
-    }
+    paint_bats(painter);
     for index in 0..PETAL_COUNT {
         let progress = (time * (0.02 + noise(index, 4) * 0.012) + noise(index, 6)).fract();
         let center = egui::pos2(
@@ -326,6 +363,38 @@ pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
                 angle: time * (0.3 + noise(index, 10)) + index as f32,
                 mirrored: index.is_multiple_of(2),
                 ..Default::default()
+            },
+        );
+    }
+}
+
+pub fn paint_bats(painter: &egui::Painter) {
+    let ctx = painter.ctx();
+    let time = ctx.input(|input| input.time) as f32;
+    let state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
+    for (index, bat) in state.bats.iter().enumerate() {
+        let sprite = if bat.perched {
+            Sprite::Perched
+        } else {
+            Sprite::BatDown
+        };
+        draw_moving(
+            painter,
+            Rect::from_center_size(bat.position, Vec2::splat(48.0 + (index % 5) as f32 * 2.0)),
+            sprite,
+            Color32::WHITE,
+            SpritePose {
+                mirrored: bat.facing_left,
+                flap: if bat.perched {
+                    0.0
+                } else {
+                    (time * 12.0 + index as f32).sin()
+                },
+                angle: if bat.perched {
+                    0.0
+                } else {
+                    (bat.velocity.y * 0.002).clamp(-0.12, 0.12)
+                },
             },
         );
     }
@@ -429,6 +498,7 @@ mod tests {
             velocity: Vec2::ZERO,
             perched: true,
             facing_left: false,
+            ..Default::default()
         };
         steer(
             &mut bat,
@@ -463,6 +533,7 @@ mod tests {
                 velocity: Vec2::ZERO,
                 perched: true,
                 facing_left: false,
+                ..Default::default()
             };
             steer(
                 &mut bat,
@@ -485,6 +556,7 @@ mod tests {
             velocity: Vec2::ZERO,
             perched: false,
             facing_left: false,
+            ..Default::default()
         };
         steer(&mut bat, Pos2::ZERO, None, false, 0.05, screen);
         steer(&mut bat, Pos2::ZERO, None, false, 0.05, screen);
@@ -517,6 +589,38 @@ mod tests {
         );
         assert!(a.distance(b) < 0.1);
     }
+    #[test]
+    fn bats_roost_scatter_spread_and_return_individually() {
+        let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 700.0));
+        let mut state = Garden::default();
+        update(&mut state, screen, 0.0, None, false);
+        assert!(state
+            .bats
+            .windows(2)
+            .any(|pair| pair[0].return_at != pair[1].return_at));
+        for bat in &mut state.bats {
+            bat.return_at = 0.0;
+        }
+        for step in 1..=600 {
+            update(&mut state, screen, step as f32 * 0.05, None, false);
+        }
+        // Some bats leave earlier than others; every bat has reached its own roost.
+        assert!(state.bats.iter().all(|bat| bat.leave_at > 0.0));
+        let pointer = state.bats[0].position;
+        update(&mut state, screen, 30.05, Some(pointer), false);
+        assert!(!state.bats[0].perched);
+        assert!(state.bats[0].return_at >= 44.05);
+        for step in 602..=780 {
+            update(&mut state, screen, step as f32 * 0.05, None, false);
+        }
+        assert!(state.bats.iter().all(|bat| screen.contains(bat.position)));
+        assert!(state.bats[0].position.distance(pointer) > 50.0);
+        for step in 781..=2200 {
+            update(&mut state, screen, step as f32 * 0.05, None, false);
+        }
+        assert!(state.bats[0].leave_at > 44.05);
+    }
+
     #[test]
     fn pointer_trail_is_bounded_expires_and_does_not_bridge_pointer_leaves() {
         let mut state = Garden::default();

@@ -773,6 +773,7 @@ pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     const INSET: f32 = 6.0;
     let ctx = ui.ctx();
     if Skin::of(ctx).finish == Finish::Gothic {
+        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
         gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
         gothic::corners(
             ui.painter(),
