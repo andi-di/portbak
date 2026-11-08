@@ -421,38 +421,58 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
 }
 
 fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Local time");
-        ui.add(
-            egui::DragValue::new(&mut job.hour)
-                .range(0..=23)
-                .min_decimals(0),
-        );
-        ui.label(":");
-        ui.add(
-            egui::DragValue::new(&mut job.minute)
-                .range(0..=59)
-                .min_decimals(0),
-        );
-        if show_next_check {
-            ui.add_space(12.0);
-            let next = if job.has_runnable_schedule() {
-                local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
-            } else {
-                "Select at least one weekday".into()
-            };
-            style::well(ui.ctx())
-                .show(ui, |ui| {
-                    ui.label(
-                        egui::RichText::new(next.to_uppercase())
-                            .font(style::label_font(ui.ctx()))
-                            .color(Palette::of(ui).good),
-                    );
-                })
-                .response
-                .on_hover_text("Next check according to the current schedule");
-        }
-    });
+    let readout_height = ui
+        .painter()
+        .layout_no_wrap(
+            "00".into(),
+            style::label_font(ui.ctx()),
+            Palette::of(ui).ink,
+        )
+        .size()
+        .y
+        + style::well(ui.ctx()).total_margin().sum().y;
+    let row_height =
+        ui.spacing()
+            .interact_size
+            .y
+            .max(if show_next_check { readout_height } else { 0.0 });
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), row_height),
+        egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
+        |ui| {
+            ui.label("Local time");
+            ui.add(
+                egui::DragValue::new(&mut job.hour)
+                    .range(0..=23)
+                    .min_decimals(0),
+            );
+            ui.label(":");
+            ui.add(
+                egui::DragValue::new(&mut job.minute)
+                    .range(0..=59)
+                    .min_decimals(0)
+                    .custom_formatter(|value, _| format!("{:02}", value as u32)),
+            );
+            if show_next_check {
+                ui.add_space(12.0);
+                let next = if job.has_runnable_schedule() {
+                    local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
+                } else {
+                    "Select at least one weekday".into()
+                };
+                style::well(ui.ctx())
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(next.to_uppercase())
+                                .font(style::label_font(ui.ctx()))
+                                .color(Palette::of(ui).good),
+                        );
+                    })
+                    .response
+                    .on_hover_text("Next check according to the current schedule");
+            }
+        },
+    );
 }
 
 fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
@@ -588,4 +608,53 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
         pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn time_controls_and_preview_are_centered_in_every_theme() {
+        for skin in crate::app::theme::skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                let mut job = Job {
+                    schedule: Schedule::Daily,
+                    minute: 5,
+                    ..Job::default()
+                };
+                for _ in 0..3 {
+                    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                        ui.set_width(800.0);
+                        time_row(ui, &mut job, true);
+                    });
+                    let mut minute_y = None;
+                    let mut preview_y = None;
+                    for shape in &output.shapes {
+                        if let egui::Shape::Text(text) = &shape.shape {
+                            let value = text.galley.text();
+                            let center = text.pos.y + text.galley.size().y / 2.0;
+                            if value == "05" {
+                                minute_y = Some(center);
+                            }
+                            if value.contains('.') && value.contains(':') {
+                                preview_y = Some(center);
+                            }
+                        }
+                    }
+                    let difference = (minute_y.expect("two-digit minute")
+                        - preview_y.expect("next-check readout"))
+                    .abs();
+                    assert!(
+                        difference <= 1.0,
+                        "{} {theme:?}: difference={difference}",
+                        skin.id
+                    );
+                }
+            }
+        }
+    }
 }
