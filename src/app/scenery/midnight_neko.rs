@@ -7,7 +7,10 @@ use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 use std::time::Duration;
 
-const BAT_COUNT: usize = 7;
+const BAT_COUNT: usize = 12;
+const PETAL_COUNT: u32 = 60;
+const REACTION_RADIUS: f32 = 180.0;
+const CLICK_REACTION_RADIUS: f32 = 320.0;
 const PARTICLE_LIMIT: usize = 72;
 const LIFETIME: f32 = 1.0;
 
@@ -181,7 +184,7 @@ fn petal(seed: u32) -> Sprite {
 fn home(screen: Rect, index: usize) -> Pos2 {
     egui::pos2(
         screen.left() + screen.width() * if index.is_multiple_of(2) { 0.08 } else { 0.92 },
-        screen.top() + screen.height() * (0.13 + index as f32 * 0.09),
+        screen.top() + screen.height() * (0.10 + index as f32 / (BAT_COUNT - 1) as f32 * 0.76),
     )
 }
 
@@ -189,7 +192,11 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
     let mut desired = (target - bat.position).normalized() * 30.0;
     if let Some(pointer) = pointer {
         let away = bat.position - pointer;
-        let radius = if pressed { 230.0 } else { 100.0 };
+        let radius = if pressed {
+            CLICK_REACTION_RADIUS
+        } else {
+            REACTION_RADIUS
+        };
         if away.length() < radius {
             desired = away.normalized() * 120.0;
             if away.length_sq() < 1.0 {
@@ -286,7 +293,7 @@ pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
         };
         draw_moving(
             painter,
-            Rect::from_center_size(bat.position, Vec2::splat(36.0 + index as f32 * 2.0)),
+            Rect::from_center_size(bat.position, Vec2::splat(36.0 + (index % 5) as f32 * 2.0)),
             sprite,
             Color32::WHITE.gamma_multiply(0.42),
             SpritePose {
@@ -300,7 +307,7 @@ pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
             },
         );
     }
-    for index in 0..36 {
+    for index in 0..PETAL_COUNT {
         let progress = (time * (0.02 + noise(index, 4) * 0.012) + noise(index, 6)).fract();
         let center = egui::pos2(
             screen.left()
@@ -445,6 +452,29 @@ mod tests {
             );
         }
         assert!(screen.contains(bat.position));
+    }
+
+    #[test]
+    fn bats_react_at_expanded_hover_and_click_distances() {
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::splat(500.0));
+        for (distance, pressed) in [(160.0, false), (280.0, true)] {
+            let mut bat = Bat {
+                position: egui::pos2(distance, 20.0),
+                velocity: Vec2::ZERO,
+                perched: true,
+                facing_left: false,
+            };
+            steer(
+                &mut bat,
+                Pos2::ZERO,
+                Some(egui::pos2(0.0, 20.0)),
+                pressed,
+                0.05,
+                screen,
+            );
+            assert!(bat.velocity.x > 0.0);
+            assert!(!bat.perched);
+        }
     }
 
     #[test]
