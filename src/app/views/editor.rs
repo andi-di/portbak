@@ -360,13 +360,17 @@ fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
             "Check immediately when enabled",
         ));
     });
-    schedule_controls(ui, job);
+    scheduling_fields(ui, job, true);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
 }
 
 pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
+    scheduling_fields(ui, job, false);
+}
+
+fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
         let modes: [(Schedule, &str, Sprite); 3] = [
             (Schedule::Interval, "Interval", Sprite::Rewind),
@@ -379,10 +383,10 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
     });
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
-        Schedule::Daily => time_row(ui, job),
+        Schedule::Daily => time_row(ui, job, show_next_check),
         Schedule::Weekdays => {
-            time_row(ui, job);
             weekday_row(ui, job);
+            time_row(ui, job, show_next_check);
         }
     }
 }
@@ -416,8 +420,8 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
     .changed()
 }
 
-fn time_row(ui: &mut egui::Ui, job: &mut Job) {
-    centered_row(ui, |ui| {
+fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
+    ui.horizontal_wrapped(|ui| {
         ui.label("Local time");
         ui.add(
             egui::DragValue::new(&mut job.hour)
@@ -430,6 +434,14 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job) {
                 .range(0..=59)
                 .min_decimals(0),
         );
+        if show_next_check {
+            let next = if job.has_runnable_schedule() {
+                local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
+            } else {
+                "Select at least one weekday".into()
+            };
+            ui.label(format!("Next check: {next}"));
+        }
     });
 }
 

@@ -107,6 +107,8 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 ### Modes
 
+- In Daily and Weekdays job settings, show the next check after the local-time controls, based on the current schedule even while disabled. In Weekdays mode, place day selection above local time.
+
 1. **Interval:** enter a duration as hours:minutes:seconds in jobs and new-job defaults. Minutes and seconds range from 00 to 59; allow hours above 23. Clamp the total to one second through 365 days. Preserve the duration of older saved value/unit settings.
 2. **Daily:** check once per day at the configured local time.
 3. **Weekdays:** check at the configured local time only on selected weekdays. Display weekdays Monday through Sunday. Require at least one selected weekday before enabling automatic execution.
