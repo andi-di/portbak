@@ -34,7 +34,7 @@ pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
 A quiet moonlit rose garden has larger cursor-aware bats that hang from the top
 edge on individual timers, scatter into separate roaming areas, and return to
-roost after randomized delays. Their near-black light-mode and dark-gray dark-mode colors keep the
+roost after randomized delays. Their near-black light-mode and black dark-mode colors keep the
 bats subdued. The garden also has falling petals and a sparse
 petal/crescent pointer trail. Effects are always enabled in this look. Bats use
 smooth wing motion and face their direction of travel; varied petals tumble

@@ -75,6 +75,9 @@ struct Bat {
     leave_at: f32,
     cycle: u32,
     seed: u32,
+    size: f32,
+    burst_seconds: f32,
+    escape_target: Pos2,
 }
 
 #[derive(Clone, Default)]
@@ -112,8 +115,8 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                     for pixel in rgba.pixels_mut() {
                         let red = pixel[0].saturating_sub(pixel[1]) > 25;
                         let color = match (dark, red) {
-                            (true, false) => [56, 55, 60],
-                            (true, true) => [44, 40, 47],
+                            (true, false) => [12, 10, 14],
+                            (true, true) => [4, 3, 5],
                             (false, false) => [53, 30, 48],
                             (false, true) => [119, 31, 65],
                         };
@@ -198,10 +201,13 @@ fn petal(seed: u32) -> Sprite {
     }
 }
 
-fn home(screen: Rect, index: usize) -> Pos2 {
+fn home(screen: Rect, index: usize, size: f32) -> Pos2 {
+    let inset = (size * 0.5).min(screen.width() * 0.5);
     egui::pos2(
-        screen.left() + screen.width() * (index as f32 + 0.5) / BAT_COUNT as f32,
-        screen.top() + 23.0_f32.min(screen.height() * 0.5),
+        screen.left()
+            + inset
+            + (screen.width() - inset * 2.0) * (index as f32 + 0.5) / BAT_COUNT as f32,
+        screen.top() + (size * 0.36 + 2.0).min(screen.height() * 0.5),
     )
 }
 
@@ -220,8 +226,12 @@ fn postpone_roost(bat: &mut Bat, time: f32) {
 }
 
 fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: f32, screen: Rect) {
-    let mut desired =
-        (target - bat.position).normalized() * (target.distance(bat.position) * 2.0).min(65.0);
+    let mut desired = (target - bat.position).normalized()
+        * (target.distance(bat.position) * 2.0).min(if bat.burst_seconds > 0.0 {
+            220.0
+        } else {
+            65.0
+        });
     if let Some(pointer) = pointer {
         let away = bat.position - pointer;
         let radius = if pressed {
@@ -230,9 +240,19 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
             REACTION_RADIUS
         };
         if away.length() < radius {
-            desired = away.normalized() * 120.0;
+            desired = away.normalized()
+                * if bat.burst_seconds > 0.0 {
+                    260.0
+                } else {
+                    120.0
+                };
             if away.length_sq() < 1.0 {
-                desired = Vec2::X * 120.0;
+                desired = Vec2::X
+                    * if bat.burst_seconds > 0.0 {
+                        260.0
+                    } else {
+                        120.0
+                    };
             }
             bat.perched = false;
         }
@@ -242,10 +262,12 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
         bat.facing_left = bat.velocity.x < 0.0;
     }
     bat.position += bat.velocity * dt;
-    let bounds = screen.shrink2(egui::vec2(
-        24.0_f32.min(screen.width() * 0.5),
-        23.0_f32.min(screen.height() * 0.5),
-    ));
+    let size = bat.size.max(48.0);
+    let inset = egui::vec2(
+        (size * 0.5).min(screen.width() * 0.5),
+        (size * 0.36).min(screen.height() * 0.5),
+    );
+    let bounds = screen.shrink2(inset);
     bat.position.x = bat.position.x.clamp(bounds.left(), bounds.right());
     bat.position.y = bat.position.y.clamp(bounds.top(), bounds.bottom());
 }
@@ -263,6 +285,7 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
                     seed: seed.wrapping_add(index as u32 * 17),
                     ..Default::default()
                 };
+                bat.size = 40.0 + noise(bat.seed, 27).powf(1.4) * 44.0;
                 bat.position = flight_target(screen, index, &bat, time);
                 postpone_roost(&mut bat, time - 10.0);
                 bat
@@ -271,6 +294,20 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
     }
     let positions: Vec<Pos2> = state.bats.iter().map(|bat| bat.position).collect();
     for (index, bat) in state.bats.iter_mut().enumerate() {
+        bat.burst_seconds = (bat.burst_seconds - dt).max(0.0);
+        if let Some(pointer) =
+            pointer.filter(|pointer| pressed && pointer.distance(bat.position) < bat.size * 0.5)
+        {
+            let away = bat.position - pointer;
+            let direction = if away.length_sq() > 1.0 {
+                away.normalized()
+            } else {
+                Vec2::angled(noise(bat.seed, bat.cycle) * std::f32::consts::TAU)
+            };
+            bat.escape_target = bat.position + direction * screen.size().length();
+            bat.burst_seconds = 2.5;
+            bat.velocity = direction * 260.0;
+        }
         let radius = if pressed {
             CLICK_REACTION_RADIUS
         } else {
@@ -283,9 +320,11 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
         if bat.perched && time >= bat.leave_at {
             postpone_roost(bat, time);
         }
-        let roost = home(screen, index);
+        let roost = home(screen, index, bat.size);
         let returning = time >= bat.return_at;
-        let mut target = if returning {
+        let mut target = if bat.burst_seconds > 0.0 {
+            bat.escape_target
+        } else if returning {
             roost
         } else {
             flight_target(screen, index, bat, time)
@@ -378,8 +417,7 @@ pub fn paint_bats(painter: &egui::Painter) {
         } else {
             Sprite::BatDown
         };
-        let rect =
-            Rect::from_center_size(bat.position, Vec2::splat(48.0 + (index % 5) as f32 * 2.0));
+        let rect = Rect::from_center_size(bat.position, Vec2::splat(bat.size));
         let pose = SpritePose {
             mirrored: bat.facing_left,
             flap: if bat.perched {
@@ -397,7 +435,7 @@ pub fn paint_bats(painter: &egui::Painter) {
         let (eyes, y) = if bat.perched {
             ([58.5, 67.5], 92.5)
         } else {
-            ([59.0, 67.0], 56.0)
+            ([65.0, 71.0], 54.5)
         };
         for x in eyes {
             let u = if bat.facing_left {
@@ -407,7 +445,7 @@ pub fn paint_bats(painter: &egui::Painter) {
             };
             let center = sprite_point(rect, u, y / 128.0, &pose);
             painter.rect_filled(
-                Rect::from_center_size(center, Vec2::splat(1.2)),
+                Rect::from_center_size(center, Vec2::splat(1.5)),
                 0,
                 Color32::from_rgb(137, 24, 43),
             );
@@ -604,6 +642,28 @@ mod tests {
         );
         assert!(a.distance(b) < 0.1);
     }
+    #[test]
+    fn direct_click_gives_a_faster_longer_escape_then_resumes_roaming() {
+        let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1400.0, 900.0));
+        let mut clicked = Garden::default();
+        update(&mut clicked, screen, 0.0, None, false);
+        clicked.bats[0].position = screen.center();
+        let mut hovered = clicked.clone();
+        let pointer = Some(screen.center() - Vec2::X * 4.0);
+        update(&mut clicked, screen, 0.05, pointer, true);
+        update(&mut hovered, screen, 0.05, pointer, false);
+        assert!(clicked.bats[0].velocity.length() > hovered.bats[0].velocity.length() * 2.0);
+        for step in 2..=20 {
+            update(&mut clicked, screen, step as f32 * 0.05, None, false);
+        }
+        assert!(clicked.bats[0].position.distance(screen.center()) > 150.0);
+        for step in 21..=80 {
+            update(&mut clicked, screen, step as f32 * 0.05, None, false);
+        }
+        assert_eq!(clicked.bats[0].burst_seconds, 0.0);
+        assert!(screen.contains(clicked.bats[0].position));
+    }
+
     #[test]
     fn bats_roost_scatter_spread_and_return_individually() {
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 700.0));
