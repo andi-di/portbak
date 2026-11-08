@@ -33,7 +33,7 @@ Alert and resting Saya heads distinguish jobs with automatic backups enabled or 
 pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
 An asymmetric vampire estate places a castle and winding stairs at lower right,
-with a silver crescent, drifting clouds and mist, distant mountains, thorn roses
+with a silver crescent, sculpted drifting clouds and curling mist, distant mountains, thorn roses
 and subtly flickering windows. Larger cursor-aware bats sometimes circle a tower
 and hang from the top edge on individual timers, scatter into separate roaming areas, and return to
 roost after randomized delays. Their near-black light-mode and black dark-mode colors keep the

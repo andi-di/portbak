@@ -19,6 +19,8 @@ const LIFETIME: f32 = 1.0;
 enum Sprite {
     Castle,
     Moon,
+    Cloud,
+    Mist,
     BatDown,
     Perched,
     Petal,
@@ -38,6 +40,14 @@ impl Sprite {
             Self::Moon => (
                 "moon",
                 include_bytes!("../../../assets/themes/midnight-neko/scenery/moon.png"),
+            ),
+            Self::Cloud => (
+                "cloud",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud.png"),
+            ),
+            Self::Mist => (
+                "mist",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/mist.png"),
             ),
             Self::BatDown => (
                 "bat_down",

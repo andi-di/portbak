@@ -1,8 +1,7 @@
 //! Asymmetric estate layers leave the central workspace open.
 
-use super::{draw, noise, Sprite};
-use crate::app::theme::style::Palette;
-use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
+use super::{draw, draw_moving, noise, Sprite, SpritePose};
+use eframe::egui::{self, Color32, Rect, Stroke, Vec2};
 
 pub(super) fn castle_rect(screen: Rect) -> Rect {
     let size = (screen.width() * 0.47)
@@ -15,20 +14,9 @@ pub(super) fn castle_rect(screen: Rect) -> Rect {
     )
 }
 
-fn cloud(painter: &egui::Painter, center: Pos2, size: Vec2, color: Color32) {
-    for (offset, scale) in [(-0.28, 0.65), (0.0, 1.0), (0.30, 0.55)] {
-        painter.add(egui::Shape::ellipse_filled(
-            center + egui::vec2(size.x * offset, size.y * offset * 0.2),
-            size * scale,
-            color,
-        ));
-    }
-}
-
 pub(super) fn paint(painter: &egui::Painter) {
     let ctx = painter.ctx();
     let screen = ctx.content_rect();
-    let palette = Palette::of_ctx(ctx);
     let dark = ctx.global_style().visuals.dark_mode;
     let time = ctx.input(|input| input.time) as f32;
     let silver = if dark {
@@ -73,15 +61,22 @@ pub(super) fn paint(painter: &egui::Painter) {
             screen.left() - 220.0 + progress * (screen.width() + 440.0),
             screen.top() + 120.0 + noise(index, 222) * screen.height() * 0.35,
         );
-        cloud(
+        let width = 260.0 + noise(index, 223) * 180.0;
+        let color = if dark {
+            Color32::WHITE.gamma_multiply(0.23)
+        } else {
+            Color32::from_rgb(132, 120, 145).gamma_multiply(0.23)
+        };
+        draw_moving(
             painter,
-            center,
-            egui::vec2(
-                110.0 + noise(index, 223) * 100.0,
-                15.0 + noise(index, 224) * 14.0,
-            ),
-            crate::app::rendering::pixel::mix(palette.background, silver, 0.22)
-                .gamma_multiply(0.35),
+            Rect::from_center_size(center, egui::vec2(width, width * 0.34)),
+            Sprite::Cloud,
+            color,
+            SpritePose {
+                mirrored: index.is_multiple_of(2),
+                angle: (time * 0.025 + index as f32).sin() * 0.025,
+                ..Default::default()
+            },
         );
     }
     draw(
@@ -95,11 +90,22 @@ pub(super) fn paint(painter: &egui::Painter) {
             screen.center().x + (time * 0.035 + layer as f32 * 2.0).sin() * screen.width() * 0.18,
             screen.bottom() - 22.0 - layer as f32 * 25.0,
         );
-        cloud(
+        let width = screen.width() * (0.85 + layer as f32 * 0.08);
+        let color = if dark {
+            Color32::WHITE.gamma_multiply(0.10)
+        } else {
+            Color32::from_rgb(125, 110, 135).gamma_multiply(0.12)
+        };
+        draw_moving(
             painter,
-            center,
-            egui::vec2(screen.width() * 0.45, 15.0 + layer as f32 * 5.0),
-            silver.gamma_multiply(0.025),
+            Rect::from_center_size(center, egui::vec2(width, width * 0.15)),
+            Sprite::Mist,
+            color,
+            SpritePose {
+                mirrored: layer % 2 == 0,
+                angle: (time * 0.015 + layer as f32).sin() * 0.018,
+                ..Default::default()
+            },
         );
     }
 }
