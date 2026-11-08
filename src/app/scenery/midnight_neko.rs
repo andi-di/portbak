@@ -1,8 +1,10 @@
 //! Moonlit roses, cursor-aware bats and sparse petal/crescent trails.
 
+mod cursors;
+
 use crate::app::rendering::ornaments::noise;
 use crate::app::theme::style::Palette;
-use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
+use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 use std::time::Duration;
 
 const BAT_COUNT: usize = 7;
@@ -368,7 +370,7 @@ fn record_pointer(state: &mut Garden, pointer: Option<Pos2>, pressed: bool, time
     }
 }
 
-pub fn paint_overlays(ctx: &egui::Context, palette: &Palette) {
+pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Tooltip,
         egui::Id::new("saya_cursor"),
@@ -400,73 +402,13 @@ pub fn paint_overlays(ctx: &egui::Context, palette: &Palette) {
             );
         }
     }
-    // Retain native text, resize and hand cursors; only replace the plain arrow.
-    if ctx.output(|output| output.cursor_icon) == egui::CursorIcon::Default {
-        if let Some(pointer) = ctx.input(|input| input.pointer.hover_pos()) {
+    // Editing and resize cursors retain their native shapes.
+    let cursor = ctx.output(|output| output.cursor_icon);
+    if let Some(pointer) = ctx.input(|input| input.pointer.hover_pos()) {
+        if cursors::paint(&painter, pointer, cursor) {
             ctx.set_cursor_icon(egui::CursorIcon::None);
-            silver_cursor(&painter, pointer, palette.accent);
         }
     }
-}
-
-fn silver_cursor(painter: &egui::Painter, tip: Pos2, accent: Color32) {
-    let at = |x, y| tip + egui::vec2(x, y);
-    let rim = Color32::from_rgb(40, 30, 34);
-    let outline = vec![
-        at(0.0, 0.0),
-        at(2.0, 27.0),
-        at(8.0, 21.0),
-        at(13.0, 32.0),
-        at(18.0, 29.0),
-        at(13.0, 18.0),
-        at(22.0, 17.0),
-    ];
-    let facets = [
-        (
-            vec![at(0.0, 0.0), at(2.0, 27.0), at(9.0, 16.0)],
-            Color32::from_rgb(249, 246, 241),
-        ),
-        (
-            vec![at(0.0, 0.0), at(9.0, 16.0), at(22.0, 17.0)],
-            Color32::from_rgb(181, 171, 171),
-        ),
-        (
-            vec![at(2.0, 27.0), at(8.0, 21.0), at(9.0, 16.0)],
-            Color32::from_rgb(129, 121, 132),
-        ),
-        (
-            vec![
-                at(8.0, 21.0),
-                at(13.0, 32.0),
-                at(18.0, 29.0),
-                at(13.0, 18.0),
-                at(9.0, 16.0),
-            ],
-            Color32::from_rgb(198, 192, 202),
-        ),
-        (
-            vec![at(9.0, 16.0), at(13.0, 18.0), at(22.0, 17.0)],
-            Color32::from_rgb(103, 92, 106),
-        ),
-    ];
-    for (points, fill) in facets {
-        painter.add(egui::Shape::convex_polygon(points, fill, Stroke::NONE));
-    }
-    painter.add(egui::Shape::closed_line(outline, Stroke::new(1.4_f32, rim)));
-    painter.line_segment(
-        [at(1.0, 2.0), at(9.0, 16.0)],
-        Stroke::new(1.0_f32, Color32::WHITE),
-    );
-    painter.add(egui::Shape::convex_polygon(
-        vec![
-            at(11.0, 21.0),
-            at(14.0, 23.0),
-            at(14.0, 27.0),
-            at(11.0, 25.0),
-        ],
-        accent,
-        Stroke::new(0.8_f32, rim),
-    ));
 }
 
 #[cfg(test)]
