@@ -95,6 +95,14 @@ impl App {
         }
         if let Some((id, was_enabled)) = activation {
             self.job_activation_changed(id, was_enabled);
+            if let Some(job) = self.job(id) {
+                let action = if job.enabled {
+                    crate::app::scenery::catgirl::Action::AutomaticEnabled
+                } else {
+                    crate::app::scenery::catgirl::Action::AutomaticDisabled
+                };
+                crate::app::scenery::catgirl::trigger(&ctx, action);
+            }
         }
         if let Some((id, action)) = action {
             let reaction = match action {

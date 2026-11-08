@@ -434,7 +434,18 @@ impl App {
                 name,
                 protected,
                 result,
-            } => self.protection_saved(request, &name, protected, result),
+            } => {
+                if protected
+                    && result.is_ok()
+                    && self
+                        .backup_history
+                        .as_ref()
+                        .is_some_and(|history| history.request == request)
+                {
+                    scenery::catgirl::trigger(ctx, scenery::catgirl::Action::ProtectionEnabled);
+                }
+                self.protection_saved(request, &name, protected, result);
+            }
             Event::SummaryLoaded {
                 job,
                 target,
@@ -445,6 +456,17 @@ impl App {
     }
 
     fn finish_operation(&mut self, id: Uuid, result: Result<Outcome, String>, ctx: &egui::Context) {
+        use scenery::catgirl::{self, Action};
+        let reaction = match &result {
+            Err(_) => Action::Failed,
+            Ok(_) if self.restoring => Action::RestoreCompleted,
+            Ok(outcome) if !outcome.created => Action::NoChanges,
+            Ok(_) if self.job(id).is_some_and(|job| job.last_success.is_none()) => {
+                Action::FirstBackup
+            }
+            Ok(_) => Action::BackupCompleted,
+        };
+        catgirl::trigger(ctx, reaction);
         if let Some(job) = self.job_mut(id) {
             match result {
                 Ok(outcome) => {

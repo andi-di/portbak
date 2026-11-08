@@ -21,9 +21,32 @@ pub enum Action {
     RemoveJob,
     Settings,
     SelectJob,
+    BackupCompleted,
+    FirstBackup,
+    NoChanges,
+    Failed,
+    AutomaticEnabled,
+    AutomaticDisabled,
+    RestoreConfirmation,
+    RestoreCompleted,
+    ProtectionEnabled,
+    DarkMode,
+    LightMode,
 }
 
 impl Action {
+    fn priority(self) -> u8 {
+        match self {
+            Self::BackupCompleted
+            | Self::FirstBackup
+            | Self::NoChanges
+            | Self::Failed
+            | Self::RestoreCompleted
+            | Self::ProtectionEnabled => 2,
+            _ => 1,
+        }
+    }
+
     fn expression(self) -> Expression {
         match self {
             Self::NewJob => Expression::Happy,
@@ -31,6 +54,17 @@ impl Action {
             Self::RemoveJob => Expression::Pouting,
             Self::Settings => Expression::Curious,
             Self::SelectJob => Expression::Waiting,
+            Self::BackupCompleted => Expression::Smug,
+            Self::FirstBackup => Expression::Celebrating,
+            Self::NoChanges => Expression::BoredExpectant,
+            Self::Failed => Expression::Sad,
+            Self::AutomaticEnabled => Expression::Energetic,
+            Self::AutomaticDisabled => Expression::Pouting,
+            Self::RestoreConfirmation => Expression::Question,
+            Self::RestoreCompleted => Expression::Happy,
+            Self::ProtectionEnabled => Expression::Dominant,
+            Self::DarkMode => Expression::Happy,
+            Self::LightMode => Expression::Sleepy,
         }
     }
 }
@@ -43,7 +77,7 @@ pub fn trigger(ctx: &egui::Context, action: Action) {
     let random = uuid::Uuid::new_v4().as_u128();
     ctx.data_mut(|data| {
         let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
-        state.request_expression(action.expression(), time, random);
+        state.request_priority(action.expression(), action.priority(), time, random);
         data.insert_temp(state_id(), state);
     });
     ctx.request_repaint();
@@ -264,6 +298,9 @@ struct Companion {
     next_random: Option<f64>,
     hovered: bool,
     pending: Option<Expression>,
+    pending_priority: u8,
+    reaction_priority: u8,
+    cooldown_until: f64,
     displayed: Expression,
     line_indices: [Option<usize>; 27],
 }
@@ -274,9 +311,9 @@ impl Companion {
     }
 
     fn tick(&mut self, time: f64, hovered: bool, random: u128) {
-        if !hovered {
+        if !hovered && time >= self.cooldown_until {
             if let Some(expression) = self.pending.take() {
-                self.set_expression(expression, time, random);
+                self.request_priority(expression, self.pending_priority, time, random);
                 return;
             }
         }
@@ -292,14 +329,27 @@ impl Companion {
     }
 
     fn request_expression(&mut self, expression: Expression, time: f64, random: u128) {
-        if self.hovered {
-            self.pending = Some(expression);
+        self.request_priority(expression, 1, time, random);
+    }
+
+    fn request_priority(&mut self, expression: Expression, priority: u8, time: f64, random: u128) {
+        if priority < self.reaction_priority && time < self.until {
+            return;
+        }
+        if self.hovered || time < self.cooldown_until {
+            if self.pending.is_none() || priority >= self.pending_priority {
+                self.pending = Some(expression);
+                self.pending_priority = priority;
+            }
         } else {
             self.set_expression(expression, time, random);
+            self.reaction_priority = priority;
+            self.cooldown_until = time + 2.0;
         }
     }
 
     fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
+        self.reaction_priority = 0;
         self.expression = expression;
         self.until = time + REACTION_SECONDS;
         self.select_line(expression, random.rotate_left(64));
@@ -475,6 +525,31 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn outcomes_win_cooldowns_and_hover_defers_changes() {
+        use super::{Companion, Expression};
+        let mut state = Companion::default();
+        state.request_expression(Expression::Waiting, 0.0, 1);
+        state.request_priority(Expression::Sad, 2, 0.5, 2);
+        state.request_expression(Expression::Cute, 1.0, 3);
+        assert_eq!(state.visible(1.0), Expression::Waiting);
+        state.tick(2.0, false, 4);
+        assert_eq!(state.visible(2.0), Expression::Sad);
+        state.request_expression(Expression::Curious, 2.5, 5);
+        state.next_random = Some(2.5);
+        state.tick(3.0, false, 6);
+        assert_eq!(state.visible(3.0), Expression::Sad);
+        state.hold_while_hovered(true, 4.0);
+        let line = state.line(4.0);
+        state.request_priority(Expression::Happy, 2, 4.0, 7);
+        state.tick(4.0, true, 8);
+        assert_eq!(state.visible(4.0), Expression::Sad);
+        assert_eq!(state.line(4.0), line);
+        state.hold_while_hovered(false, 4.1);
+        state.tick(4.1, false, 9);
+        assert_eq!(state.visible(4.1), Expression::Happy);
+    }
+
     #[test]
     fn random_deadlines_vary_and_do_not_interrupt_hovered_reactions() {
         let mut state = super::Companion::default();

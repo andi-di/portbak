@@ -76,6 +76,10 @@ impl App {
             if let Some(history) = &mut self.backup_history {
                 history.selected = Some(name);
                 history.confirming_restore = true;
+                crate::app::scenery::catgirl::trigger(
+                    &ctx,
+                    crate::app::scenery::catgirl::Action::RestoreConfirmation,
+                );
             }
         }
         self.show_restore_confirmation(&ctx);

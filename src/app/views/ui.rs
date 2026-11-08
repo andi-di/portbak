@@ -114,6 +114,14 @@ impl App {
                         {
                             self.config.theme = if dark { Theme::Light } else { Theme::Dark };
                             ctx.set_theme(theme_preference(self.config.theme));
+                            crate::app::scenery::catgirl::trigger(
+                                &ctx,
+                                if dark {
+                                    crate::app::scenery::catgirl::Action::LightMode
+                                } else {
+                                    crate::app::scenery::catgirl::Action::DarkMode
+                                },
+                            );
                         }
                     });
                 });
