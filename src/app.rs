@@ -612,6 +612,16 @@ mod tests {
     }
 
     #[test]
+    fn startup_does_not_select_an_existing_job() {
+        let config = Config {
+            jobs: vec![Job::default()],
+            ..Config::default()
+        };
+        let app = app_with(config, PathBuf::new());
+        assert!(app.selected.is_none());
+    }
+
+    #[test]
     fn add_job_copies_current_defaults_and_selects_a_fresh_job() {
         let mut app = app_with(Config::default(), PathBuf::new());
         app.add_job();
@@ -1006,6 +1016,7 @@ mod tests {
             ..Config::default()
         };
         let mut app = app_with(config, PathBuf::new());
+        app.selected = Some(id);
         app.enqueue(id);
         let context = egui::Context::default();
         let _ = context.run_ui(egui::RawInput::default(), |ui| {
