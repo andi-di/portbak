@@ -117,7 +117,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             line(&[(0.25, 0.3), (0.3, 0.9), (0.7, 0.9), (0.75, 0.3)]);
             line(&[(0.35, 0.2), (0.35, 0.1), (0.65, 0.1), (0.65, 0.2)]);
         }
-        Sprite::Rewind | Sprite::Back | Sprite::Interval => {
+        Sprite::Rewind | Sprite::Interval => {
             line(&[(0.5, 0.2), (0.2, 0.5), (0.5, 0.8)]);
             line(&[(0.2, 0.5), (0.85, 0.5)]);
         }

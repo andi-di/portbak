@@ -27,7 +27,7 @@ pub fn paint(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32,
         Sprite::Clock | Sprite::Weekdays => clock(&pen, palette, tint),
         Sprite::Shield => shield(&pen, palette, tint),
         Sprite::Trash => bin(&pen, palette, tint),
-        Sprite::Rewind | Sprite::Back | Sprite::Interval => back_arrow(&pen, palette, tint),
+        Sprite::Rewind | Sprite::Interval => back_arrow(&pen, palette, tint),
         Sprite::Play => gel(
             &pen,
             palette,

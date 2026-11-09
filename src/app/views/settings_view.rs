@@ -1,5 +1,5 @@
 use crate::app::rendering::glass::{self, Tint};
-use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use crate::app::rendering::pixel::{self, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
@@ -22,38 +22,24 @@ impl App {
         let ctx = ui.ctx().clone();
         let frame =
             egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
-        let mut close = false;
         egui::CentralPanel::default()
             .frame(frame)
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    close = settings_page(ui, &mut self.config, &mut self.settings_tab);
+                    settings_page(ui, &mut self.config, &mut self.settings_tab);
                 });
             });
-        if close {
-            self.settings_open = false;
-        }
     }
 }
 
-/// Returns whether the user asked to go back to the jobs.
-fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) -> bool {
+fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) {
     let palette = Palette::of(ui);
-    let close = ui
-        .horizontal(|ui| {
-            sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
-            ui.add_space(6.0);
-            pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let back = PixelButton::new("Back to jobs")
-                    .sprite(Sprite::Back)
-                    .tone(Tone::Accent);
-                ui.add(back).clicked()
-            })
-            .inner
-        })
-        .inner;
+    ui.horizontal(|ui| {
+        sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
+        ui.add_space(6.0);
+        pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
+    });
     ui.add_space(14.0);
     ui.horizontal(|ui| {
         pixel::choice(
@@ -77,7 +63,6 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
             });
         }
     }
-    close
 }
 
 fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
@@ -265,7 +250,7 @@ mod tests {
                 let mut tab = SettingsTab::Jobs;
                 let _ = context.run_ui(egui::RawInput::default(), |ui| {
                     egui::CentralPanel::default().show_inside(ui, |ui| {
-                        assert!(!settings_page(ui, &mut config, &mut tab));
+                        settings_page(ui, &mut config, &mut tab);
                     });
                 });
                 assert!(config == before);
@@ -291,7 +276,7 @@ mod tests {
                 });
                 let _ = context.run_ui(egui::RawInput::default(), |ui| {
                     egui::CentralPanel::default().show_inside(ui, |ui| {
-                        assert!(!settings_page(ui, &mut config, &mut tab));
+                        settings_page(ui, &mut config, &mut tab);
                     });
                 });
                 assert_eq!(config.skin, candidate.id);

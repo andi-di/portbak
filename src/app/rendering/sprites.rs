@@ -29,7 +29,6 @@ pub enum Sprite {
     Cursor,
     Plus,
     Gear,
-    Back,
     JobSettings,
     Theme,
     FolderBackup,
@@ -40,7 +39,7 @@ pub enum Sprite {
 
 impl Sprite {
     #[cfg(test)]
-    pub const ALL: [Sprite; 25] = [
+    pub const ALL: [Sprite; 24] = [
         Sprite::Floppy,
         Sprite::Folder,
         Sprite::Clock,
@@ -59,7 +58,6 @@ impl Sprite {
         Sprite::Cursor,
         Sprite::Plus,
         Sprite::Gear,
-        Sprite::Back,
         Sprite::JobSettings,
         Sprite::Theme,
         Sprite::FolderBackup,
@@ -75,7 +73,7 @@ impl Sprite {
             Sprite::Clock | Sprite::Weekdays => CLOCK,
             Sprite::Shield => SHIELD,
             Sprite::Trash => TRASH,
-            Sprite::Rewind | Sprite::Back | Sprite::Interval => REWIND,
+            Sprite::Rewind | Sprite::Interval => REWIND,
             Sprite::Play => PLAY,
             Sprite::Chest => CHEST,
             Sprite::Package => PACKAGE,

@@ -148,3 +148,6 @@ CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER=x86_64-w64-mingw32-clang \
 ```
 
 LLVM-MinGW tools must be in PATH. The Windows CI workflow uses MSVC with a statically linked C runtime instead.
+
+Opening Settings leaves the selected job. Close Settings to return to the main
+screen, or click a job to open it.

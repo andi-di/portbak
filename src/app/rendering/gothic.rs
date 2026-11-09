@@ -211,7 +211,6 @@ fn icon_asset(sprite: Sprite, dark: bool) -> (&'static str, &'static [u8]) {
         Sprite::Cursor => asset!("backup-date", dark),
         Sprite::Plus => asset!("new-job", dark),
         Sprite::Gear => asset!("settings", dark),
-        Sprite::Back => asset!("back", dark),
         Sprite::JobSettings => asset!("job-settings", dark),
         Sprite::Theme => asset!("theme", dark),
         Sprite::FolderBackup => asset!("folder-backup", dark),

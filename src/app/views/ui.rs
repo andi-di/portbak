@@ -71,6 +71,18 @@ impl App {
         }
     }
 
+    fn toggle_settings(&mut self) {
+        self.settings_open = !self.settings_open;
+        self.selected = None;
+        self.backups_tab = false;
+    }
+
+    fn open_job(&mut self, id: uuid::Uuid) {
+        self.selected = Some(id);
+        self.settings_open = false;
+        self.backups_tab = false;
+    }
+
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
@@ -93,7 +105,7 @@ impl App {
                             .sprite(Sprite::Gear)
                             .selected(self.settings_open);
                         if ui.add(settings).on_hover_text("Settings").clicked() {
-                            self.settings_open = !self.settings_open;
+                            self.toggle_settings();
                             if self.settings_open {
                                 crate::app::scenery::catgirl::trigger(
                                     ui.ctx(),
@@ -287,14 +299,11 @@ impl App {
                         }
                     });
                 if let Some(id) = clicked {
-                    self.selected = (self.selected != Some(id)).then_some(id);
-                    if self.selected.is_some() {
-                        crate::app::scenery::catgirl::trigger(
-                            ui.ctx(),
-                            crate::app::scenery::catgirl::Action::SelectJob,
-                        );
-                    }
-                    self.settings_open = false;
+                    self.open_job(id);
+                    crate::app::scenery::catgirl::trigger(
+                        ui.ctx(),
+                        crate::app::scenery::catgirl::Action::SelectJob,
+                    );
                 }
                 if show_mascot {
                     ui.add_space((ui.available_height() - mascot_height).max(0.0));
@@ -547,6 +556,34 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     use super::*;
     use crate::model::Config;
+
+    #[test]
+    fn settings_leave_the_job_and_close_to_the_main_screen() {
+        let mut app = App::new(
+            Config {
+                jobs: vec![Job::default()],
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.selected = Some(app.config.jobs[0].id);
+        app.backups_tab = true;
+        app.toggle_settings();
+        assert!(app.settings_open);
+        assert!(app.selected.is_none());
+        assert!(!app.backups_tab);
+        app.toggle_settings();
+        assert!(!app.settings_open);
+        assert!(app.selected.is_none());
+        app.toggle_settings();
+        let id = app.config.jobs[0].id;
+        app.open_job(id);
+        assert_eq!(app.selected, Some(id));
+        assert!(!app.settings_open);
+        app.open_job(id);
+        assert_eq!(app.selected, Some(id));
+    }
 
     #[test]
     fn check_transitions_do_not_emit_widget_id_warnings() {
