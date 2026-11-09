@@ -491,8 +491,8 @@ pub fn show(ui: &mut egui::Ui) {
 
     // Tuck the portrait's crop edges beneath the frame rails.
     let opening = Rect::from_min_max(
-        rect.min + rect.size() * egui::vec2(0.115, 0.13),
-        rect.min + rect.size() * egui::vec2(0.885, 0.90),
+        rect.min + rect.size() * egui::vec2(0.065, 0.066),
+        rect.min + rect.size() * egui::vec2(0.935, 0.936),
     );
     paint(ui, opening, &format!("{expression:?}"), expression.bytes());
     paint(
