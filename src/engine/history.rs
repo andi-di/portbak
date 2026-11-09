@@ -1,5 +1,5 @@
 use super::{
-    destination, exceeds_limits, is_link, is_zip_backup, lock_destination, manifest_path,
+    counted, destination, exceeds_limits, is_link, is_zip_backup, lock_destination, manifest_path,
     metadata_if_exists, read_manifest, save,
 };
 use crate::model::{Job, Record};
@@ -65,8 +65,10 @@ pub fn warnings(job: &Job, records: &[Record]) -> Vec<String> {
     if let Some(limit) = job.max_count {
         let free = limit.saturating_sub(protected.len());
         if free <= LOW_FREE_PLACES {
+            let verb = if free == 1 { "remains" } else { "remain" };
             warnings.push(format!(
-                "Low retention capacity: {free} places remain ({} protected, limit {limit}).",
+                "Low retention capacity: {} {verb} ({} protected, limit {limit}).",
+                counted(free, "place", "places"),
                 protected.len()
             ));
         }
@@ -107,6 +109,22 @@ mod tests {
     use crate::model::Manifest;
     use chrono::Utc;
     use std::{fs, path::PathBuf};
+
+    #[test]
+    fn capacity_warning_uses_singular_for_one_place() {
+        let job = Job {
+            rolling: true,
+            count_protected: true,
+            max_count: Some(3),
+            max_bytes: None,
+            ..Job::default()
+        };
+        let records = vec![record(1, true, 1), record(2, true, 1)];
+        assert_eq!(
+            warnings(&job, &records),
+            ["Low retention capacity: 1 place remains (2 protected, limit 3)."]
+        );
+    }
 
     fn record(index: u32, protected: bool, size: u64) -> Record {
         Record {
