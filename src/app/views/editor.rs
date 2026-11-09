@@ -205,10 +205,10 @@ fn job_editor(
 /// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
     let narrow = ui.available_width() < 620.0;
-    let identity_height = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
-        80.0
+    let (identity_height, action_inset) = if Skin::of(ui.ctx()).finish == style::Finish::Gothic {
+        (80.0, 148.0)
     } else {
-        60.0
+        (60.0, 124.0)
     };
     if narrow {
         let (rect, _) = ui.allocate_exact_size(
@@ -257,7 +257,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
         },
     );
     if !narrow {
-        centered_identity(ui, job, rect.shrink2(egui::vec2(124.0, 0.0)));
+        centered_identity(ui, job, rect.shrink2(egui::vec2(action_inset, 0.0)));
     }
     action
 }
