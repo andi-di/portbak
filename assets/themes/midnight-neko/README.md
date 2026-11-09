@@ -3,7 +3,7 @@
 Theme assets:
 
 - `saya-full-body.png`: static pixel-art welcome figure.
-- `saya-head.png`: simplified 64 × 64 pixel portrait beside the application name.
+- `saya-emblem.png`: Kurobane family crest beside the application and job names.
 - `expressions/`: all 27 refined pixel busts for the sidebar; click to show one
   of the 26 non-neutral expressions without immediate repeats. Hovering holds the
   expression; it resets after the pointer has been away for three seconds.

@@ -436,16 +436,16 @@ fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
 pub fn show_header(ui: &mut egui::Ui) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(56.0), egui::Sense::hover());
 
-    paint_head(ui, rect);
-    response.on_hover_text("Kurobane Saya")
+    paint_emblem(ui, rect);
+    response.on_hover_text("Kurobane family emblem")
 }
 
-pub fn paint_head(ui: &egui::Ui, rect: egui::Rect) {
+pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
     paint(
         ui,
         rect,
-        "head",
-        include_bytes!("../../../assets/themes/midnight-neko/saya-head.png"),
+        "family-emblem",
+        include_bytes!("../../../assets/themes/midnight-neko/saya-emblem.png"),
     );
 }
 

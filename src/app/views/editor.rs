@@ -294,7 +294,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
             };
             if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
                 let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
-                crate::app::scenery::catgirl::paint_head(ui, rect);
+                crate::app::scenery::catgirl::paint_emblem(ui, rect);
             } else {
                 sprites::show(
                     ui,

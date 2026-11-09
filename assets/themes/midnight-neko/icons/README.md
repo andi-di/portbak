@@ -10,7 +10,7 @@ The current Saya job heads, masters, previews and prompts live in
 ## Resolution and size
 
 - Functional icons are exactly **128 × 128 pixels**, RGBA PNG.
-- Saya heads (active, paused, job title and app header) use **128 × 128 pixels**,
+- Saya status heads (active and paused) use **128 × 128 pixels**,
   with a centered 104-pixel maximum visible extent and no added pale contour.
   Their reference palette is identical across light and dark modes.
   Favor a coarse 32-pixel design grid and broad flat color clusters for faces.
@@ -23,14 +23,14 @@ The current Saya job heads, masters, previews and prompts live in
 - Keep the same canvas and occupied-area rule for replacements and new icons.
   Check readability at 24, 32, and 48 pixels before use.
 - Utility and job action icons render at 32 logical pixels. New job uses 40.
-  Job status heads render at 72 logical pixels. The shared name portrait
+  Job status heads render at 72 logical pixels. The Kurobane family emblem
   renders at 56 logical pixels in the app header and 80 beside the job name.
 - Generate each functional silhouette individually. Derive the `dark/` (white)
   and `light/` (black) base masks from the same alpha mask so their
   geometry stays identical. The renderer adds a shallow inset silver bevel and
   broad diagonal metallic reflections and stepped facets: light silver for dark surfaces, dark silver for light
   surfaces. Clamp shading toward the readable foreground wherever needed to
-  preserve 4.5:1 contrast. Keep Saya status and job-title heads in their original colors.
+  preserve 4.5:1 contrast. Keep Saya status heads in their original colors.
   Buttons select the variant from their actual fill,
   including hover and pressed states; standalone icons follow the theme mode.
 - Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
