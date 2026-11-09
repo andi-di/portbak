@@ -2,6 +2,7 @@
 
 mod dialogue;
 
+use crate::app::rendering::pixel::pointing_hand;
 use crate::app::theme::style::Palette;
 
 use eframe::egui::{self, Color32, Pos2, Rect};
@@ -635,7 +636,7 @@ pub fn show(ui: &mut egui::Ui) {
         egui::pos2(ui.clip_rect().center().x, slot.center().y),
         egui::Vec2::splat(width),
     );
-    let response = ui.interact(rect, portrait_id, egui::Sense::click());
+    let response = pointing_hand(ui.interact(rect, portrait_id, egui::Sense::click()));
 
     state.hold_while_hovered(response.hovered(), time);
     if response.clicked() {

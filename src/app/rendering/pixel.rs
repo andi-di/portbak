@@ -15,6 +15,19 @@ use std::time::Duration;
 const ICON_SCALE: f32 = 2.0;
 const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
+pub(crate) fn pointing_hand(response: Response) -> Response {
+    let ctx = &response.ctx;
+    let held = Skin::of(ctx).finish == Finish::Gothic
+        && response.enabled()
+        && response.is_pointer_button_down_on()
+        && ctx.input(|input| input.pointer.primary_down())
+        && ctx.output(|output| output.cursor_icon == egui::CursorIcon::Default);
+    if response.hovered() || held {
+        ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    response
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Tone {
     Plain,
@@ -257,7 +270,7 @@ impl Widget for PixelButton {
         }
         let top = cursor.y + (content.y - galley.size().y) / 2.0;
         painter.galley(egui::pos2(cursor.x, top).round(), galley, ink);
-        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+        pointing_hand(response)
     }
 }
 
@@ -413,7 +426,7 @@ impl Widget for PixelCheckbox<'_> {
             galley,
             ink,
         );
-        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+        pointing_hand(response)
     }
 }
 

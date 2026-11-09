@@ -429,9 +429,7 @@ impl App {
                     .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
-        let response = ui
-            .interact(rect, card_id, egui::Sense::click())
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
         ui.painter().set(
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),

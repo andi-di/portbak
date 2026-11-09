@@ -591,10 +591,9 @@ pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
     }
     // Editing and resize cursors retain their native shapes.
     let cursor = ctx.output(|output| output.cursor_icon);
-    if let Some(pointer) = ctx.input(|input| input.pointer.hover_pos()) {
-        if cursors::paint(&painter, pointer, cursor) {
-            ctx.set_cursor_icon(egui::CursorIcon::None);
-        }
+    let pointer = ctx.input(|input| input.pointer.hover_pos());
+    if cursors::paint(&painter, pointer, cursor) {
+        ctx.set_cursor_icon(egui::CursorIcon::None);
     }
 }
 

@@ -7,16 +7,17 @@ const SILVER: Color32 = Color32::from_rgb(181, 171, 181);
 const LIGHT: Color32 = Color32::from_rgb(249, 246, 241);
 const SHADE: Color32 = Color32::from_rgb(103, 92, 106);
 
-pub(super) fn paint(painter: &egui::Painter, tip: Pos2, cursor: egui::CursorIcon) -> bool {
+pub(super) fn paint(painter: &egui::Painter, tip: Option<Pos2>, cursor: egui::CursorIcon) -> bool {
     let down = painter.ctx().input(|input| input.pointer.primary_down());
     let id = egui::Id::new("saya_held_hand_cursor");
     let held = painter.ctx().data_mut(|data| {
         let held = down
-            && (cursor == egui::CursorIcon::PointingHand
+            && ((tip.is_some() && cursor == egui::CursorIcon::PointingHand)
                 || data.get_temp::<bool>(id).unwrap_or(false));
         data.insert_temp(id, held);
         held
     });
+    let Some(tip) = tip else { return false };
     match cursor {
         egui::CursorIcon::Default if held => hand(painter, tip, true),
         egui::CursorIcon::Default => arrow(painter, tip),
@@ -236,7 +237,7 @@ mod tests {
         assert_eq!(hand_point(tip, 0.0, 0.0, true), tip);
         assert!(hand_point(tip, 0.0, 24.0, true).y < hand_point(tip, 0.0, 24.0, false).y);
         let context = egui::Context::default();
-        let frame = |events, cursor| {
+        let frame = |events, pointer, cursor| {
             context
                 .run_ui(
                     egui::RawInput {
@@ -244,7 +245,7 @@ mod tests {
                         ..Default::default()
                     },
                     |ui| {
-                        assert!(paint(ui.painter(), tip, cursor));
+                        assert_eq!(paint(ui.painter(), pointer, cursor), pointer.is_some());
                     },
                 )
                 .shapes
@@ -258,10 +259,12 @@ mod tests {
         };
         let pressed_shapes = frame(
             vec![egui::Event::PointerMoved(tip), press],
+            Some(tip),
             egui::CursorIcon::PointingHand,
         );
         let dragged_shapes = frame(
             vec![egui::Event::PointerMoved(tip + egui::vec2(100.0, 0.0))],
+            Some(tip),
             egui::CursorIcon::Default,
         );
         assert_eq!(pressed_shapes, dragged_shapes);
@@ -271,18 +274,37 @@ mod tests {
             pressed: false,
             modifiers: egui::Modifiers::NONE,
         };
-        let released_shapes = frame(vec![release], egui::CursorIcon::Default);
-        assert!(released_shapes < pressed_shapes);
+        frame(
+            vec![release, egui::Event::PointerGone],
+            None,
+            egui::CursorIcon::Default,
+        );
+        let background_press = egui::Event::PointerButton {
+            pos: tip,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let background_shapes = frame(
+            vec![egui::Event::PointerMoved(tip), background_press],
+            Some(tip),
+            egui::CursorIcon::Default,
+        );
+        assert!(background_shapes < pressed_shapes);
     }
 
     #[test]
     fn styles_arrow_and_hand_but_preserves_native_editing_cursors() {
         let ctx = egui::Context::default();
         let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
-            assert!(paint(ui.painter(), Pos2::ZERO, egui::CursorIcon::Default));
             assert!(paint(
                 ui.painter(),
-                Pos2::ZERO,
+                Some(Pos2::ZERO),
+                egui::CursorIcon::Default
+            ));
+            assert!(paint(
+                ui.painter(),
+                Some(Pos2::ZERO),
                 egui::CursorIcon::PointingHand
             ));
             for cursor in [
@@ -291,7 +313,7 @@ mod tests {
                 egui::CursorIcon::ResizeVertical,
                 egui::CursorIcon::NotAllowed,
             ] {
-                assert!(!paint(ui.painter(), Pos2::ZERO, cursor));
+                assert!(!paint(ui.painter(), Some(Pos2::ZERO), cursor));
             }
         });
     }
