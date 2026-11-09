@@ -2,7 +2,7 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_TIME,
+    alert, caption, centered_row, gib_field, local_time, path_picker, retention_warnings, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -12,7 +12,6 @@ use uuid::Uuid;
 
 const DEFAULT_MAX_COUNT: usize = 10;
 const MAX_COUNT_LIMIT: usize = 100_000;
-const BYTES_PER_GIB: f64 = 1_073_741_824.0;
 const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -547,14 +546,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                 &mut job.max_bytes,
                 DEFAULT_MAX_BYTES,
                 |ui, bytes| {
-                    let mut gib = *bytes as f64 / BYTES_PER_GIB;
-                    let editor = egui::DragValue::new(&mut gib)
-                        .speed(0.1)
-                        .range(0.001..=100_000.0)
-                        .suffix(" GiB");
-                    if ui.add(editor).changed() {
-                        *bytes = (gib * BYTES_PER_GIB) as u64;
-                    }
+                    gib_field(ui, true, bytes);
                 },
             );
             centered_row(ui, |ui| {

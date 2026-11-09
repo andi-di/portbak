@@ -3,7 +3,7 @@ use crate::app::rendering::pixel::{self, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
-use crate::app::views::widgets::{caption, centered_row};
+use crate::app::views::widgets::{caption, centered_row, gib_field};
 use crate::app::App;
 use crate::model::{Config, JobDefaults};
 use eframe::egui;
@@ -110,19 +110,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
                     &mut defaults.size_enabled,
                     "Max total size",
                 ));
-                let mut gib = defaults.max_bytes as f64 / 1_073_741_824.0;
-                if ui
-                    .add_enabled(
-                        defaults.size_enabled,
-                        egui::DragValue::new(&mut gib)
-                            .speed(0.1)
-                            .range(0.001..=100_000.0)
-                            .suffix(" GiB"),
-                    )
-                    .changed()
-                {
-                    defaults.max_bytes = (gib * 1_073_741_824.0) as u64;
-                }
+                gib_field(ui, defaults.size_enabled, &mut defaults.max_bytes);
             });
             centered_row(ui, |ui| {
                 ui.add(PixelCheckbox::new(

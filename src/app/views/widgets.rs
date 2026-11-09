@@ -124,6 +124,25 @@ pub fn retention_warnings(ui: &mut egui::Ui, job: &Job, records: &[Record]) {
     }
 }
 
+const BYTES_PER_GIB: f64 = 1_073_741_824.0;
+
+/// Editable byte limit shown in GiB.
+pub fn gib_field(ui: &mut egui::Ui, enabled: bool, bytes: &mut u64) -> egui::Response {
+    let mut gib = *bytes as f64 / BYTES_PER_GIB;
+    // Clamping a stored value mid-edit makes egui discard the text being typed,
+    // so only user input is clamped and bytes are rounded to stay inside the range.
+    let editor = egui::DragValue::new(&mut gib)
+        .speed(0.1)
+        .range(0.001..=100_000.0)
+        .clamp_existing_to_range(false)
+        .suffix(" GiB");
+    let response = ui.add_enabled(enabled, editor);
+    if response.changed() {
+        *bytes = (gib * BYTES_PER_GIB).round() as u64;
+    }
+    response
+}
+
 /// Binary-prefixed size, e.g. `1.5 MiB`; exact byte counts stay available on hover.
 pub fn format_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -189,6 +208,54 @@ mod tests {
                 });
             });
         });
+    }
+
+    #[test]
+    fn typed_sizes_below_one_gib_are_stored_exactly() {
+        for (typed, expected) in [("0.5", 0.5), ("0.001", 0.001), ("0.004", 0.004)] {
+            let context = egui::Context::default();
+            let mut bytes = 10 * 1024 * 1024 * 1024;
+            let frame = |events: Vec<egui::Event>, bytes: &mut u64| {
+                let input = egui::RawInput {
+                    events,
+                    ..Default::default()
+                };
+                let mut rect = egui::Rect::NOTHING;
+                let _ = context.run_ui(input, |ui| {
+                    egui::CentralPanel::default().show_inside(ui, |ui| {
+                        rect = gib_field(ui, true, bytes).rect;
+                    });
+                });
+                rect
+            };
+            let center = frame(Vec::new(), &mut bytes).center();
+            let press = |pressed| egui::Event::PointerButton {
+                pos: center,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(
+                vec![egui::Event::PointerMoved(center), press(true)],
+                &mut bytes,
+            );
+            frame(vec![press(false)], &mut bytes);
+            frame(Vec::new(), &mut bytes);
+            // One character per frame, like a person typing.
+            for character in typed.chars() {
+                frame(vec![egui::Event::Text(character.into())], &mut bytes);
+            }
+            let enter = egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(vec![enter], &mut bytes);
+            frame(Vec::new(), &mut bytes);
+            assert_eq!(bytes, (expected * BYTES_PER_GIB).round() as u64, "{typed}");
+        }
     }
 
     #[test]
