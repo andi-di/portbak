@@ -23,7 +23,7 @@ impl App {
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                page_scroll_area().show(ui, |ui| {
+                page_scroll_area(ui, |ui| {
                     settings_page(ui, &mut self.config, &mut self.settings_tab);
                 });
             });

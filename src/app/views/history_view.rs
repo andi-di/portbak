@@ -51,7 +51,7 @@ impl App {
                             ui.add_space(8.0);
                         }
                     });
-                page_scroll_area().show(ui, |ui| {
+                page_scroll_area(ui, |ui| {
                     if let Some(history) = &mut self.backup_history {
                         if history.job.id == id {
                             response = history_contents(ui, history);

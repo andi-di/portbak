@@ -62,7 +62,7 @@ impl App {
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                page_scroll_area().show(ui, |ui| {
+                page_scroll_area(ui, |ui| {
                     let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
                     let (Some(job), Some(permissions)) = (job, permissions) else {
                         add = welcome(ui, can_add);

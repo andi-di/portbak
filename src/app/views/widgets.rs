@@ -17,10 +17,14 @@ pub fn page_frame(ui: &egui::Ui) -> egui::Frame {
     egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(0, PAGE_PADDING))
 }
 
-pub fn page_scroll_area() -> egui::ScrollArea {
-    egui::ScrollArea::both()
-        .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
-        .auto_shrink([false, true])
+pub fn page_scroll_area(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+    ui.scope(|ui| {
+        ui.spacing_mut().scroll.bar_outer_margin = 8.0;
+        egui::ScrollArea::both()
+            .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
+            .auto_shrink([false, true])
+            .show(ui, contents);
+    });
 }
 
 pub fn local_time(time: DateTime<Utc>, format: &str) -> String {
