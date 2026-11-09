@@ -33,6 +33,7 @@ All application-owned interface text, errors, defaults, comments, and documentat
 Provide:
 
 - A job list showing only each job’s icon, name, and right-aligned next-check countdown in one vertically centered row. Box the countdown like the scheduling readout, without a text prefix; hide it when scheduling is disabled. Its divider remains at the selected width after dragging and is restored after restarting.
+  - While a job runs, restores, or waits in the queue, show RUNNING, RESTORING, or QUEUED in the countdown's place. Hold the label as long as the footer activity so quick checks do not flash.
 - Clicking the selected job deselects it and returns to the start screen.
 - At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
 - Show the last backup time and latest result in a compact status row below the job header; show errors prominently. Do not use a separate Status pane.
@@ -62,7 +63,7 @@ Provide:
   - Midnight Neko uses a silver crescent around a crimson gem and a fine diamond chain. During activity, pulse the gem, orbit a silver highlight and move a diamond along the chain; keep a still, dimmer emblem when idle.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name and theme selector without a slogan. Default to a 1280 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. Rows wrap in narrow windows; content that still does not fit scrolls sideways instead of pushing scroll bars out of view. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name, at most a short tagline per look, and the theme selector. Default to a 1280 × 960 logical-pixel window, with room below the job controls.
 
 The application remains a single distributable executable with an embedded icon. On Windows, use the app icon for the executable in Explorer and shortcuts as well as the app window. Under Linux, offer that icon directly to X11 and to Wayland compositors supporting window-icon pixel data. Missing support, icon setup errors, or an unresponsive icon negotiation must not block startup, show an error dialog, or prevent normal use; retain the compositor default icon. Do not install desktop entries or extract icon files.
 
@@ -79,11 +80,12 @@ The application remains a single distributable executable with an embedded icon.
 - Size restore confirmation to avoid scrolling at the default window size; allow scrolling in smaller windows. Place **Cancel** on the left and the restore confirmation button on the right.
 - In the Backups tab, subtly highlight the first list entry of each local calendar day, newest first. Keep protection clearly recognizable. Wrap job action buttons on narrow windows.
 - Show retention capacity warnings in the Backups tab and job details; refresh after protection changes, limit changes, and backup completion.
-- On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status. Prevent edits and manual starts while restoring; other jobs resume scheduling afterward.
+- On confirmed restore, persist this job as disabled with no next scheduled time before starting work. It stays disabled after success or failure. Run restore through the shared background worker with progress and error status, shown on the Backups tab. Prevent edits and manual starts while restoring; other jobs resume scheduling afterward.
 - Enable or disable automatic scheduling for an individual job using a prominent green enable button or red disable button.
 - **Remove job**: remove the job configuration without deleting any existing backups.
 - Save changes automatically and preserve them across restarts.
 - Prevent editing or removing a running or queued job until its pending work finishes, except that automatic scheduling can be toggled at any time. Disabling removes queued work for that job but lets a running backup finish. Manual checks remain available when scheduling is disabled.
+  - Keep a busy job's settings looking unchanged; ignore edits, folder selection, **Check now**, and **Remove job** instead of disabling them, so quick checks do not flicker.
 
 ### Window lifecycle
 
@@ -106,7 +108,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 
 | Setting | Behavior and default |
 | --- | --- |
-| Name | Editable display name, limited to 50 characters; initially empty |
+| Name | Editable display name, limited to 50 characters; initially empty; shown as **Unnamed job** when blank |
 | Source folder | Existing folder selected through a folder picker or editable path; initially empty |
 | Destination folder | Automatic destination enabled by default; generated on source selection; manually editable |
 | Automatic scheduling | Disabled by default |
@@ -138,6 +140,7 @@ Also persist the next scheduled check, last successful backup time, and latest j
 - Scheduling works only while the application is running, including when minimized. Do not register system tasks, install services, or wake an off computer.
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
 - Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
+  - The details show the activity label, countdown, and next check time in the status row below the job header.
 - On enabling a schedule, plan its next future occurrence.
 - The per-job **Check immediately when enabled** option inherits the settings template when created; the template starts unchecked. Later template changes do not affect existing jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.
