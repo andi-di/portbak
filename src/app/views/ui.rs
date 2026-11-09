@@ -350,11 +350,18 @@ impl App {
                 .map(|remaining| (remaining.to_uppercase(), palette.good)),
         };
         let width = ui.available_width() - CARD_SHADOW;
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
+        let (top, bottom) = if gothic { (2, 0) } else { (4, 4) };
         let frame = egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(CARD_HORIZONTAL_PADDING, 4))
+            .inner_margin(egui::Margin {
+                left: CARD_HORIZONTAL_PADDING,
+                right: CARD_HORIZONTAL_PADDING,
+                top,
+                bottom,
+            })
             .show(ui, |ui| {
                 ui.set_width(width - 2.0 * f32::from(CARD_HORIZONTAL_PADDING));
-                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                if gothic {
                     saya_job_identity(ui, job, badge);
                     return;
                 }
@@ -449,10 +456,18 @@ impl App {
 
 /// Saya's head, the name, and the right-aligned readout share one vertically centered row.
 fn saya_job_identity(ui: &mut egui::Ui, job: &Job, badge: Option<(String, egui::Color32)>) {
+    const ICON_SIZE: f32 = 72.0;
+    // The head artwork has about six points of transparent space above and below.
+    const TRANSPARENT_INSET: f32 = 6.0;
     let palette = Palette::of(ui);
-    let (row, _) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::hover());
-    let icon = egui::Rect::from_min_size(row.min, egui::Vec2::splat(72.0));
+    let (row, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), ICON_SIZE - 2.0 * TRANSPARENT_INSET),
+        egui::Sense::hover(),
+    );
+    let icon = egui::Rect::from_min_size(
+        row.min - egui::Vec2::Y * TRANSPARENT_INSET,
+        egui::Vec2::splat(ICON_SIZE),
+    );
     crate::app::rendering::gothic::job_icon(ui.painter(), icon, job.enabled);
     let gap = ui.spacing().item_spacing.x;
     let left = icon.right() + gap;
