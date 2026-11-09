@@ -118,7 +118,7 @@ The test opens the real app with temporary, preconfigured folder-copy and ZIP jo
 
 Allow extra time for startup, initial backups, and the final unchanged checks. Both jobs must finish each round before the next change; a missed deadline fails with a timing diagnostic rather than skipping an intermediate version. Avoid interacting with the test window or its test folders during the run; browsing backup history pauses scheduling.
 
-The script exits with code `0` on success or `1` on failure and stops its own app process. It leaves the app log, `report.json`, expected source versions, and backups in a printed `portbak-change-detection-*` directory under the system temporary folder. Existing jobs and user data are untouched. No additional Python packages are needed. The verifier's fast checks can be run with `python3 -B -m unittest discover -s tools -p 'test_backup_change_detection.py'` (use `py` on Windows).
+The script exits with code `0` on success or `1` on failure and stops its own app process. It leaves the app log, `report.json`, expected source versions, and backups in a printed `portbak-change-detection-*` directory under the system temporary folder. Existing jobs and user data are untouched. No additional Python packages are needed. The verifier's fast checks can be run with `python3 -B -m unittest discover -s tools -p 'test_backup_verifier.py'` (use `py` on Windows).
 
 ### Linux UI smoke test
 
