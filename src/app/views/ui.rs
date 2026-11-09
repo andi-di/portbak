@@ -278,13 +278,17 @@ impl App {
                     );
                 }
                 ui.add_space(12.0);
-                let mascot_height =
-                    crate::app::scenery::catgirl::reserved_height(ui.available_width())
-                        .min(ui.available_height() * 0.55);
                 let show_mascot = Skin::of(ui.ctx()).effects.hearts
                     && (!self.config.jobs.is_empty() || self.settings_open);
                 let list_height = if show_mascot {
-                    ui.available_height() - mascot_height
+                    let available = ui.available_height();
+                    let min_list_height = if self.config.jobs.is_empty() {
+                        0.0
+                    } else {
+                        104.0_f32.min(available * 0.45)
+                    };
+                    (available - crate::app::scenery::catgirl::reserved_height(ui))
+                        .max(min_list_height)
                 } else {
                     ui.available_height()
                 };
@@ -306,7 +310,6 @@ impl App {
                     );
                 }
                 if show_mascot {
-                    ui.add_space((ui.available_height() - mascot_height).max(0.0));
                     ui.vertical_centered(crate::app::scenery::catgirl::show);
                 }
             });

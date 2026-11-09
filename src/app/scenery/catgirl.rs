@@ -449,8 +449,14 @@ pub fn paint_head(ui: &egui::Ui, rect: egui::Rect) {
     );
 }
 
-pub fn reserved_height(width: f32) -> f32 {
-    width.min(340.0) + 48.0
+const DIALOGUE_HEIGHT: f32 = 48.0;
+
+fn frame_width(ui: &egui::Ui) -> f32 {
+    (ui.clip_rect().width() - 4.0).max(0.0)
+}
+
+pub fn reserved_height(ui: &egui::Ui) -> f32 {
+    frame_width(ui) + DIALOGUE_HEIGHT
 }
 
 pub fn show(ui: &mut egui::Ui) {
@@ -462,12 +468,14 @@ pub fn show(ui: &mut egui::Ui) {
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
-    let width = ui
-        .available_width()
-        .min(340.0)
-        .min((ui.available_height() - 48.0).max(24.0));
-
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, width), egui::Sense::click());
+    let width = frame_width(ui).min((ui.available_height() - DIALOGUE_HEIGHT).max(24.0));
+    let (portrait_id, slot) = ui.allocate_space(egui::vec2(ui.available_width(), width));
+    // The frame uses the panel's side margins without widening the job list.
+    let rect = Rect::from_center_size(
+        egui::pos2(ui.clip_rect().center().x, slot.center().y),
+        egui::Vec2::splat(width),
+    );
+    let response = ui.interact(rect, portrait_id, egui::Sense::click());
 
     state.hold_while_hovered(response.hovered(), time);
     if response.clicked() {
