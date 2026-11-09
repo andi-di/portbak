@@ -469,15 +469,32 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 
 const DIALOGUE_HEIGHT: f32 = 70.0;
 
-fn show_letter(ui: &mut egui::Ui, line: &str) {
+fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     let palette = Palette::of(ui);
-    ui.add_space(6.0);
+    // Join the painted rails inside the frame texture's transparent margins.
+    let rail_inset = portrait.width() * 0.04;
+    let width = (portrait.width() - rail_inset * 2.0).max(180.0_f32.min(frame_width(ui)));
+    let top = egui::pos2(
+        portrait.center().x - width / 2.0,
+        portrait.bottom() - rail_inset,
+    );
+    let mut letter_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt("saya_letter")
+            .max_rect(Rect::from_min_size(top, egui::vec2(width, DIALOGUE_HEIGHT)))
+            .layout(egui::Layout::top_down(egui::Align::Center)),
+    );
     let letter = egui::Frame::new()
         .fill(palette.raised)
         .stroke(egui::Stroke::new(1.0_f32, palette.metal))
-        .corner_radius(3)
-        .inner_margin(egui::Margin::symmetric(16, 9))
-        .show(ui, |ui| {
+        .corner_radius(egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: 3,
+            se: 3,
+        })
+        .inner_margin(egui::Margin::symmetric(16, 12))
+        .show(&mut letter_ui, |ui| {
             let label = egui::Label::new(egui::RichText::new(line).small().color(palette.ink))
                 .wrap()
                 .halign(egui::Align::Center);
@@ -485,6 +502,8 @@ fn show_letter(ui: &mut egui::Ui, line: &str) {
         });
 
     let rect = letter.response.rect;
+    // The letter can use the panel margins, just like the portrait.
+    ui.add_space((rect.bottom() + 3.0 - ui.cursor().top()).max(0.0));
     let painter = ui.painter();
     let trim = egui::Stroke::new(1.0_f32, palette.outline);
     let inset = rect.shrink(3.0);
@@ -499,7 +518,10 @@ fn show_letter(ui: &mut egui::Ui, line: &str) {
     }
     ornaments::diamond_lamp(
         painter,
-        Rect::from_center_size(rect.center_top(), egui::Vec2::splat(11.0)),
+        Rect::from_center_size(
+            rect.center_bottom() - egui::vec2(0.0, 3.0),
+            egui::Vec2::splat(11.0),
+        ),
         palette.bad,
         false,
     );
@@ -597,14 +619,13 @@ pub fn show(ui: &mut egui::Ui) {
         paint_love_hearts(ui, opening, elapsed);
         ui.ctx().request_repaint();
     }
+    show_letter(ui, rect, state.line(time));
     paint(
         ui,
         rect,
         "portrait-frame",
         include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png"),
     );
-
-    show_letter(ui, state.line(time));
 
     if time < state.until {
         ui.ctx()
