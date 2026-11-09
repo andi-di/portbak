@@ -473,11 +473,10 @@ const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/sa
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     let palette = Palette::of(ui);
     // Join the painted rails inside the frame texture's transparent margins.
-    let rail_inset = portrait.width() * 0.04;
-    let width = (portrait.width() - rail_inset * 2.0).max(180.0_f32.min(frame_width(ui)));
+    let width = (portrait.width() * 0.87).max(180.0_f32.min(frame_width(ui)));
     let top = egui::pos2(
         portrait.center().x - width / 2.0,
-        portrait.bottom() - rail_inset,
+        portrait.bottom() - portrait.height() * 0.04,
     );
     let mut letter_ui = ui.new_child(
         egui::UiBuilder::new()
