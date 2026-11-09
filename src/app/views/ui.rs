@@ -11,6 +11,12 @@ use chrono::Utc;
 use eframe::egui;
 
 const CARD_SHADOW: f32 = 4.0;
+const CARD_HORIZONTAL_PADDING: i8 = 8;
+const SIDEBAR_WIDTH: std::ops::RangeInclusive<f32> = 300.0..=460.0;
+
+fn clamp_sidebar_width(width: f32) -> f32 {
+    width.clamp(*SIDEBAR_WIDTH.start(), *SIDEBAR_WIDTH.end())
+}
 
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -249,8 +255,8 @@ impl App {
             bottom: 8,
         });
         let panel = egui::Panel::left("jobs")
-            .default_size(self.config.sidebar_width.clamp(240.0, 460.0))
-            .size_range(240.0..=460.0)
+            .default_size(clamp_sidebar_width(self.config.sidebar_width))
+            .size_range(SIDEBAR_WIDTH)
             .frame(frame)
             .show_inside(ui, |ui| {
                 pixel::panel_decoration(ui, 1.0);
@@ -281,14 +287,10 @@ impl App {
                 let show_mascot = Skin::of(ui.ctx()).effects.hearts
                     && (!self.config.jobs.is_empty() || self.settings_open);
                 let list_height = if show_mascot {
-                    let available = ui.available_height();
-                    let min_list_height = if self.config.jobs.is_empty() {
-                        0.0
-                    } else {
-                        104.0_f32.min(available * 0.45)
-                    };
-                    (available - crate::app::scenery::catgirl::reserved_height(ui))
-                        .max(min_list_height)
+                    (ui.available_height()
+                        - ui.spacing().item_spacing.y
+                        - crate::app::scenery::catgirl::reserved_height(ui))
+                    .max(0.0)
                 } else {
                     ui.available_height()
                 };
@@ -317,7 +319,7 @@ impl App {
             .read_response(egui::Id::new("jobs").with("__resize"))
             .is_some_and(|response| response.dragged())
         {
-            self.config.sidebar_width = panel.response.rect.width().clamp(240.0, 460.0);
+            self.config.sidebar_width = clamp_sidebar_width(panel.response.rect.width());
         }
     }
 
@@ -349,9 +351,9 @@ impl App {
         };
         let width = ui.available_width() - CARD_SHADOW;
         let frame = egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(12, 10))
+            .inner_margin(egui::Margin::symmetric(CARD_HORIZONTAL_PADDING, 4))
             .show(ui, |ui| {
-                ui.set_width(width - 24.0);
+                ui.set_width(width - 2.0 * f32::from(CARD_HORIZONTAL_PADDING));
                 if Skin::of(ui.ctx()).finish == Finish::Gothic {
                     saya_job_identity(ui, job, badge);
                     return;
@@ -440,7 +442,7 @@ impl App {
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),
         );
-        ui.add_space(CARD_SHADOW + 4.0);
+        ui.add_space(CARD_SHADOW);
         response.clicked()
     }
 }
@@ -894,7 +896,7 @@ mod tests {
             let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
         };
         frame(&mut app, &ctx, vec![]);
-        let start = egui::pos2(290.0, 300.0);
+        let start = egui::pos2(300.0, 300.0);
         let end = egui::pos2(390.0, 300.0);
         frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
         frame(
@@ -942,6 +944,52 @@ mod tests {
             .rect
             .width();
         assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
+    }
+
+    #[test]
+    fn midnight_neko_portrait_fits_at_minimum_window_size_with_wide_sidebar() {
+        let ctx = egui::Context::default();
+        let mut app = App::new(
+            Config {
+                skin: "midnight-neko".into(),
+                sidebar_width: *SIDEBAR_WIDTH.end(),
+                jobs: (0..8).map(|_| Job::default()).collect(),
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.ensure_skin(&ctx);
+        for _ in 0..2 {
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        crate::MIN_WINDOW_SIZE,
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    app.show_header(ui);
+                    app.show_footer(ui);
+                    app.show_job_list(ui);
+                },
+            );
+            let portrait = output.shapes.iter().find_map(|clipped| {
+                let egui::Shape::Mesh(mesh) = &clipped.shape else {
+                    return None;
+                };
+                let rect = mesh.calc_bounds();
+                (rect.left() < 10.0 && rect.width() > 450.0 && rect.width() == rect.height())
+                    .then_some((rect, clipped.clip_rect))
+            });
+            let (rect, clip) = portrait.expect("full-width square portrait");
+            assert!(clip.contains_rect(rect), "{rect:?} outside {clip:?}");
+            assert!(
+                rect.bottom() + 100.0 <= clip.bottom(),
+                "{rect:?} in {clip:?}"
+            );
+        }
     }
 
     #[test]
@@ -994,8 +1042,8 @@ mod tests {
     #[test]
     fn narrow_windows_keep_every_view_inside_the_window() {
         use crate::app::views::settings_view::SettingsTab;
-        const SCREEN: egui::Vec2 = egui::vec2(800.0, 600.0);
-        for sidebar_width in [290.0, 460.0] {
+        const SCREEN: egui::Vec2 = crate::MIN_WINDOW_SIZE;
+        for sidebar_width in [*SIDEBAR_WIDTH.start(), *SIDEBAR_WIDTH.end()] {
             for skin in skins::ALL {
                 for view in ["job settings", "backups", "settings", "theme"] {
                     let ctx = egui::Context::default();

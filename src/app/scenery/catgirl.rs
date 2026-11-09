@@ -467,15 +467,14 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
     );
 }
 
-const DIALOGUE_HEIGHT: f32 = 70.0;
+// Leave room for the longest wrapped line when Saya changes expressions.
+const DIALOGUE_HEIGHT: f32 = 100.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
 const LETTER_TRIM_HEIGHT: f32 = 20.0;
 const LETTER_PADDING: f32 = 8.0;
 const LETTER_TEXT_INSET: f32 = 16.0;
-const MIN_PORTRAIT: f32 = 24.0;
 // The straight rails' outer edges sit 4.8% in from either texture edge.
 const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
-const MIN_LETTER_WIDTH: f32 = 180.0;
 const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
 
 fn letter_text(
@@ -496,32 +495,6 @@ fn letter_text(
 
 fn letter_height(galley: &egui::Galley) -> f32 {
     galley.size().y.max(24.0) + 2.0 * LETTER_PADDING + LETTER_TRIM_HEIGHT
-}
-
-fn fit_dialogue(
-    ui: &egui::Ui,
-    available: f32,
-    line: &str,
-) -> (egui::Vec2, std::sync::Arc<egui::Galley>) {
-    let mut font = egui::TextStyle::Small.resolve(ui.style());
-    let max_width = frame_width(ui);
-    let min_width = (MIN_LETTER_WIDTH / FRAME_RAIL_SPAN).min(max_width);
-    let width = (available - DIALOGUE_HEIGHT).clamp(min_width, max_width);
-    let galley = letter_text(ui, width * FRAME_RAIL_SPAN, line, &font);
-    if width + letter_height(&galley) <= available {
-        return (egui::Vec2::splat(width), galley);
-    }
-
-    // Keep the rails aligned when only the frame height can shrink further.
-    let mut narrow = letter_text(ui, min_width * FRAME_RAIL_SPAN, line, &font);
-    while MIN_PORTRAIT + letter_height(&narrow) > available && font.size > 9.0 {
-        font.size = (font.size - 1.0).max(9.0);
-        narrow = letter_text(ui, min_width * FRAME_RAIL_SPAN, line, &font);
-    }
-    let width = width.min((available - letter_height(&narrow)).max(min_width));
-    let galley = letter_text(ui, width * FRAME_RAIL_SPAN, line, &font);
-    let height = width.min((available - letter_height(&galley)).max(MIN_PORTRAIT));
-    (egui::vec2(width, height), galley)
 }
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::Galley>) {
@@ -673,12 +646,11 @@ pub fn show(ui: &mut egui::Ui) {
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
-    let available = ui.available_height();
-    let line = state.line(time);
-    let (size, galley) = fit_dialogue(ui, available, line);
+    let width = frame_width(ui);
+    let size = egui::Vec2::splat(width);
     let portrait_id = ui.next_auto_id();
     let hover_rect = Rect::from_min_size(
-        egui::pos2(ui.clip_rect().center().x - size.x / 2.0, ui.cursor().top()),
+        egui::pos2(ui.clip_rect().center().x - width / 2.0, ui.cursor().top()),
         size,
     );
     let response = pointing_hand(ui.interact(hover_rect, portrait_id, egui::Sense::click()));
@@ -695,12 +667,9 @@ pub fn show(ui: &mut egui::Ui) {
         state.select_line(expression, uuid::Uuid::new_v4().as_u128());
     }
 
-    let (size, galley) = if state.line(time) == line {
-        (size, galley)
-    } else {
-        fit_dialogue(ui, available, state.line(time))
-    };
-    let (_, slot) = ui.allocate_space(egui::vec2(ui.available_width(), size.y));
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let galley = letter_text(ui, width * FRAME_RAIL_SPAN, state.line(time), &font);
+    let (_, slot) = ui.allocate_space(egui::vec2(ui.available_width(), width));
     // The frame uses the panel's side margins without widening the job list.
     let rect = Rect::from_center_size(egui::pos2(ui.clip_rect().center().x, slot.center().y), size);
     // Tuck the portrait's crop edges beneath the frame rails.
@@ -708,22 +677,13 @@ pub fn show(ui: &mut egui::Ui) {
         rect.min + rect.size() * egui::vec2(0.065, 0.066),
         rect.min + rect.size() * egui::vec2(0.935, 0.936),
     );
-    if let Some(art) = texture(ui.ctx(), &format!("{expression:?}"), expression.bytes()) {
-        // Crop the bust when the frame is short to preserve the artwork's proportions.
-        let uv_height =
-            (opening.height() / opening.width() * (art.size_vec2().x / art.size_vec2().y)).min(1.0);
-        let uv = Rect::from_center_size(egui::pos2(0.5, 0.5), egui::vec2(1.0, uv_height));
-        ui.painter().image(art.id(), opening, uv, Color32::WHITE);
-    }
+    paint(ui, opening, &format!("{expression:?}"), expression.bytes());
     if let Some(elapsed) = state.love_elapsed(time) {
         paint_love_hearts(ui, opening, elapsed);
         ui.ctx().request_repaint();
     }
     show_letter(ui, rect, galley);
-    if let Some(frame) = texture(ui.ctx(), "portrait-frame", FRAME_ART) {
-        let uv = Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0));
-        ui.painter().image(frame.id(), rect, uv, Color32::WHITE);
-    }
+    paint(ui, rect, "portrait-frame", FRAME_ART);
 
     if time < state.until {
         ui.ctx()
@@ -755,10 +715,9 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn wrapped_dialogue_fits_the_remaining_sidebar_height() {
+    fn every_dialogue_line_fits_the_reserved_height_at_minimum_sidebar_width() {
         use super::{
-            fit_dialogue, letter_height, DIALOGUE_HEIGHT, FRAME_RAIL_SPAN, MIN_LETTER_WIDTH,
-            MIN_PORTRAIT,
+            frame_width, letter_height, letter_text, reserved_height, Expression, FRAME_RAIL_SPAN,
         };
         use eframe::egui;
 
@@ -768,23 +727,25 @@ mod tests {
             egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(
                     egui::Pos2::ZERO,
-                    egui::vec2(240.0, 134.0),
+                    egui::vec2(300.0, crate::MIN_WINDOW_SIZE.y),
                 )),
                 ..Default::default()
             },
             |ui| {
-                let available = ui.available_height();
-                let (portrait, galley) = fit_dialogue(
-                    ui,
-                    available,
-                    "Do not mistake my patience for permission to tease me. Now go make some tea.",
-                );
-                assert!(galley.rows.len() > 1);
-                assert!(letter_height(&galley) > DIALOGUE_HEIGHT);
-                assert!(portrait.x > portrait.y);
-                assert!(portrait.x * FRAME_RAIL_SPAN >= MIN_LETTER_WIDTH);
-                assert!(portrait.y >= MIN_PORTRAIT);
-                assert!(portrait.y + letter_height(&galley) <= available);
+                let width = frame_width(ui);
+                let font = egui::TextStyle::Small.resolve(ui.style());
+                for expression in [Expression::Neutral]
+                    .into_iter()
+                    .chain(Expression::REACTIONS)
+                {
+                    for line in expression.lines() {
+                        let galley = letter_text(ui, width * FRAME_RAIL_SPAN, line, &font);
+                        assert!(
+                            width + letter_height(&galley) <= reserved_height(ui),
+                            "{line}"
+                        );
+                    }
+                }
             },
         );
     }

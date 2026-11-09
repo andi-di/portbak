@@ -13,6 +13,7 @@ use std::{
 };
 
 const CONFIG_VERSION: u32 = 1;
+const MIN_WINDOW_SIZE: egui::Vec2 = egui::vec2(1024.0, 940.0);
 
 fn main() {
     if let Err(error) = startup() {
@@ -45,7 +46,7 @@ fn startup() -> anyhow::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 960.0])
-            .with_min_inner_size([800.0, 600.0])
+            .with_min_inner_size(MIN_WINDOW_SIZE)
             .with_icon(app_icon()),
         ..Default::default()
     };

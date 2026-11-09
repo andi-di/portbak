@@ -24,6 +24,8 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 Choose **Retro**, **Modern**, **Frutiger Aero**, or **Midnight Neko** in Settings. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
+The minimum window size is 1024 × 940 logical pixels. The job sidebar is at least 300 logical pixels wide. In Midnight Neko, Saya's square portrait and attached dialogue box use the full sidebar width, and the job list scrolls above them.
+
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 
 On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.

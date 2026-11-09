@@ -391,7 +391,7 @@ impl Default for Config {
             theme: Theme::System,
             skin: "retro".into(),
             job_defaults: JobDefaults::default(),
-            sidebar_width: 290.0,
+            sidebar_width: 300.0,
             jobs: vec![],
         }
     }
@@ -898,7 +898,7 @@ mod tests {
         let saved: Config =
             serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();
         assert_eq!(saved.skin, "retro");
-        assert_eq!(saved.sidebar_width, 290.0);
+        assert_eq!(saved.sidebar_width, 300.0);
         assert_eq!(saved.theme, Theme::Light);
     }
 
