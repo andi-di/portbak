@@ -141,8 +141,8 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 - Scheduling works only while the application is running, including when minimized. Do not register system tasks, install services, or wake an off computer.
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
-- Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
-  - The details show the activity label, countdown, and next check time in the status row below the job header.
+- Enabled jobs show a countdown to the next automatic check in the job list, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero.
+  - Job settings omit the countdown and Running label. The Backups tab shows the activity label, countdown, and absolute next check time in its status row when available.
 - On enabling a schedule, plan its next future occurrence.
 - The per-job **Check immediately when enabled** option inherits the settings template when created; the template starts unchecked. Later template changes do not affect existing jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.

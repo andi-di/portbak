@@ -44,7 +44,7 @@ impl App {
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
-            activity: self.activity_label(id),
+            activity: self.activity_label(id).filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
         let selected = self.selected;
@@ -178,7 +178,7 @@ fn job_editor(
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
-    job_status(ui, job, permissions.activity);
+    job_status(ui, job, permissions.activity, false);
     ui.add_space(14.0);
     // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
     let unchanged = permissions.busy.then(|| job.clone());
@@ -616,17 +616,23 @@ fn optional_limit<T>(
     });
 }
 
-pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
+pub(super) fn job_status(
+    ui: &mut egui::Ui,
+    job: &Job,
+    activity: Option<&str>,
+    show_countdown: bool,
+) {
     let palette = Palette::of(ui);
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
+    let countdown = show_countdown.then(|| job.countdown(Utc::now())).flatten();
     ui.horizontal_wrapped(|ui| {
         if let Some(activity) = activity {
             ui.label(egui::RichText::new(activity).small().color(palette.gold));
             ui.label(egui::RichText::new("·").small().color(palette.dim));
         }
-        if let (Some(remaining), Some(next)) = (job.countdown(Utc::now()), job.next_run) {
+        if let (Some(remaining), Some(next)) = (countdown, job.next_run) {
             let next = local_time(next, DATE_TIME);
             ui.label(
                 egui::RichText::new(format!("Next check in {remaining} ({next})"))
