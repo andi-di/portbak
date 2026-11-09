@@ -47,7 +47,7 @@ impl App {
                 );
                 // Restores start here, so their progress and result show here too.
                 if let Some(job) = self.job(id) {
-                    super::editor::job_status(ui, job, self.activity_label(id), true);
+                    super::editor::job_status(ui, job, self.activity_label(id));
                     ui.add_space(8.0);
                 }
                 egui::ScrollArea::both()
