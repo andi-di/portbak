@@ -190,6 +190,11 @@ fn job_editor(
     });
     if let Some(unchanged) = unchanged {
         *job = unchanged;
+        // Edits are discarded, but a job without a runnable schedule must still stop.
+        if job.enabled && !job.has_runnable_schedule() {
+            job.enabled = false;
+            job.reschedule(Utc::now());
+        }
     }
     action
 }
