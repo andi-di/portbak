@@ -2,7 +2,6 @@
 
 mod dialogue;
 
-use crate::app::rendering::ornaments;
 use crate::app::theme::style::Palette;
 
 use eframe::egui::{self, Color32, Pos2, Rect};
@@ -468,6 +467,8 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 }
 
 const DIALOGUE_HEIGHT: f32 = 70.0;
+const LETTER_TRIM_OVERHANG: f32 = 7.0;
+const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     let palette = Palette::of(ui);
@@ -485,14 +486,7 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
     let letter = egui::Frame::new()
-        .fill(palette.raised)
-        .stroke(egui::Stroke::new(1.0_f32, palette.metal))
-        .corner_radius(egui::CornerRadius {
-            nw: 0,
-            ne: 0,
-            sw: 3,
-            se: 3,
-        })
+        .fill(palette.surface)
         .inner_margin(egui::Margin::symmetric(16, 12))
         .show(&mut letter_ui, |ui| {
             let label = egui::Label::new(egui::RichText::new(line).small().color(palette.ink))
@@ -503,28 +497,61 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
 
     let rect = letter.response.rect;
     // The letter can use the panel margins, just like the portrait.
-    ui.add_space((rect.bottom() + 3.0 - ui.cursor().top()).max(0.0));
+    ui.add_space((rect.bottom() + LETTER_TRIM_OVERHANG - ui.cursor().top()).max(0.0));
+    paint_letter_trim(ui, rect);
+}
+
+fn paint_letter_trim(ui: &egui::Ui, rect: Rect) {
     let painter = ui.painter();
-    let trim = egui::Stroke::new(1.0_f32, palette.outline);
-    let inset = rect.shrink(3.0);
-    for (corner, direction) in [(inset.left_bottom(), 1.0), (inset.right_bottom(), -1.0)] {
-        painter.line_segment(
-            [
-                corner - egui::vec2(0.0, 8.0),
-                corner + egui::vec2(direction * 8.0, 0.0),
-            ],
-            trim,
+    let bottom = rect.bottom() + LETTER_TRIM_OVERHANG;
+    for x in [rect.left() + 1.0, rect.right() - 1.0] {
+        for (width, color) in [
+            (5.0_f32, Color32::from_rgb(57, 34, 44)),
+            (3.0, Color32::from_rgb(182, 163, 156)),
+            (1.0, Color32::from_rgb(104, 47, 66)),
+        ] {
+            painter.vline(
+                x,
+                rect.top()..=rect.bottom(),
+                egui::Stroke::new(width, color),
+            );
+        }
+    }
+
+    let Some(frame) = texture(ui.ctx(), "portrait-frame", FRAME_ART) else {
+        return;
+    };
+    // Reuse the frame's corners and ruby at fixed proportions. Stretch only the plain rails.
+    let cap = 22.0_f32.min(rect.width() / 5.0);
+    let left = rect.left() - 4.0;
+    let right = rect.right() + 4.0;
+    let center = rect.center().x;
+    let edges = [
+        left,
+        left + cap,
+        center - cap,
+        center + cap,
+        right - cap,
+        right,
+    ];
+    let strips = [
+        (0.0, 0.13),
+        (0.13, 0.16),
+        (0.37, 0.63),
+        (0.84, 0.87),
+        (0.87, 1.0),
+    ];
+    for (edge, (u0, u1)) in edges.windows(2).zip(strips) {
+        painter.image(
+            frame.id(),
+            Rect::from_min_max(
+                egui::pos2(edge[0], bottom - 20.0),
+                egui::pos2(edge[1], bottom),
+            ),
+            Rect::from_min_max(egui::pos2(u0, 0.88), egui::pos2(u1, 1.0)),
+            Color32::WHITE,
         );
     }
-    ornaments::diamond_lamp(
-        painter,
-        Rect::from_center_size(
-            rect.center_bottom() - egui::vec2(0.0, 3.0),
-            egui::Vec2::splat(11.0),
-        ),
-        palette.bad,
-        false,
-    );
 }
 
 fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
@@ -620,12 +647,7 @@ pub fn show(ui: &mut egui::Ui) {
         ui.ctx().request_repaint();
     }
     show_letter(ui, rect, state.line(time));
-    paint(
-        ui,
-        rect,
-        "portrait-frame",
-        include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png"),
-    );
+    paint(ui, rect, "portrait-frame", FRAME_ART);
 
     if time < state.until {
         ui.ctx()
