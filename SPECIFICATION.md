@@ -37,7 +37,7 @@ Provide:
   - While a job runs, restores, or waits in the queue, show RUNNING, RESTORING, or QUEUED in the countdown's place. Hold the label as long as the footer activity so quick checks do not flash.
 - Clicking the selected job deselects it and returns to the start screen.
 - At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
-  - Midnight Neko leaves extra space between the job emblem and the action buttons.
+  - Leave extra space between the job identity and the action buttons in wide views.
 - Show the last backup time and latest result in a compact status row below the job header; show errors prominently. Do not use a separate Status pane.
 - An editor for the selected job.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
