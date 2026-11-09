@@ -22,8 +22,7 @@ The current Saya job heads, masters, previews and prompts live in
   measuring bounds; preserve intentional internal transparent gaps.
 - Keep the same canvas and occupied-area rule for replacements and new icons.
   Check readability at 24, 32, and 48 pixels before use.
-- Utility buttons render at 32 logical pixels. New job uses 40. The Check now
-  icon uses a 15-pixel slot so its visible triangle is about 12 pixels tall.
+- Utility and job action icons render at 32 logical pixels. New job uses 40.
   Job status heads render at 72 logical pixels. The shared name portrait
   renders at 56 logical pixels in the app header and 80 beside the job name.
 - Generate each functional silhouette individually. Derive the `dark/` (white)
