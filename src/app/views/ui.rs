@@ -77,8 +77,8 @@ impl App {
         self.backups_tab = false;
     }
 
-    fn open_job(&mut self, id: uuid::Uuid) {
-        self.selected = Some(id);
+    fn toggle_job(&mut self, id: uuid::Uuid) {
+        self.selected = (self.selected != Some(id)).then_some(id);
         self.settings_open = false;
         self.backups_tab = false;
     }
@@ -299,7 +299,7 @@ impl App {
                         }
                     });
                 if let Some(id) = clicked {
-                    self.open_job(id);
+                    self.toggle_job(id);
                     crate::app::scenery::catgirl::trigger(
                         ui.ctx(),
                         crate::app::scenery::catgirl::Action::SelectJob,
@@ -578,11 +578,11 @@ mod tests {
         assert!(app.selected.is_none());
         app.toggle_settings();
         let id = app.config.jobs[0].id;
-        app.open_job(id);
+        app.toggle_job(id);
         assert_eq!(app.selected, Some(id));
         assert!(!app.settings_open);
-        app.open_job(id);
-        assert_eq!(app.selected, Some(id));
+        app.toggle_job(id);
+        assert!(app.selected.is_none());
     }
 
     #[test]
