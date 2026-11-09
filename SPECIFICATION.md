@@ -79,6 +79,7 @@ The application remains a single distributable executable with an embedded icon.
 - Backup rows are not selectable. Each row has an icon-only restore button with a tooltip. Clicking it opens a confirmation modal for that backup, showing the resolved source path, version, replacement warning, **Cancel**, and a red **Replace contents and restore** button. Only confirmation starts restoration; Cancel, Escape, or backdrop dismissal changes neither source nor activation. Require an available backup and source folder to restore.
 - Keep the Backups tab usable in narrow windows in every look. Allow the backup list and the surrounding content to scroll; wrap long names and paths.
   - Inset the vertical scrollbar slightly from the right edge on Job settings, Settings, and Backups. Use equal left and right content padding.
+  - Wrap theme descriptions within their cards so resizing does not trigger a horizontal scrollbar.
 - With no destination selected, prompt the user to choose one in Job settings instead of loading history or showing a filesystem error.
 - Size restore confirmation to avoid scrolling at the default window size; allow scrolling in smaller windows. Place **Cancel** on the left and the restore confirmation button on the right.
 - In the Backups tab, subtly highlight the first list entry of each local calendar day, newest first. Keep protection clearly recognizable. Wrap job action buttons on narrow windows.

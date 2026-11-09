@@ -17,14 +17,22 @@ pub fn page_frame(ui: &egui::Ui) -> egui::Frame {
     egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(0, PAGE_PADDING))
 }
 
-pub fn page_scroll_area(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+pub fn page_scroll_area(
+    ui: &mut egui::Ui,
+    contents: impl FnOnce(&mut egui::Ui),
+) -> egui::scroll_area::ScrollAreaOutput<()> {
     ui.scope(|ui| {
         ui.spacing_mut().scroll.bar_outer_margin = 8.0;
         egui::ScrollArea::both()
             .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
             .auto_shrink([false, true])
-            .show(ui, contents);
-    });
+            .show(ui, |ui| {
+                // Leave room for widgets that round up while the scrollbar animates.
+                ui.set_max_width((ui.available_width() - 1.0).max(0.0));
+                contents(ui);
+            })
+    })
+    .inner
 }
 
 pub fn local_time(time: DateTime<Utc>, format: &str) -> String {

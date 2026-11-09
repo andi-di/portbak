@@ -129,25 +129,23 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
         .inner_margin(egui::Margin::symmetric(14, 10))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            ui.spacing_mut().item_spacing.y = 4.0;
+            let ink = if selected {
+                palette.accent_ink
+            } else {
+                palette.ink
+            };
             ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    let ink = if selected {
-                        palette.accent_ink
-                    } else {
-                        palette.ink
-                    };
-                    ui.label(egui::RichText::new(candidate.name).heading().color(ink));
-                    ui.label(egui::RichText::new(candidate.description).color(ink));
-                    swatches(ui, &candidate.dark);
-                    swatches(ui, &candidate.light);
-                });
+                ui.label(egui::RichText::new(candidate.name).heading().color(ink));
                 if selected {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         pixel::badge(ui, "Active", palette.good);
                     });
                 }
             });
+            ui.label(egui::RichText::new(candidate.description).color(ink));
+            swatches(ui, &candidate.dark);
+            swatches(ui, &candidate.light);
         });
     let rect = frame.response.rect;
     let response =
@@ -238,6 +236,41 @@ mod tests {
                     });
                 });
                 assert!(config == before);
+            }
+        }
+    }
+
+    #[test]
+    fn theme_cards_fit_the_page_with_or_without_a_vertical_scrollbar() {
+        for skin in skins::ALL {
+            let ctx = egui::Context::default();
+            style::install(&ctx, skin);
+            let mut config = Config {
+                skin: skin.id.into(),
+                ..Config::default()
+            };
+            for width in (480..=810).step_by(5) {
+                let _ = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width as f32, 700.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        let scroll = page_scroll_area(ui, |ui| {
+                            settings_page(ui, &mut config, &mut SettingsTab::Theme);
+                        });
+                        assert!(
+                            scroll.content_size.x <= scroll.inner_rect.width(),
+                            "{} at {width}: {} > {}",
+                            skin.id,
+                            scroll.content_size.x,
+                            scroll.inner_rect.width()
+                        );
+                    },
+                );
             }
         }
     }
