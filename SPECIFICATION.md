@@ -33,9 +33,11 @@ All application-owned interface text, errors, defaults, comments, and documentat
 Provide:
 
 - A job list showing only each job’s icon, name, and right-aligned next-check countdown in one vertically centered row. Box the countdown like the scheduling readout, without a text prefix; hide it when scheduling is disabled. Its divider remains at the selected width after dragging and is restored after restarting.
+  - Keep the sidebar at least 300 logical pixels wide and use compact padding so more jobs fit in view.
   - While a job runs, restores, or waits in the queue, show RUNNING, RESTORING, or QUEUED in the countdown's place. Hold the label as long as the footer activity so quick checks do not flash.
 - Clicking the selected job deselects it and returns to the start screen.
 - At the top of the job editor, place the power and **Check now** buttons on the left, **Remove job** on the right, and center the job icon and name. In narrow views, center the identity above the action row. Omit the redundant activation-status text.
+  - Leave extra space between the job identity and the action buttons in wide views.
 - Show the last backup time and latest result in a compact status row below the job header; show errors prominently. Do not use a separate Status pane.
 - An editor for the selected job.
 - Settings, Light/Dark, Choose folder, and automatic-backup power buttons use icons with descriptive hover tooltips and accessible names. Preserve selected-state indicators.
@@ -49,10 +51,10 @@ Provide:
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.
   - New job: Happy; Check now: Energetic; Remove job: Pouting; Settings: Curious; select job: Waiting; Dark mode: Happy; Light mode: Sleepy.
 - When Saya enters her in-love expression, three ruby hearts briefly rise and fade inside the sidebar frame. Holding the expression does not replay the effect.
-- Saya's dialogue is centered in a letterbox attached to her portrait, with matching silver and burgundy rails, filigree corners, and a ruby seal. Size the portrait to leave room for wrapped dialogue.
+- Saya's dialogue is centered in a letterbox attached to her portrait, with matching silver and burgundy rails, filigree corners, and a ruby seal. Keep the portrait square and at full sidebar width, with the letterbox aligned to the frame rails. Reserve space for wrapped dialogue and scroll the job list above it.
 - Midnight Neko uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
-- Midnight Neko job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge).
-- Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered or during a cooldown. Keep expression and dialogue unchanged while hovered otherwise, deferring automatic and action reactions until the pointer leaves; return to neutral after three seconds away. The welcome figure stays static and does not react to clicks. Fit the square frame to the sidebar width and remaining height, allowing space for dialogue and a scrollable job list.
+- Midnight Neko job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge). Align the head with the lower card border and keep the badge inside it.
+- Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered or during a cooldown. Keep expression and dialogue unchanged while hovered otherwise, deferring automatic and action reactions until the pointer leaves; return to neutral after three seconds away. The welcome figure stays static and does not react to clicks.
   - Each expression, including neutral, has at least four matching dialogue lines. Pick a line on expression changes, keep it stable while visible, and avoid repeating that expression's previous line during the session.
 - Midnight Neko has an asymmetric moonlit vampire estate with a castle and winding stairs at lower right, a silver crescent below the topbar, detailed layered rocky mountains, thorn roses, two sculpted pixel-art cloud variants drifting at individual speeds and layered curling mist, and subtly flickering burgundy windows, twelve bats that fly, perch, avoid the pointer and scatter on clicks, varied falling petals, and short-lived petal/crescent/silver-spark cursor trails. Decorations never intercept controls. Preserve native text, resize and other specialized cursors.
   - The pointing hand appears over clickable controls and Saya's portrait. Its pressed variant stays active through a held primary click, with specialized cursors taking precedence.
@@ -63,7 +65,7 @@ Provide:
   - Midnight Neko uses a silver crescent around a crimson gem and a fine diamond chain. During activity, pulse the gem, orbit a silver highlight and move a diamond along the chain; keep a still, dimmer emblem when idle.
 - An empty state explaining how to create the first job.
 
-The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. Rows wrap in narrow windows; content that still does not fit scrolls sideways instead of pushing scroll bars out of view. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name, at most a short tagline per look, and the theme selector. Default to a 1280 × 960 logical-pixel window, with room below the job controls.
+The interface must remain responsive during hashing, copying, compression, verification, and cleanup. Long content must be scrollable. Rows wrap in narrow windows; content that still does not fit scrolls sideways instead of pushing scroll bars out of view. All controls must remain accessible at smaller window sizes. Vertically center all elements within each horizontal row. At narrow widths, place the job activation control below the job heading so it remains accessible. The header shows the application name, at most a short tagline per look, and the theme selector. Default to a 1280 × 960 logical-pixel window, with a 1024 × 940 minimum.
 
 The application remains a single distributable executable with an embedded icon. On Windows, use the app icon for the executable in Explorer and shortcuts as well as the app window. Under Linux, offer that icon directly to X11 and to Wayland compositors supporting window-icon pixel data. Missing support, icon setup errors, or an unresponsive icon negotiation must not block startup, show an error dialog, or prevent normal use; retain the compositor default icon. Do not install desktop entries or extract icon files.
 
@@ -76,6 +78,8 @@ The application remains a single distributable executable with an embedded icon.
 - Each backup row has an icon-only button to open its location in the system file manager. Open folder backups directly; select ZIP backups in Windows Explorer or open their parent folder on Linux. Disable for unavailable backups and report launch failures.
 - Backup rows are not selectable. Each row has an icon-only restore button with a tooltip. Clicking it opens a confirmation modal for that backup, showing the resolved source path, version, replacement warning, **Cancel**, and a red **Replace contents and restore** button. Only confirmation starts restoration; Cancel, Escape, or backdrop dismissal changes neither source nor activation. Require an available backup and source folder to restore.
 - Keep the Backups tab usable in narrow windows in every look. Allow the backup list and the surrounding content to scroll; wrap long names and paths.
+  - Inset the vertical scrollbar slightly from the right edge on Job settings, Settings, and Backups. Use equal left and right content padding.
+  - Wrap theme descriptions within their cards so resizing does not trigger a horizontal scrollbar.
 - With no destination selected, prompt the user to choose one in Job settings instead of loading history or showing a filesystem error.
 - Size restore confirmation to avoid scrolling at the default window size; allow scrolling in smaller windows. Place **Cancel** on the left and the restore confirmation button on the right.
 - In the Backups tab, subtly highlight the first list entry of each local calendar day, newest first. Keep protection clearly recognizable. Wrap job action buttons on narrow windows.
@@ -139,8 +143,8 @@ Also persist the next scheduled check, last successful backup time, and latest j
 
 - Scheduling works only while the application is running, including when minimized. Do not register system tasks, install services, or wake an off computer.
 - Disabling clears the next scheduled time. Each activation, including reactivation, starts a fresh future schedule.
-- Enabled jobs show a countdown to the next automatic check in both the job list and details, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero. Keep the absolute next check time in the details. Running/queued indicators remain visible.
-  - The details show the activity label, countdown, and next check time in the status row below the job header.
+- Enabled jobs show a countdown to the next automatic check in the job list, updated every second. Format as HH:MM:SS with a day prefix for durations of at least 24 hours; clamp overdue values to zero.
+  - The Backups tab shows the activity label when available. Job settings omit the Running label.
 - On enabling a schedule, plan its next future occurrence.
 - The per-job **Check immediately when enabled** option inherits the settings template when created; the template starts unchecked. Later template changes do not affect existing jobs. When checked, each disabled-to-enabled transition queues one immediate change check, without changing the future scheduled time. Deduplicate active/queued checks. Startup alone does not trigger this option.
 - Recalculate the next future occurrence when the user changes schedule settings.

@@ -72,7 +72,7 @@ pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
         Palette::of_ctx(painter.ctx()).surface,
     );
     let radius = rect.width() * 0.16;
-    let center = rect.right_bottom() - Vec2::splat(radius + 1.0);
+    let center = rect.right_bottom() - egui::vec2(radius + 1.0, radius + 10.0);
     let burgundy = Color32::from_rgb(103, 29, 54);
     let ivory = Color32::from_rgb(246, 232, 226);
     painter.circle_filled(center, radius, burgundy);

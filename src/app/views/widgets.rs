@@ -11,6 +11,32 @@ pub const DATE_TIME: &str = "%d.%m.%Y %H:%M:%S";
 pub const DATE: &str = "%a %d.%m.%Y";
 pub const TIME: &str = "%H:%M:%S";
 
+pub const PAGE_PADDING: i8 = 22;
+
+pub fn page_frame(ui: &egui::Ui) -> egui::Frame {
+    egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(0, PAGE_PADDING))
+}
+
+pub fn page_scroll_area(
+    ui: &mut egui::Ui,
+    contents: impl FnOnce(&mut egui::Ui),
+) -> egui::scroll_area::ScrollAreaOutput<()> {
+    ui.scope(|ui| {
+        let scroll = &mut ui.spacing_mut().scroll;
+        scroll.bar_inner_margin = 2.0;
+        scroll.bar_outer_margin = 8.0;
+        egui::ScrollArea::both()
+            .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                // Leave room for widgets that round up while the scrollbar animates.
+                ui.set_max_width((ui.available_width() - 1.0).max(0.0));
+                contents(ui);
+            })
+    })
+    .inner
+}
+
 pub fn local_time(time: DateTime<Utc>, format: &str) -> String {
     time.with_timezone(&Local).format(format).to_string()
 }

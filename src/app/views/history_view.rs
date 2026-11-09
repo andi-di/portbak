@@ -2,15 +2,14 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Palette};
 use crate::app::views::widgets::{
-    alert, caption, display_path, format_bytes, local_time, retention_warnings, DATE, TIME,
+    alert, caption, display_path, format_bytes, local_time, page_frame, page_scroll_area,
+    retention_warnings, DATE, PAGE_PADDING, TIME,
 };
 use crate::app::{records_of, App, BackupHistory};
 use crate::engine::history::Backup;
 use chrono::{Local, TimeZone};
 use eframe::egui;
 
-/// Shortest backup list; taller windows let the list fill the remaining height.
-const MIN_LIST_HEIGHT: f32 = 300.0;
 /// Changes are applied after the history state is no longer borrowed.
 #[derive(Default)]
 struct HistoryResponse {
@@ -29,47 +28,44 @@ impl App {
             .job(id)
             .is_some_and(|job| job.target.as_os_str().is_empty());
         self.open_history(id, &ctx);
-        let frame =
-            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         let mut response = HistoryResponse::default();
         egui::CentralPanel::default()
-            .frame(frame)
+            .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                ui.add_enabled_ui(
-                    !self
-                        .backup_history
-                        .as_ref()
-                        .is_some_and(|history| history.saving),
-                    |ui| {
-                        super::editor::job_tabs(ui, &mut self.backups_tab);
-                    },
-                );
-                // Restores start here, so their progress and result show here too.
-                if let Some(job) = self.job(id) {
-                    super::editor::job_status(ui, job, self.activity_label(id));
-                    ui.add_space(8.0);
-                }
-                egui::ScrollArea::both()
-                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
-                    .auto_shrink([false, true])
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
                     .show(ui, |ui| {
-                        if let Some(history) = &mut self.backup_history {
-                            if history.job.id == id {
-                                response = history_contents(ui, history);
-                            } else {
-                                ui.label("Finishing protection changes for the previous job ...");
-                            }
-                        } else if destination_missing {
-                            ui.label(
-                                "Choose a destination folder in Job settings to view backups.",
-                            );
-                        } else {
-                            ui.label(
-                            "Backups will be available when active and queued operations finish.",
+                        ui.add_enabled_ui(
+                            !self
+                                .backup_history
+                                .as_ref()
+                                .is_some_and(|history| history.saving),
+                            |ui| {
+                                super::editor::job_tabs(ui, &mut self.backups_tab);
+                            },
                         );
+                        // Restores start here, so their progress and result show here too.
+                        if let Some(job) = self.job(id) {
+                            super::editor::job_status(ui, job, self.activity_label(id));
+                            ui.add_space(8.0);
                         }
                     });
+                page_scroll_area(ui, |ui| {
+                    if let Some(history) = &mut self.backup_history {
+                        if history.job.id == id {
+                            response = history_contents(ui, history);
+                        } else {
+                            ui.label("Finishing protection changes for the previous job ...");
+                        }
+                    } else if destination_missing {
+                        ui.label("Choose a destination folder in Job settings to view backups.");
+                    } else {
+                        ui.label(
+                            "Backups will be available when active and queued operations finish.",
+                        );
+                    }
+                });
             });
         if let Some((name, protected)) = response.protection {
             self.save_protection(name, protected, &ctx);
@@ -125,9 +121,6 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
     let palette = Palette::of(ui);
     let mut response = HistoryResponse::default();
     ui.heading(dialog.job.display_name());
-    ui.label(
-        "Lock backups to protect them from retention deletion. Use a backup's restore button to replace the source contents.",
-    );
     match &dialog.backups {
         None => {
             ui.label("Loading backup history ...");
@@ -263,29 +256,21 @@ fn backup_list(
     let mut response = HistoryResponse::default();
     let starts = day_starts(backups, &Local);
     sunken(ui, |ui| {
-        // Leave room for the well's bottom edge so the page itself does not need to scroll.
-        let edge = style::well(ui.ctx()).total_margin().sum().y;
-        let height = (ui.available_height() - edge).max(MIN_LIST_HEIGHT);
-        egui::ScrollArea::vertical()
-            .max_height(height)
-            .auto_shrink([false, true])
-            .show(ui, |ui| {
-                for (backup, first_of_day) in backups.iter().zip(starts) {
-                    if first_of_day {
-                        day_header(ui, backup);
-                    }
-                    let row = backup_controls(ui, backup, saving, source_available);
-                    if row.protection.is_some() {
-                        response.protection = row.protection;
-                    }
-                    if row.reveal.is_some() {
-                        response.reveal = row.reveal;
-                    }
-                    if row.restore.is_some() {
-                        response.restore = row.restore;
-                    }
-                }
-            });
+        for (backup, first_of_day) in backups.iter().zip(starts) {
+            if first_of_day {
+                day_header(ui, backup);
+            }
+            let row = backup_controls(ui, backup, saving, source_available);
+            if row.protection.is_some() {
+                response.protection = row.protection;
+            }
+            if row.reveal.is_some() {
+                response.reveal = row.reveal;
+            }
+            if row.restore.is_some() {
+                response.restore = row.restore;
+            }
+        }
     });
     response
 }

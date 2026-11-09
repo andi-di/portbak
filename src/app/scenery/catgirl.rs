@@ -467,19 +467,15 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
     );
 }
 
-const DIALOGUE_HEIGHT: f32 = 70.0;
+// Leave room for the longest wrapped line when Saya changes expressions.
+const DIALOGUE_HEIGHT: f32 = 100.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
 const LETTER_TRIM_HEIGHT: f32 = 20.0;
 const LETTER_PADDING: f32 = 8.0;
 const LETTER_TEXT_INSET: f32 = 16.0;
-const MIN_PORTRAIT: f32 = 24.0;
+// The straight rails' outer edges sit 4.8% in from either texture edge.
+const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
 const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
-
-fn letter_width(ui: &egui::Ui, portrait_width: f32) -> f32 {
-    // The straight rails' outer edges sit 4.8% in from either texture edge.
-    let rail_width = portrait_width * (1.0 - 2.0 * 0.048);
-    rail_width.max(180.0_f32.min(frame_width(ui)))
-}
 
 fn letter_text(
     ui: &egui::Ui,
@@ -501,27 +497,8 @@ fn letter_height(galley: &egui::Galley) -> f32 {
     galley.size().y.max(24.0) + 2.0 * LETTER_PADDING + LETTER_TRIM_HEIGHT
 }
 
-fn fit_dialogue(ui: &egui::Ui, available: f32, line: &str) -> (f32, std::sync::Arc<egui::Galley>) {
-    let mut font = egui::TextStyle::Small.resolve(ui.style());
-    let width = frame_width(ui).min((available - DIALOGUE_HEIGHT).max(MIN_PORTRAIT));
-    let galley = letter_text(ui, letter_width(ui, width), line, &font);
-    if width + letter_height(&galley) <= available {
-        return (width, galley);
-    }
-
-    // A smaller portrait may also narrow the letter. Budget for the narrowest wrap before shrinking.
-    let narrow_width = letter_width(ui, MIN_PORTRAIT);
-    let mut narrow = letter_text(ui, narrow_width, line, &font);
-    while MIN_PORTRAIT + letter_height(&narrow) > available && font.size > 9.0 {
-        font.size = (font.size - 1.0).max(9.0);
-        narrow = letter_text(ui, narrow_width, line, &font);
-    }
-    let width = width.min((available - letter_height(&narrow)).max(MIN_PORTRAIT));
-    (width, letter_text(ui, letter_width(ui, width), line, &font))
-}
-
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::Galley>) {
-    let width = letter_width(ui, portrait.width());
+    let width = portrait.width() * FRAME_RAIL_SPAN;
     let rect = Rect::from_min_max(
         egui::pos2(
             portrait.center().x - width / 2.0,
@@ -669,13 +646,12 @@ pub fn show(ui: &mut egui::Ui) {
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
-    let available = ui.available_height();
-    let line = state.line(time);
-    let (width, galley) = fit_dialogue(ui, available, line);
+    let width = frame_width(ui);
+    let size = egui::Vec2::splat(width);
     let portrait_id = ui.next_auto_id();
     let hover_rect = Rect::from_min_size(
         egui::pos2(ui.clip_rect().center().x - width / 2.0, ui.cursor().top()),
-        egui::Vec2::splat(width),
+        size,
     );
     let response = pointing_hand(ui.interact(hover_rect, portrait_id, egui::Sense::click()));
 
@@ -691,17 +667,11 @@ pub fn show(ui: &mut egui::Ui) {
         state.select_line(expression, uuid::Uuid::new_v4().as_u128());
     }
 
-    let (width, galley) = if state.line(time) == line {
-        (width, galley)
-    } else {
-        fit_dialogue(ui, available, state.line(time))
-    };
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let galley = letter_text(ui, width * FRAME_RAIL_SPAN, state.line(time), &font);
     let (_, slot) = ui.allocate_space(egui::vec2(ui.available_width(), width));
     // The frame uses the panel's side margins without widening the job list.
-    let rect = Rect::from_center_size(
-        egui::pos2(ui.clip_rect().center().x, slot.center().y),
-        egui::Vec2::splat(width),
-    );
+    let rect = Rect::from_center_size(egui::pos2(ui.clip_rect().center().x, slot.center().y), size);
     // Tuck the portrait's crop edges beneath the frame rails.
     let opening = Rect::from_min_max(
         rect.min + rect.size() * egui::vec2(0.065, 0.066),
@@ -745,8 +715,10 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn wrapped_dialogue_fits_the_remaining_sidebar_height() {
-        use super::{fit_dialogue, letter_height, DIALOGUE_HEIGHT, MIN_PORTRAIT};
+    fn every_dialogue_line_fits_the_reserved_height_at_minimum_sidebar_width() {
+        use super::{
+            frame_width, letter_height, letter_text, reserved_height, Expression, FRAME_RAIL_SPAN,
+        };
         use eframe::egui;
 
         let ctx = egui::Context::default();
@@ -755,21 +727,25 @@ mod tests {
             egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(
                     egui::Pos2::ZERO,
-                    egui::vec2(240.0, 134.0),
+                    egui::vec2(300.0, crate::MIN_WINDOW_SIZE.y),
                 )),
                 ..Default::default()
             },
             |ui| {
-                let available = ui.available_height();
-                let (portrait, galley) = fit_dialogue(
-                    ui,
-                    available,
-                    "Do not mistake my patience for permission to tease me. Now go make some tea.",
-                );
-                assert!(galley.rows.len() > 1);
-                assert!(letter_height(&galley) > DIALOGUE_HEIGHT);
-                assert!(portrait >= MIN_PORTRAIT);
-                assert!(portrait + letter_height(&galley) <= available);
+                let width = frame_width(ui);
+                let font = egui::TextStyle::Small.resolve(ui.style());
+                for expression in [Expression::Neutral]
+                    .into_iter()
+                    .chain(Expression::REACTIONS)
+                {
+                    for line in expression.lines() {
+                        let galley = letter_text(ui, width * FRAME_RAIL_SPAN, line, &font);
+                        assert!(
+                            width + letter_height(&galley) <= reserved_height(ui),
+                            "{line}"
+                        );
+                    }
+                }
             },
         );
     }

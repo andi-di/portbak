@@ -2,7 +2,8 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_row, gib_field, local_time, path_picker, retention_warnings, DATE_TIME,
+    alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
+    retention_warnings, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -44,7 +45,7 @@ impl App {
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
-            activity: self.activity_label(id),
+            activity: self.activity_label(id).filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
         let selected = self.selected;
@@ -57,39 +58,34 @@ impl App {
         let mut action = None;
         let mut activation = None;
         let mut add = false;
-        let frame =
-            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         egui::CentralPanel::default()
-            .frame(frame)
+            .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::both()
-                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                        let (Some(job), Some(permissions)) = (job, permissions) else {
-                            add = welcome(ui, can_add);
-                            return;
-                        };
-                        job_tabs(ui, &mut self.backups_tab);
-                        let was_enabled = job.enabled;
-                        let previous = job.clone();
-                        let summary = summaries
-                            .get(&job.id)
-                            .filter(|summary| summary.target == job.target);
-                        action = job_editor(ui, job, &permissions, summary)
-                            .map(|action| (job.id, action));
-                        if !permissions.busy {
-                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
-                                self.error =
-                                    format!("Could not update automatic destination: {error:#}");
-                            }
+                page_scroll_area(ui, |ui| {
+                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                    let (Some(job), Some(permissions)) = (job, permissions) else {
+                        add = welcome(ui, can_add);
+                        return;
+                    };
+                    job_tabs(ui, &mut self.backups_tab);
+                    let was_enabled = job.enabled;
+                    let previous = job.clone();
+                    let summary = summaries
+                        .get(&job.id)
+                        .filter(|summary| summary.target == job.target);
+                    action =
+                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    if !permissions.busy {
+                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                            self.error =
+                                format!("Could not update automatic destination: {error:#}");
                         }
-                        if was_enabled != job.enabled {
-                            activation = Some((job.id, was_enabled));
-                        }
-                    });
+                    }
+                    if was_enabled != job.enabled {
+                        activation = Some((job.id, was_enabled));
+                    }
+                });
             });
         if add {
             self.add_job();
@@ -204,8 +200,9 @@ fn job_editor(
 
 /// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
+    const ACTION_INSET: f32 = 148.0;
     let narrow = ui.available_width() < 620.0;
-    let identity_height = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+    let identity_height = if Skin::of(ui.ctx()).finish == style::Finish::Gothic {
         80.0
     } else {
         60.0
@@ -257,7 +254,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
         },
     );
     if !narrow {
-        centered_identity(ui, job, rect.shrink2(egui::vec2(124.0, 0.0)));
+        centered_identity(ui, job, rect.shrink2(egui::vec2(ACTION_INSET, 0.0)));
     }
     action
 }
@@ -624,15 +621,6 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     ui.horizontal_wrapped(|ui| {
         if let Some(activity) = activity {
             ui.label(egui::RichText::new(activity).small().color(palette.gold));
-            ui.label(egui::RichText::new("·").small().color(palette.dim));
-        }
-        if let (Some(remaining), Some(next)) = (job.countdown(Utc::now()), job.next_run) {
-            let next = local_time(next, DATE_TIME);
-            ui.label(
-                egui::RichText::new(format!("Next check in {remaining} ({next})"))
-                    .small()
-                    .color(palette.good),
-            );
             ui.label(egui::RichText::new("·").small().color(palette.dim));
         }
         ui.label(
