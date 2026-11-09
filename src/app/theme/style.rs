@@ -30,8 +30,6 @@ pub enum Finish {
     Pixel,
     /// Flat rounded controls and simple line icons.
     Modern,
-    /// Vector glyphs, forged plates, spiked sockets and diamond lamps.
-    Engraved,
     /// Glossy icons, gel buttons, glass tiles and orb lamps.
     Glass,
     /// Matte gothic panels, silver ornaments and crimson accents.
@@ -71,8 +69,6 @@ pub struct Palette {
     pub scanline: Color32,
     /// Top of the wallpaper gradient, which fades down into `background`.
     pub sky: Color32,
-    /// Color the window edges sink into when the vignette effect is on.
-    pub vignette: Color32,
 }
 
 /// Font files placed in front of egui's defaults, which stay as glyph fallbacks.
@@ -116,9 +112,6 @@ pub struct Effects {
     pub scanlines: bool,
     pub grid: bool,
     pub stripes: bool,
-    /// Sparks drifting up behind the content; keeps the window repainting while visible.
-    pub embers: bool,
-    pub vignette: bool,
     /// A sky, aurora and hills painted behind every panel.
     pub wallpaper: bool,
     /// Bubbles drifting up behind the panels; keeps the window repainting while visible.
@@ -136,8 +129,6 @@ pub enum TitleBar {
     Striped,
     /// Plain heading on the card surface.
     Modern,
-    /// A dark band with a tinted icon, a fading colored rule and diamond ornaments.
-    Engraved,
     /// A tinted glass band with a glossy reflection and a glowing title.
     Glass,
     /// Matte gothic panels, silver ornaments and crimson accents.
@@ -223,7 +214,7 @@ pub fn well(ctx: &egui::Context) -> egui::Frame {
     let stroke = match Skin::of(ctx).finish {
         Finish::Glass => Stroke::new(1.0_f32, palette.hot.gamma_multiply(0.8)),
         Finish::Modern | Finish::Gothic => Stroke::new(1.0_f32, palette.outline),
-        Finish::Pixel | Finish::Engraved => Stroke::new(2.0_f32, palette.outline),
+        Finish::Pixel => Stroke::new(2.0_f32, palette.outline),
     };
     egui::Frame::new()
         .fill(ctx.global_style().visuals.extreme_bg_color)

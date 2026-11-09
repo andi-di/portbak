@@ -36,8 +36,6 @@ pub static MODERN: Skin = Skin {
         scanlines: false,
         grid: false,
         stripes: false,
-        embers: false,
-        vignette: false,
         wallpaper: false,
         bubbles: false,
         hearts: false,
@@ -74,7 +72,6 @@ const DARK: Palette = Palette {
     paper: Color32::from_rgb(0xff, 0xff, 0xff),
     scanline: Color32::TRANSPARENT,
     sky: Color32::TRANSPARENT,
-    vignette: Color32::TRANSPARENT,
 };
 const LIGHT: Palette = Palette {
     background: Color32::from_rgb(0xfa, 0xfa, 0xfa),
@@ -97,5 +94,4 @@ const LIGHT: Palette = Palette {
     paper: Color32::from_rgb(0xff, 0xff, 0xff),
     scanline: Color32::TRANSPARENT,
     sky: Color32::TRANSPARENT,
-    vignette: Color32::TRANSPARENT,
 };

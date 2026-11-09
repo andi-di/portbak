@@ -41,8 +41,6 @@ pub static MIDNIGHT_NEKO: Skin = Skin {
         scanlines: false,
         grid: false,
         stripes: false,
-        embers: false,
-        vignette: false,
         wallpaper: true,
         bubbles: false,
         hearts: true,
@@ -80,7 +78,6 @@ const MOONLIGHT: Palette = Palette {
     paper: Color32::from_rgb(0xf1, 0xd0, 0xca),
     scanline: Color32::from_rgb(0x00, 0x00, 0x00),
     sky: Color32::from_rgb(0x28, 0x1e, 0x22),
-    vignette: Color32::from_rgb(0x00, 0x00, 0x00),
 };
 
 const PALE_STONE: Palette = Palette {
@@ -104,5 +101,4 @@ const PALE_STONE: Palette = Palette {
     paper: Color32::from_rgb(0xfc, 0xf2, 0xee),
     scanline: Color32::from_rgb(0x00, 0x00, 0x00),
     sky: Color32::from_rgb(0xe5, 0xce, 0xcb),
-    vignette: Color32::from_rgb(0x00, 0x00, 0x00),
 };

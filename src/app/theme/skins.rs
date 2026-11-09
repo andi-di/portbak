@@ -1,6 +1,5 @@
 //! Registry of available skins. A new look is one more `Skin` value listed in `ALL`.
 
-mod dark_fantasy;
 mod frutiger_aero;
 mod midnight_neko;
 mod modern;
@@ -10,7 +9,6 @@ use crate::app::theme::style::Skin;
 
 pub static ALL: &[&Skin] = &[
     &retro::RETRO,
-    &dark_fantasy::DARK_FANTASY,
     &modern::MODERN,
     &frutiger_aero::FRUTIGER_AERO,
     &midnight_neko::MIDNIGHT_NEKO,
