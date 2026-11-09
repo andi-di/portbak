@@ -472,8 +472,9 @@ const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/sa
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     let palette = Palette::of(ui);
-    // Join the painted rails inside the frame texture's transparent margins.
-    let width = (portrait.width() * 0.87).max(180.0_f32.min(frame_width(ui)));
+    // The straight rails' outer edges sit 4.8% in from either texture edge.
+    let rail_width = portrait.width() * (1.0 - 2.0 * 0.048);
+    let width = rail_width.max(180.0_f32.min(frame_width(ui)));
     let top = egui::pos2(
         portrait.center().x - width / 2.0,
         portrait.bottom() - portrait.height() * 0.04,
@@ -503,7 +504,8 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
 fn paint_letter_trim(ui: &egui::Ui, rect: Rect) {
     let painter = ui.painter();
     let bottom = rect.bottom() + LETTER_TRIM_OVERHANG;
-    for x in [rect.left() + 1.0, rect.right() - 1.0] {
+    // Keep the full five-point stroke inside the measured outer edges.
+    for x in [rect.left() + 2.5, rect.right() - 2.5] {
         for (width, color) in [
             (5.0_f32, Color32::from_rgb(57, 34, 44)),
             (3.0, Color32::from_rgb(182, 163, 156)),
