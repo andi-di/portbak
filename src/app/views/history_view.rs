@@ -9,7 +9,8 @@ use crate::engine::history::Backup;
 use chrono::{Local, TimeZone};
 use eframe::egui;
 
-const LIST_HEIGHT: f32 = 300.0;
+/// Shortest backup list; taller windows let the list fill the remaining height.
+const MIN_LIST_HEIGHT: f32 = 300.0;
 /// Changes are applied after the history state is no longer borrowed.
 #[derive(Default)]
 struct HistoryResponse {
@@ -44,6 +45,11 @@ impl App {
                         super::editor::job_tabs(ui, &mut self.backups_tab);
                     },
                 );
+                // Restores start here, so their progress and result show here too.
+                if let Some(job) = self.job(id) {
+                    super::editor::job_status(ui, job, self.activity_label(id));
+                    ui.add_space(8.0);
+                }
                 egui::ScrollArea::both()
                     // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
                     .auto_shrink([false, true])
@@ -257,8 +263,11 @@ fn backup_list(
     let mut response = HistoryResponse::default();
     let starts = day_starts(backups, &Local);
     sunken(ui, |ui| {
+        // Leave room for the well's bottom edge so the page itself does not need to scroll.
+        let edge = style::well(ui.ctx()).total_margin().sum().y;
+        let height = (ui.available_height() - edge).max(MIN_LIST_HEIGHT);
         egui::ScrollArea::vertical()
-            .max_height(LIST_HEIGHT)
+            .max_height(height)
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 for (backup, first_of_day) in backups.iter().zip(starts) {

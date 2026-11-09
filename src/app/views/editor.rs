@@ -616,7 +616,7 @@ fn optional_limit<T>(
     });
 }
 
-fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
+pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     let palette = Palette::of(ui);
     let last_backup = job
         .last_success
