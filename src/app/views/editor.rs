@@ -2,7 +2,8 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_row, gib_field, local_time, path_picker, retention_warnings, DATE_TIME,
+    alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
+    retention_warnings, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -57,39 +58,34 @@ impl App {
         let mut action = None;
         let mut activation = None;
         let mut add = false;
-        let frame =
-            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         egui::CentralPanel::default()
-            .frame(frame)
+            .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::both()
-                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                        let (Some(job), Some(permissions)) = (job, permissions) else {
-                            add = welcome(ui, can_add);
-                            return;
-                        };
-                        job_tabs(ui, &mut self.backups_tab);
-                        let was_enabled = job.enabled;
-                        let previous = job.clone();
-                        let summary = summaries
-                            .get(&job.id)
-                            .filter(|summary| summary.target == job.target);
-                        action = job_editor(ui, job, &permissions, summary)
-                            .map(|action| (job.id, action));
-                        if !permissions.busy {
-                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
-                                self.error =
-                                    format!("Could not update automatic destination: {error:#}");
-                            }
+                page_scroll_area().show(ui, |ui| {
+                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                    let (Some(job), Some(permissions)) = (job, permissions) else {
+                        add = welcome(ui, can_add);
+                        return;
+                    };
+                    job_tabs(ui, &mut self.backups_tab);
+                    let was_enabled = job.enabled;
+                    let previous = job.clone();
+                    let summary = summaries
+                        .get(&job.id)
+                        .filter(|summary| summary.target == job.target);
+                    action =
+                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    if !permissions.busy {
+                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                            self.error =
+                                format!("Could not update automatic destination: {error:#}");
                         }
-                        if was_enabled != job.enabled {
-                            activation = Some((job.id, was_enabled));
-                        }
-                    });
+                    }
+                    if was_enabled != job.enabled {
+                        activation = Some((job.id, was_enabled));
+                    }
+                });
             });
         if add {
             self.add_job();

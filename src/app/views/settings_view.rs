@@ -3,7 +3,7 @@ use crate::app::rendering::pixel::{self, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
-use crate::app::views::widgets::{caption, centered_row, gib_field};
+use crate::app::views::widgets::{caption, centered_row, gib_field, page_frame, page_scroll_area};
 use crate::app::App;
 use crate::model::{Config, JobDefaults};
 use eframe::egui;
@@ -19,19 +19,13 @@ pub(in crate::app) enum SettingsTab {
 
 impl App {
     pub(in crate::app) fn show_settings(&mut self, ui: &mut egui::Ui) {
-        let ctx = ui.ctx().clone();
-        let frame =
-            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         egui::CentralPanel::default()
-            .frame(frame)
+            .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::both()
-                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        settings_page(ui, &mut self.config, &mut self.settings_tab);
-                    });
+                page_scroll_area().show(ui, |ui| {
+                    settings_page(ui, &mut self.config, &mut self.settings_tab);
+                });
             });
     }
 }
