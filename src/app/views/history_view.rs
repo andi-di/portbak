@@ -125,9 +125,7 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
     let palette = Palette::of(ui);
     let mut response = HistoryResponse::default();
     ui.heading(dialog.job.display_name());
-    ui.label(
-        "Lock backups to protect them from retention deletion. Use a backup's restore button to replace the source contents.",
-    );
+    ui.label("Lock backups to protect them from retention deletion.\nUse a backup's restore button to replace the source contents.");
     match &dialog.backups {
         None => {
             ui.label("Loading backup history ...");
