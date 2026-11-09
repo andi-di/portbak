@@ -436,14 +436,17 @@ fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
 pub fn show_header(ui: &mut egui::Ui) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(56.0), egui::Sense::hover());
 
+    paint_head(ui, rect);
+    response.on_hover_text("Kurobane Saya")
+}
+
+pub fn paint_head(ui: &egui::Ui, rect: egui::Rect) {
     paint(
         ui,
         rect,
         "head",
         include_bytes!("../../../assets/themes/midnight-neko/saya-head.png"),
     );
-
-    response.on_hover_text("Kurobane Saya")
 }
 
 pub fn reserved_height(width: f32) -> f32 {

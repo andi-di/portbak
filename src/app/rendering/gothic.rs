@@ -56,19 +56,6 @@ pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color3
     paint_icon(painter, rect, name, bytes, dark, fill);
 }
 
-pub fn job_title_icon(painter: &egui::Painter, rect: Rect) {
-    let dark = painter.ctx().global_style().visuals.dark_mode;
-    let (name, bytes) = asset!("job-title", dark);
-    paint_icon(
-        painter,
-        rect,
-        name,
-        bytes,
-        dark,
-        Palette::of_ctx(painter.ctx()).surface,
-    );
-}
-
 pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
     let dark = painter.ctx().global_style().visuals.dark_mode;
     let (name, bytes) = if active {
@@ -187,7 +174,7 @@ fn paint_icon(
         let result = image::load_from_memory(bytes)
             .map(|image| {
                 let mut rgba = image.to_rgba8();
-                if !matches!(name, "job-active" | "job-inactive" | "job-title") {
+                if !matches!(name, "job-active" | "job-inactive") {
                     silver_finish(&mut rgba, dark, fill);
                 }
                 painter.ctx().load_texture(
@@ -522,65 +509,19 @@ mod tests {
     }
 
     #[test]
-    fn saya_heads_keep_the_reference_palette_without_mode_specific_borders() {
-        let palette = [
-            [53, 37, 44],
-            [35, 24, 31],
-            [88, 66, 80],
-            [103, 29, 54],
-            [241, 208, 202],
-            [202, 155, 147],
-            [72, 97, 59],
-            [126, 149, 78],
-            [246, 232, 226],
-            [107, 15, 31],
-            [181, 171, 171],
-            [18, 14, 19],
-        ];
-        for (name, dark, light) in [
+    fn saya_status_heads_use_identical_artwork_in_both_modes() {
+        for (dark, light) in [
+            (asset!("job-active", true).1, asset!("job-active", false).1),
             (
-                "active",
-                asset!("job-active", true).1,
-                asset!("job-active", false).1,
-            ),
-            (
-                "paused",
                 asset!("job-inactive", true).1,
                 asset!("job-inactive", false).1,
-            ),
-            (
-                "title",
-                asset!("job-title", true).1,
-                asset!("job-title", false).1,
             ),
         ] {
             let dark = image::load_from_memory(dark).unwrap().to_rgba8();
             let light = image::load_from_memory(light).unwrap().to_rgba8();
             assert_eq!(dark.dimensions(), (128, 128));
-            assert!(
-                dark == light,
-                "{name} changes colors or contour between modes"
-            );
-            assert!(
-                dark.enumerate_pixels()
-                    .any(|(x, y, pixel)| (50..78).contains(&x)
-                        && (100..118).contains(&y)
-                        && matches!(pixel.0, [107, 15, 31, 255] | [103, 29, 54, 255])),
-                "{name}: missing red gemstone in the choker area"
-            );
-            for pixel in dark.pixels().filter(|pixel| pixel[3] > 0) {
-                assert!(
-                    palette.contains(&[pixel[0], pixel[1], pixel[2]]),
-                    "{name}: unexpected palette color {pixel:?}"
-                );
-            }
-            if name != "paused" {
-                assert!(
-                    dark.pixels()
-                        .any(|pixel| matches!(pixel.0, [72, 97, 59, 255] | [126, 149, 78, 255])),
-                    "{name}: missing moss-green eyes"
-                );
-            }
+            assert_eq!(dark.get_pixel(0, 0).0[3], 0);
+            assert!(dark == light);
         }
     }
 

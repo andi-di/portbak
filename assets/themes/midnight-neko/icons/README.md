@@ -4,8 +4,8 @@ Each function has its own transparent PNG; do not combine icons into a sprite
 sheet. Generation prompts and masters live locally under
 `agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
 The archive emblem and shield-shaped job controls are in `v3/`.
-The current Saya job heads, normalization palette, previews and prompts live in
-`agent-local/refinements/characters/saya/pixel-head/job-icons-v5/`.
+The current Saya job heads, masters, previews and prompts live in
+`agent-local/refinements/characters/saya/pixel-head/job-icons-v6/`.
 
 ## Resolution and size
 
@@ -23,8 +23,8 @@ The current Saya job heads, normalization palette, previews and prompts live in
 - Keep the same canvas and occupied-area rule for replacements and new icons.
   Check readability at 24, 32, and 48 pixels before use.
 - Utility buttons render at 32 logical pixels; New job and Check now use 40.
-  Job status heads render at 72 logical pixels in taller list entries; the
-  job-title head renders at 80 logical pixels.
+  Job status heads render at 72 logical pixels. The shared name portrait
+  renders at 56 logical pixels in the app header and 80 beside the job name.
 - Generate each functional silhouette individually. Derive the `dark/` (white)
   and `light/` (black) base masks from the same alpha mask so their
   geometry stays identical. The renderer adds a shallow inset silver bevel and
@@ -36,10 +36,10 @@ The current Saya job heads, normalization palette, previews and prompts live in
 - Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
   Readability at 24 pixels takes priority over decorative detail. No fine
   engraving, interior gems, ribbons, gradients or multiple nested symbols.
-- Job heads retain Saya's character colors. Aggressive eyes, visible vampire fangs and a play badge
-  mean automatic backups are enabled; sleeping closed eyes and a pause badge
-  mean automatic backups are disabled.
-  Use the same fixed reference palette in both modes, with no white or silver
+- Job heads retain Saya's character colors. Open eyes, small fangs visible
+  beneath closed lips, and a play badge indicate automatic backups are enabled.
+  Closed eyes and a pause badge indicate automatic backups are disabled.
+  Use the same artwork and reference colors in both modes, with no white or silver
   outer contour. Favor broad faces and clear eyes. Keep status necks short and
   tapered, with clear separation between chin and black choker, plus the same
   red ruby in a silver mount on every head. Render the 23-pixel play/pause
