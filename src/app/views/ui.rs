@@ -418,7 +418,7 @@ impl App {
                     egui::pos2(name_right.max(icon_rect.right() + gap), row.bottom()),
                 );
                 let mut text = egui::text::LayoutJob::simple(
-                    job.name.clone(),
+                    job.display_name().to_owned(),
                     egui::TextStyle::Body.resolve(ui.style()),
                     palette.ink,
                     name_rect.width(),
@@ -470,7 +470,7 @@ fn saya_job_identity(ui: &mut egui::Ui, job: &Job, badge: Option<(String, egui::
         name_right = rect.left() - gap;
     }
     let mut name = egui::text::LayoutJob::simple(
-        job.name.clone(),
+        job.display_name().to_owned(),
         egui::TextStyle::Body.resolve(ui.style()),
         palette.ink,
         (name_right - left).max(0.0),

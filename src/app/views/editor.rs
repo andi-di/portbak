@@ -293,7 +293,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
     let font = egui::TextStyle::Heading.resolve(ui.style());
     let name_width = ui
         .painter()
-        .layout_no_wrap(job.name.clone(), font, palette.ink)
+        .layout_no_wrap(job.display_name().to_owned(), font, palette.ink)
         .size()
         .x;
     let width = (icon_size.x + ui.spacing().item_spacing.x + 6.0 + name_width).min(rect.width());
@@ -320,7 +320,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
                 );
             }
             ui.add_space(6.0);
-            ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
+            ui.add(egui::Label::new(egui::RichText::new(job.display_name()).heading()).truncate());
         },
     );
 }
