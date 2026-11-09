@@ -15,6 +15,19 @@ use std::time::Duration;
 const ICON_SCALE: f32 = 2.0;
 const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
+pub(crate) fn pointing_hand(response: Response) -> Response {
+    let ctx = &response.ctx;
+    let held = Skin::of(ctx).finish == Finish::Gothic
+        && response.enabled()
+        && response.is_pointer_button_down_on()
+        && ctx.input(|input| input.pointer.primary_down())
+        && ctx.output(|output| output.cursor_icon == egui::CursorIcon::Default);
+    if response.hovered() || held {
+        ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    response
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Tone {
     Plain,
@@ -99,6 +112,23 @@ impl Widget for PixelButton {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
+        let icon_scale = if gothic {
+            if self.sprite == Some(Sprite::Plus) {
+                40.0 / 12.0
+            } else {
+                32.0 / 12.0
+            }
+        } else {
+            ICON_SCALE
+        };
+        let utility = gothic
+            && self.icon_only
+            && self.tone == Tone::Plain
+            && matches!(
+                self.sprite,
+                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
+            );
         let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
         let text = if self.icon_only {
             String::new()
@@ -110,7 +140,7 @@ impl Widget for PixelButton {
             .painter()
             .layout_no_wrap(text.clone(), font, Color32::PLACEHOLDER);
         let icon = self.sprite.map_or(Vec2::ZERO, |sprite| {
-            sprites::size(ui.ctx(), sprite, ICON_SCALE)
+            sprites::size(ui.ctx(), sprite, icon_scale)
         });
         let gap = if icon.x > 0.0 && !text.is_empty() {
             8.0
@@ -118,7 +148,10 @@ impl Widget for PixelButton {
             0.0
         };
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
-        let padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
+        let mut padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
+        if gothic {
+            padding.y = padding.y.min(6.0);
+        }
         let finish = Skin::of(ui.ctx()).finish;
         // Plates and gels press straight down, so they only need room below.
         let margin = if finish == Finish::Pixel {
@@ -163,7 +196,9 @@ impl Widget for PixelButton {
         let face = if modern {
             let face = Rect::from_min_size(rect.min, face_size);
             if finish == Finish::Gothic {
-                gothic::control(painter, face, fill, response.has_focus(), enabled);
+                if !utility || hovered || sunk || response.has_focus() {
+                    gothic::control(painter, face, fill, response.has_focus(), enabled);
+                }
             } else {
                 crate::app::rendering::modern::control(
                     painter,
@@ -201,7 +236,9 @@ impl Widget for PixelButton {
             }
             face
         };
-        let ink = if modern && self.tone == Tone::Plain && !self.selected {
+        let ink = if gothic && enabled {
+            gothic::foreground(fill)
+        } else if modern && self.tone == Tone::Plain && !self.selected {
             if enabled {
                 palette.ink
             } else {
@@ -218,18 +255,22 @@ impl Widget for PixelButton {
         if let Some(sprite) = self.sprite {
             let tint = match (enabled, self.tone, self.selected) {
                 (false, ..) => palette.dim,
-                (true, Tone::Plain, false) if finish == Finish::Gothic => palette.metal,
+                (true, Tone::Plain, false) if finish == Finish::Gothic => ink,
                 (true, Tone::Plain, false) => palette.accent,
                 _ => ink,
             };
             let top = cursor.y + (content.y - icon.y) / 2.0;
             let origin = egui::pos2(cursor.x, top);
-            sprites::paint_awake(painter, origin, sprite, ICON_SCALE, tint, glow);
+            if gothic {
+                gothic::icon_on(painter, Rect::from_min_size(origin, icon), sprite, fill);
+            } else {
+                sprites::paint_awake(painter, origin, sprite, icon_scale, tint, glow);
+            }
             cursor.x += icon.x + gap;
         }
         let top = cursor.y + (content.y - galley.size().y) / 2.0;
         painter.galley(egui::pos2(cursor.x, top).round(), galley, ink);
-        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+        pointing_hand(response)
     }
 }
 
@@ -371,7 +412,11 @@ impl Widget for PixelCheckbox<'_> {
             } else {
                 palette.dim
             };
-            sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
+            if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                gothic::icon_on(painter, square.shrink(1.0), Sprite::Check, palette.accent);
+            } else {
+                sprites::paint_centered(painter, square.center(), Sprite::Check, ICON_SCALE, tint);
+            }
         }
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =
@@ -381,7 +426,7 @@ impl Widget for PixelCheckbox<'_> {
             galley,
             ink,
         );
-        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+        pointing_hand(response)
     }
 }
 
@@ -408,9 +453,12 @@ pub fn choice<T: PartialEq>(
 /// Total height of a `PixelButton` with a single text line, including its shadow.
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
-    ui.text_style_height(&TextStyle::Button)
-        + (ui.spacing().button_padding.y + m.border * 2.0) * 2.0
-        + m.lift
+    let content = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        ui.text_style_height(&TextStyle::Button).max(40.0)
+    } else {
+        ui.text_style_height(&TextStyle::Button)
+    };
+    content + (ui.spacing().button_padding.y + m.border * 2.0) * 2.0 + m.lift
 }
 
 /// A framed panel with a striped title bar, like a window on an old desktop.
@@ -748,6 +796,7 @@ pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     const INSET: f32 = 6.0;
     let ctx = ui.ctx();
     if Skin::of(ctx).finish == Finish::Gothic {
+        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
         gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
         gothic::corners(
             ui.painter(),
@@ -788,6 +837,7 @@ pub fn paint_scenery(ui: &egui::Ui) {
     let effects = &Skin::of(ui.ctx()).effects;
     let palette = Palette::of(ui);
     if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        midnight_neko::paint_scene(ui.painter(), Palette::of(ui));
         gothic::pattern(ui.painter(), ui.clip_rect());
     }
     if effects.grid {

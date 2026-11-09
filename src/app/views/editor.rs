@@ -88,11 +88,28 @@ impl App {
             });
         if add {
             self.add_job();
+            crate::app::scenery::catgirl::trigger(
+                &ctx,
+                crate::app::scenery::catgirl::Action::NewJob,
+            );
         }
         if let Some((id, was_enabled)) = activation {
             self.job_activation_changed(id, was_enabled);
+            if let Some(job) = self.job(id) {
+                let action = if job.enabled {
+                    crate::app::scenery::catgirl::Action::AutomaticEnabled
+                } else {
+                    crate::app::scenery::catgirl::Action::AutomaticDisabled
+                };
+                crate::app::scenery::catgirl::trigger(&ctx, action);
+            }
         }
         if let Some((id, action)) = action {
+            let reaction = match action {
+                JobAction::Check => crate::app::scenery::catgirl::Action::CheckNow,
+                JobAction::Remove => crate::app::scenery::catgirl::Action::RemoveJob,
+            };
+            crate::app::scenery::catgirl::trigger(&ctx, reaction);
             self.apply(id, action);
         }
     }
@@ -110,7 +127,11 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let palette = Palette::of(ui);
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if pixel::blink(ui, 0.6) { 0.0 } else { 6.0 };
+        let bob = if Skin::of(ui.ctx()).effects.hearts || pixel::blink(ui, 0.6) {
+            0.0
+        } else {
+            6.0
+        };
         ui.add_space(bob);
         if Skin::of(ui.ctx()).effects.hearts {
             crate::app::scenery::catgirl::show_welcome(ui);
@@ -171,14 +192,23 @@ fn job_editor(
 /// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
     let narrow = ui.available_width() < 620.0;
+    let identity_height = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+        80.0
+    } else {
+        60.0
+    };
     if narrow {
-        let (rect, _) =
-            ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width(), identity_height),
+            egui::Sense::hover(),
+        );
         centered_identity(ui, job, rect);
         ui.add_space(8.0);
     }
-    let (rect, _) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), identity_height),
+        egui::Sense::hover(),
+    );
     let mut action = None;
     ui.scope_builder(
         egui::UiBuilder::new()
@@ -239,7 +269,11 @@ fn job_action_button(
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
     let palette = Palette::of(ui);
-    let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 5.0);
+    let icon_size = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+        egui::Vec2::splat(80.0)
+    } else {
+        sprites::size(ui.ctx(), Sprite::Floppy, 5.0)
+    };
     let font = egui::TextStyle::Heading.resolve(ui.style());
     let name_width = ui
         .painter()
@@ -258,12 +292,17 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
             } else {
                 palette.metal
             };
-            sprites::show(
-                ui,
-                Sprite::Floppy,
-                5.0,
-                style::decorative_color(ui.ctx(), tint),
-            );
+            if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+                let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
+                crate::app::scenery::catgirl::paint_emblem(ui, rect);
+            } else {
+                sprites::show(
+                    ui,
+                    Sprite::Floppy,
+                    5.0,
+                    style::decorative_color(ui.ctx(), tint),
+                );
+            }
             ui.add_space(6.0);
             ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
         },
@@ -364,9 +403,9 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
         let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Rewind),
-            (Schedule::Daily, "Daily", Sprite::Sun),
-            (Schedule::Weekdays, "Weekdays", Sprite::Clock),
+            (Schedule::Interval, "Interval", Sprite::Interval),
+            (Schedule::Daily, "Daily", Sprite::Daily),
+            (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
         ];
         for (schedule, label, sprite) in modes {
             pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
@@ -595,7 +634,13 @@ fn job_status(ui: &mut egui::Ui, job: &Job) {
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
     ui.horizontal(|ui| {
-        pixel::choice(ui, backups, false, "Job settings", Some(Sprite::Folder));
+        pixel::choice(
+            ui,
+            backups,
+            false,
+            "Job settings",
+            Some(Sprite::JobSettings),
+        );
         pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);

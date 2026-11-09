@@ -1,10 +1,21 @@
 # Midnight Neko artwork
 
-Only current production assets are kept here:
+Theme assets:
 
-- `upper-body.png`: scythe-free waist-up reactions for the main screen.
-- `portraits.png`: natural head-and-shoulders reactions for the jobs view.
-- `pixel-face.png`: transparent pixel-art mascot.
-- `icons.png`: silver, ruby and crescent-themed interface icons.
+- `saya-full-body.png`: static pixel-art welcome figure.
+- `saya-emblem.png`: Kurobane family crest beside the application and job names.
+- `expressions/`: all 27 refined pixel busts for the sidebar; click to show one
+  of the 26 non-neutral expressions without immediate repeats. Hovering holds the
+  expression; it resets after the pointer has been away for three seconds.
+- `scenery/`: moonlit rose garden, bat flight/perching sprites, petal and crescent.
+- `icons/`: individually generated Saya-inspired interface icons and prompts.
+  See its README for the shared resolution and visible-size rules.
 
-All use transparent backgrounds. Character images retain their original proportions when fitted into the view; faces are not forced into identical positions. Sprite atlases use equal cells. No app-drawn picture frame or backdrop is added. Each matching `*-prompt.md` file contains one self-contained final generation prompt. Edit history and intermediate prompts are not retained here.
+All use transparent backgrounds and preserve their proportions. Expressions are
+individual 512 × 512 PNGs. The welcome figure is static and has no click reaction.
+Prompts are stored alongside assets; refinement masters remain in agent-local.
+
+Scenery remains behind controls. Bats avoid the pointer and scatter on clicks;
+one approaches at a distance. Flying bats deform one consistent sprite smoothly
+and mirror with direction. Three petal shapes tumble and vary in size; petals,
+crescents and silver sparks form a bounded trail. All effects stay enabled.

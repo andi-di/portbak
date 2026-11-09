@@ -76,6 +76,10 @@ impl App {
             if let Some(history) = &mut self.backup_history {
                 history.selected = Some(name);
                 history.confirming_restore = true;
+                crate::app::scenery::catgirl::trigger(
+                    &ctx,
+                    crate::app::scenery::catgirl::Action::RestoreConfirmation,
+                );
             }
         }
         self.show_restore_confirmation(&ctx);
@@ -183,7 +187,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
     caption(ui, "Source folder to replace");
     sunken(ui, |ui| {
         ui.horizontal(|ui| {
-            sprites::show(ui, Sprite::Folder, 2.0, palette.gold);
+            sprites::show(ui, Sprite::FolderBackup, 2.0, palette.gold);
             ui.add(egui::Label::new(display_path(source)).wrap());
         });
     });
@@ -307,7 +311,7 @@ fn backup_row<R>(
                 let (sprite, tint) = if backup.zip {
                     (Sprite::Package, palette.gold)
                 } else {
-                    (Sprite::Folder, palette.gold)
+                    (Sprite::FolderBackup, palette.gold)
                 };
                 sprites::show(ui, sprite, 2.0, tint);
                 let text_width = (ui.available_width() - 184.0).max(40.0);

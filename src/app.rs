@@ -138,7 +138,7 @@ impl App {
         }
         let (tx, rx) = mpsc::channel();
         Self {
-            selected: config.jobs.first().map(|job| job.id),
+            selected: None,
             config,
             path,
             queue: VecDeque::new(),
@@ -434,7 +434,18 @@ impl App {
                 name,
                 protected,
                 result,
-            } => self.protection_saved(request, &name, protected, result),
+            } => {
+                if protected
+                    && result.is_ok()
+                    && self
+                        .backup_history
+                        .as_ref()
+                        .is_some_and(|history| history.request == request)
+                {
+                    scenery::catgirl::trigger(ctx, scenery::catgirl::Action::ProtectionEnabled);
+                }
+                self.protection_saved(request, &name, protected, result);
+            }
             Event::SummaryLoaded {
                 job,
                 target,
@@ -445,6 +456,12 @@ impl App {
     }
 
     fn finish_operation(&mut self, id: Uuid, result: Result<Outcome, String>, ctx: &egui::Context) {
+        use scenery::catgirl::{self, Action};
+        match &result {
+            Err(_) => catgirl::trigger(ctx, Action::Failed),
+            Ok(_) if self.restoring => catgirl::trigger(ctx, Action::RestoreCompleted),
+            Ok(_) => {}
+        }
         if let Some(job) = self.job_mut(id) {
             match result {
                 Ok(outcome) => {
@@ -609,6 +626,16 @@ mod tests {
 
     fn app_with(config: Config, path: PathBuf) -> App {
         App::new(config, path, tempfile::tempfile().unwrap())
+    }
+
+    #[test]
+    fn startup_does_not_select_an_existing_job() {
+        let config = Config {
+            jobs: vec![Job::default()],
+            ..Config::default()
+        };
+        let app = app_with(config, PathBuf::new());
+        assert!(app.selected.is_none());
     }
 
     #[test]
@@ -1006,6 +1033,7 @@ mod tests {
             ..Config::default()
         };
         let mut app = app_with(config, PathBuf::new());
+        app.selected = Some(id);
         app.enqueue(id);
         let context = egui::Context::default();
         let _ = context.run_ui(egui::RawInput::default(), |ui| {

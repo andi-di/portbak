@@ -89,7 +89,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             box_at(0.3, 0.1, 0.4, 0.3);
             box_at(0.3, 0.6, 0.4, 0.3);
         }
-        Sprite::Folder => line(&[
+        Sprite::Folder | Sprite::JobSettings | Sprite::FolderBackup => line(&[
             (0.1, 0.3),
             (0.1, 0.85),
             (0.9, 0.85),
@@ -99,7 +99,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             (0.1, 0.15),
             (0.1, 0.3),
         ]),
-        Sprite::Clock => {
+        Sprite::Clock | Sprite::Weekdays => {
             painter.circle_stroke(point(0.5, 0.5), rect.width() * 0.38, stroke);
             line(&[(0.5, 0.25), (0.5, 0.5), (0.7, 0.6)]);
         }
@@ -117,7 +117,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             line(&[(0.25, 0.3), (0.3, 0.9), (0.7, 0.9), (0.75, 0.3)]);
             line(&[(0.35, 0.2), (0.35, 0.1), (0.65, 0.1), (0.65, 0.2)]);
         }
-        Sprite::Rewind => {
+        Sprite::Rewind | Sprite::Interval => {
             line(&[(0.5, 0.2), (0.2, 0.5), (0.5, 0.8)]);
             line(&[(0.2, 0.5), (0.85, 0.5)]);
         }
@@ -134,7 +134,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             line(&[(0.15, 0.35), (0.85, 0.35)]);
             line(&[(0.5, 0.15), (0.5, 0.5)]);
         }
-        Sprite::Sun => {
+        Sprite::Sun | Sprite::Daily => {
             painter.circle_stroke(point(0.5, 0.5), rect.width() * 0.2, stroke);
             for i in 0..8 {
                 let a = i as f32 * std::f32::consts::TAU / 8.0;
@@ -157,7 +157,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
             (0.45, 0.25),
             (0.6, 0.1),
         ]),
-        Sprite::Monitor => {
+        Sprite::Monitor | Sprite::Theme => {
             box_at(0.1, 0.15, 0.8, 0.55);
             line(&[(0.5, 0.7), (0.5, 0.9)]);
             line(&[(0.3, 0.9), (0.7, 0.9)]);
@@ -196,7 +196,7 @@ pub fn icon(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) 
     }
 }
 
-fn luminance(color: Color32) -> f32 {
+pub(super) fn luminance(color: Color32) -> f32 {
     let channel = |value: u8| {
         let value = f32::from(value) / 255.0;
         if value <= 0.04045 {

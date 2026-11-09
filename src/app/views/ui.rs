@@ -71,6 +71,18 @@ impl App {
         }
     }
 
+    fn toggle_settings(&mut self) {
+        self.settings_open = !self.settings_open;
+        self.selected = None;
+        self.backups_tab = false;
+    }
+
+    fn toggle_job(&mut self, id: uuid::Uuid) {
+        self.selected = (self.selected != Some(id)).then_some(id);
+        self.settings_open = false;
+        self.backups_tab = false;
+    }
+
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
@@ -93,7 +105,13 @@ impl App {
                             .sprite(Sprite::Gear)
                             .selected(self.settings_open);
                         if ui.add(settings).on_hover_text("Settings").clicked() {
-                            self.settings_open = !self.settings_open;
+                            self.toggle_settings();
+                            if self.settings_open {
+                                crate::app::scenery::catgirl::trigger(
+                                    ui.ctx(),
+                                    crate::app::scenery::catgirl::Action::Settings,
+                                );
+                            }
                         }
                         let dark = self.config.theme == Theme::Dark;
                         let (label, sprite) = if dark {
@@ -108,6 +126,14 @@ impl App {
                         {
                             self.config.theme = if dark { Theme::Light } else { Theme::Dark };
                             ctx.set_theme(theme_preference(self.config.theme));
+                            crate::app::scenery::catgirl::trigger(
+                                &ctx,
+                                if dark {
+                                    crate::app::scenery::catgirl::Action::LightMode
+                                } else {
+                                    crate::app::scenery::catgirl::Action::DarkMode
+                                },
+                            );
                         }
                     });
                 });
@@ -180,6 +206,14 @@ impl App {
                                 .max_rect(rect)
                                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
                             |ui| {
+                                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                                    crate::app::rendering::gothic::activity(
+                                        ui.painter(),
+                                        rect,
+                                        active,
+                                    );
+                                    return;
+                                }
                                 pixel::led(
                                     ui,
                                     if active { palette.gold } else { palette.dim },
@@ -238,15 +272,23 @@ impl App {
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
+                    crate::app::scenery::catgirl::trigger(
+                        ui.ctx(),
+                        crate::app::scenery::catgirl::Action::NewJob,
+                    );
                 }
                 ui.add_space(12.0);
-                let mascot_height =
-                    crate::app::scenery::catgirl::reserved_height(ui.available_width());
                 let show_mascot = Skin::of(ui.ctx()).effects.hearts
-                    && (!self.config.jobs.is_empty() || self.settings_open)
-                    && ui.available_height() > mascot_height + 120.0;
+                    && (!self.config.jobs.is_empty() || self.settings_open);
                 let list_height = if show_mascot {
-                    ui.available_height() - mascot_height
+                    let available = ui.available_height();
+                    let min_list_height = if self.config.jobs.is_empty() {
+                        0.0
+                    } else {
+                        104.0_f32.min(available * 0.45)
+                    };
+                    (available - crate::app::scenery::catgirl::reserved_height(ui))
+                        .max(min_list_height)
                 } else {
                     ui.available_height()
                 };
@@ -261,11 +303,13 @@ impl App {
                         }
                     });
                 if let Some(id) = clicked {
-                    self.selected = (self.selected != Some(id)).then_some(id);
-                    self.settings_open = false;
+                    self.toggle_job(id);
+                    crate::app::scenery::catgirl::trigger(
+                        ui.ctx(),
+                        crate::app::scenery::catgirl::Action::SelectJob,
+                    );
                 }
                 if show_mascot {
-                    ui.add_space((ui.available_height() - mascot_height).max(0.0));
                     ui.vertical_centered(crate::app::scenery::catgirl::show);
                 }
             });
@@ -301,6 +345,10 @@ impl App {
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
+                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                    saya_job_identity(ui, job);
+                    return;
+                }
                 let countdown = job.countdown(Utc::now()).map(|value| value.to_uppercase());
                 let well = style::well(ui.ctx());
                 let countdown_size = countdown.as_ref().map_or(egui::Vec2::ZERO, |text| {
@@ -381,9 +429,7 @@ impl App {
                     .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
-        let response = ui
-            .interact(rect, card_id, egui::Sense::click())
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
         ui.painter().set(
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered()),
@@ -393,11 +439,59 @@ impl App {
     }
 }
 
+fn saya_job_identity(ui: &mut egui::Ui, job: &Job) {
+    let palette = Palette::of(ui);
+    let (row, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::hover());
+    let icon = egui::Rect::from_min_size(row.min, egui::Vec2::splat(72.0));
+    crate::app::rendering::gothic::job_icon(ui.painter(), icon, job.enabled);
+    let left = icon.right() + ui.spacing().item_spacing.x;
+    let width = (row.right() - left).max(0.0);
+    let mut name = egui::text::LayoutJob::simple(
+        job.name.clone(),
+        egui::TextStyle::Body.resolve(ui.style()),
+        palette.ink,
+        width,
+    );
+    name.wrap.max_rows = 2;
+    name.wrap.break_anywhere = true;
+    let name = ui.painter().layout_job(name);
+    let countdown = job.countdown(Utc::now()).map(|value| {
+        let mut text = egui::text::LayoutJob::simple(
+            value.to_uppercase(),
+            egui::TextStyle::Small.resolve(ui.style()),
+            palette.good,
+            (width - 10.0).max(0.0),
+        );
+        text.wrap.max_rows = 1;
+        text.wrap.break_anywhere = true;
+        ui.painter().layout_job(text)
+    });
+    let extra = countdown.as_ref().map_or(0.0, |text| text.size().y + 12.0);
+    let top = row.center().y - (name.size().y + extra) / 2.0;
+    let painter = ui.painter().with_clip_rect(
+        egui::Rect::from_min_max(egui::pos2(left, row.top()), row.max).intersect(ui.clip_rect()),
+    );
+    painter.galley(egui::pos2(left, top), name.clone(), palette.ink);
+    if let Some(text) = countdown {
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(left, top + name.size().y + 6.0),
+            text.size() + egui::vec2(10.0, 6.0),
+        );
+        painter.rect_filled(rect, 3, palette.sunken);
+        painter.galley(rect.min + egui::vec2(5.0, 3.0), text, palette.good);
+    }
+}
+
 /// The skin's mascot next to the wordmark; pixel mascots get a twinkling glint.
 fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
-    let mascot = sprites::show(ui, skin.wording.mascot, 4.0, palette.hot);
+    let mascot = if skin.finish == Finish::Gothic {
+        crate::app::scenery::catgirl::show_header(ui)
+    } else {
+        sprites::show(ui, skin.wording.mascot, 4.0, palette.hot)
+    };
     if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [
@@ -502,6 +596,34 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     use super::*;
     use crate::model::Config;
+
+    #[test]
+    fn settings_leave_the_job_and_close_to_the_main_screen() {
+        let mut app = App::new(
+            Config {
+                jobs: vec![Job::default()],
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.selected = Some(app.config.jobs[0].id);
+        app.backups_tab = true;
+        app.toggle_settings();
+        assert!(app.settings_open);
+        assert!(app.selected.is_none());
+        assert!(!app.backups_tab);
+        app.toggle_settings();
+        assert!(!app.settings_open);
+        assert!(app.selected.is_none());
+        app.toggle_settings();
+        let id = app.config.jobs[0].id;
+        app.toggle_job(id);
+        assert_eq!(app.selected, Some(id));
+        assert!(!app.settings_open);
+        app.toggle_job(id);
+        assert!(app.selected.is_none());
+    }
 
     #[test]
     fn check_transitions_do_not_emit_widget_id_warnings() {
