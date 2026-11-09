@@ -340,20 +340,26 @@ impl App {
         let wake = ui
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
+        // Running and queued work replaces the countdown in the card's readout.
+        let badge = match self.activity_label(job.id) {
+            Some(label) => Some((label.to_uppercase(), palette.gold)),
+            None => job
+                .countdown(Utc::now())
+                .map(|remaining| (remaining.to_uppercase(), palette.good)),
+        };
         let width = ui.available_width() - CARD_SHADOW;
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
                 if Skin::of(ui.ctx()).finish == Finish::Gothic {
-                    saya_job_identity(ui, job);
+                    saya_job_identity(ui, job, badge);
                     return;
                 }
-                let countdown = job.countdown(Utc::now()).map(|value| value.to_uppercase());
                 let well = style::well(ui.ctx());
-                let countdown_size = countdown.as_ref().map_or(egui::Vec2::ZERO, |text| {
+                let countdown_size = badge.as_ref().map_or(egui::Vec2::ZERO, |(text, color)| {
                     ui.painter()
-                        .layout_no_wrap(text.clone(), style::label_font(ui.ctx()), palette.good)
+                        .layout_no_wrap(text.clone(), style::label_font(ui.ctx()), *color)
                         .size()
                         + well.total_margin().sum()
                 });
@@ -384,7 +390,7 @@ impl App {
                     wake,
                 );
                 let gap = ui.spacing().item_spacing.x;
-                let name_right = if let Some(remaining) = countdown {
+                let name_right = if let Some((remaining, color)) = badge {
                     let rect = egui::Rect::from_center_size(
                         egui::pos2(row.right() - countdown_size.x / 2.0, row.center().y),
                         countdown_size,
@@ -398,7 +404,7 @@ impl App {
                                 ui.label(
                                     egui::RichText::new(remaining)
                                         .font(style::label_font(ui.ctx()))
-                                        .color(palette.good),
+                                        .color(color),
                                 );
                             });
                         },
@@ -439,48 +445,41 @@ impl App {
     }
 }
 
-fn saya_job_identity(ui: &mut egui::Ui, job: &Job) {
+/// Saya's head, the name, and the right-aligned readout share one vertically centered row.
+fn saya_job_identity(ui: &mut egui::Ui, job: &Job, badge: Option<(String, egui::Color32)>) {
     let palette = Palette::of(ui);
     let (row, _) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::hover());
     let icon = egui::Rect::from_min_size(row.min, egui::Vec2::splat(72.0));
     crate::app::rendering::gothic::job_icon(ui.painter(), icon, job.enabled);
-    let left = icon.right() + ui.spacing().item_spacing.x;
-    let width = (row.right() - left).max(0.0);
+    let gap = ui.spacing().item_spacing.x;
+    let left = icon.right() + gap;
+    let painter = ui.painter().with_clip_rect(row.intersect(ui.clip_rect()));
+    let mut name_right = row.right();
+    if let Some((text, color)) = badge {
+        let text =
+            ui.painter()
+                .layout_no_wrap(text, egui::TextStyle::Small.resolve(ui.style()), color);
+        let size = text.size() + egui::vec2(10.0, 6.0);
+        let rect = egui::Rect::from_center_size(
+            egui::pos2(row.right() - size.x / 2.0, row.center().y),
+            size,
+        );
+        painter.rect_filled(rect, 3, palette.sunken);
+        painter.galley(rect.min + egui::vec2(5.0, 3.0), text, color);
+        name_right = rect.left() - gap;
+    }
     let mut name = egui::text::LayoutJob::simple(
         job.name.clone(),
         egui::TextStyle::Body.resolve(ui.style()),
         palette.ink,
-        width,
+        (name_right - left).max(0.0),
     );
     name.wrap.max_rows = 2;
     name.wrap.break_anywhere = true;
     let name = ui.painter().layout_job(name);
-    let countdown = job.countdown(Utc::now()).map(|value| {
-        let mut text = egui::text::LayoutJob::simple(
-            value.to_uppercase(),
-            egui::TextStyle::Small.resolve(ui.style()),
-            palette.good,
-            (width - 10.0).max(0.0),
-        );
-        text.wrap.max_rows = 1;
-        text.wrap.break_anywhere = true;
-        ui.painter().layout_job(text)
-    });
-    let extra = countdown.as_ref().map_or(0.0, |text| text.size().y + 12.0);
-    let top = row.center().y - (name.size().y + extra) / 2.0;
-    let painter = ui.painter().with_clip_rect(
-        egui::Rect::from_min_max(egui::pos2(left, row.top()), row.max).intersect(ui.clip_rect()),
-    );
-    painter.galley(egui::pos2(left, top), name.clone(), palette.ink);
-    if let Some(text) = countdown {
-        let rect = egui::Rect::from_min_size(
-            egui::pos2(left, top + name.size().y + 6.0),
-            text.size() + egui::vec2(10.0, 6.0),
-        );
-        painter.rect_filled(rect, 3, palette.sunken);
-        painter.galley(rect.min + egui::vec2(5.0, 3.0), text, palette.good);
-    }
+    let origin = egui::pos2(left, row.center().y - name.size().y / 2.0);
+    painter.galley(origin, name, palette.ink);
 }
 
 /// The skin's mascot next to the wordmark; pixel mascots get a twinkling glint.

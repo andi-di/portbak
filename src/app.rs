@@ -115,6 +115,8 @@ pub struct App {
     active: Option<Uuid>,
     restoring: bool,
     activity_until: Option<Instant>,
+    /// The job and label of the operation that just finished, held with the footer activity.
+    recent_activity: Option<(Uuid, &'static str)>,
     backup_history: Option<BackupHistory>,
     backups_tab: bool,
     settings_open: bool,
@@ -145,6 +147,7 @@ impl App {
             active: None,
             restoring: false,
             activity_until: None,
+            recent_activity: None,
             backup_history: None,
             backups_tab: false,
             settings_open: false,
@@ -185,6 +188,27 @@ impl App {
                 .backup_history
                 .as_ref()
                 .is_some_and(|history| history.saving)
+    }
+
+    /// Running, restoring, or queued work for a job. Finished work stays labelled as long as
+    /// the footer activity, so quick checks do not flash the label.
+    fn activity_label(&self, id: Uuid) -> Option<&'static str> {
+        if self.active == Some(id) {
+            return Some(if self.restoring {
+                "Restoring"
+            } else {
+                "Running"
+            });
+        }
+        if self.queue.contains(&id) {
+            return Some("Queued");
+        }
+        let recent = self
+            .activity_until
+            .is_some_and(|until| until > Instant::now());
+        self.recent_activity
+            .filter(|(job, _)| recent && *job == id)
+            .map(|(_, label)| label)
     }
 
     fn is_busy(&self, id: Uuid) -> bool {
@@ -473,6 +497,7 @@ impl App {
                 Err(error) => job.status = format!("Error: {error}"),
             }
         }
+        self.recent_activity = self.activity_label(id).map(|label| (id, label));
         self.active = None;
         self.restoring = false;
         self.activity_until = Some(Instant::now() + Duration::from_millis(750));
