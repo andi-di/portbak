@@ -481,10 +481,10 @@ pub fn show(ui: &mut egui::Ui) {
         state.select_line(expression, uuid::Uuid::new_v4().as_u128());
     }
 
-    // Fit each expression inside the opening below the crest and above the ruby.
+    // Tuck the portrait's crop edges beneath the frame rails.
     let opening = Rect::from_min_max(
-        rect.min + rect.size() * egui::vec2(0.15, 0.18),
-        rect.min + rect.size() * egui::vec2(0.85, 0.84),
+        rect.min + rect.size() * egui::vec2(0.115, 0.13),
+        rect.min + rect.size() * egui::vec2(0.885, 0.90),
     );
     paint(ui, opening, &format!("{expression:?}"), expression.bytes());
     paint(
