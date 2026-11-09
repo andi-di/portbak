@@ -101,10 +101,10 @@ impl Widget for PixelButton {
         let palette = Palette::of(ui);
         let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
         let icon_scale = if gothic {
-            if matches!(self.sprite, Some(Sprite::Plus | Sprite::Play)) {
-                40.0 / 12.0
-            } else {
-                32.0 / 12.0
+            match self.sprite {
+                Some(Sprite::Plus) => 40.0 / 12.0,
+                Some(Sprite::Play) => 15.0 / 12.0,
+                _ => 32.0 / 12.0,
             }
         } else {
             ICON_SCALE
