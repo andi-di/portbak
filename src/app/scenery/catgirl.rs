@@ -9,6 +9,12 @@ use eframe::egui::{self, Color32, Pos2, Rect};
 use std::time::Duration;
 
 const REACTION_SECONDS: f64 = 3.0;
+const LOVE_HEART_SECONDS: f64 = 0.6;
+const LOVE_HEARTS: [(f32, f32, f32, f64); 3] = [
+    (0.16, 0.43, 0.10, 0.0),
+    (0.85, 0.48, 0.13, 0.07),
+    (0.93, 0.32, 0.07, 0.14),
+];
 
 fn state_id() -> egui::Id {
     egui::Id::new("saya_sidebar_companion")
@@ -283,6 +289,7 @@ impl Expression {
 
 struct Companion {
     expression: Expression,
+    love_started_at: Option<f64>,
     until: f64,
     next_random: Option<f64>,
     hovered: bool,
@@ -341,11 +348,21 @@ impl Companion {
     }
 
     fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
+        if expression != self.visible(time) {
+            self.love_started_at = (expression == Expression::InLove).then_some(time);
+        }
         self.reaction_priority = 0;
         self.expression = expression;
         self.until = time + REACTION_SECONDS;
         self.select_line(expression, random.rotate_left(64));
         self.schedule(time, random);
+    }
+
+    fn love_elapsed(&self, time: f64) -> Option<f64> {
+        self.love_started_at
+            .filter(|_| self.visible(time) == Expression::InLove)
+            .map(|start| time - start)
+            .filter(|elapsed| (0.0..LOVE_HEART_SECONDS + LOVE_HEARTS[2].3).contains(elapsed))
     }
 
     fn hold_while_hovered(&mut self, hovered: bool, time: f64) {
@@ -451,6 +468,50 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 
 const DIALOGUE_HEIGHT: f32 = 48.0;
 
+fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
+    let painter = ui.painter().with_clip_rect(opening);
+    // The top row has two lobes. The following rows taper to the point.
+    let rows = [
+        (1, 3, 0),
+        (5, 7, 0),
+        (0, 8, 1),
+        (0, 8, 2),
+        (1, 7, 3),
+        (2, 6, 4),
+        (3, 5, 5),
+        (4, 4, 6),
+    ];
+    for (x, y, size, delay) in LOVE_HEARTS {
+        let age = ((elapsed - delay) / LOVE_HEART_SECONDS) as f32;
+        if !(0.0..1.0).contains(&age) {
+            continue;
+        }
+        let opacity = (age * 12.0).min(1.0) * (1.0 - age).min(0.65) / 0.65;
+        let cell = (opening.width() * size / 9.0).max(0.75);
+        let center = opening.min + opening.size() * egui::vec2(x, y - 0.14 * age);
+        let origin = (center - egui::vec2(4.5, 3.5) * cell).round();
+        let ruby = Color32::from_rgb(223, 54, 100).gamma_multiply(opacity);
+        for (left, right, row) in rows {
+            painter.rect_filled(
+                Rect::from_min_size(
+                    origin + egui::vec2(left as f32, row as f32) * cell,
+                    egui::vec2((right - left + 1) as f32, 1.0) * cell,
+                ),
+                0.0,
+                ruby,
+            );
+        }
+        painter.rect_filled(
+            Rect::from_min_size(
+                origin + egui::vec2(1.0, 1.0) * cell,
+                egui::vec2(2.0, 1.0) * cell,
+            ),
+            0.0,
+            Color32::from_rgb(255, 180, 199).gamma_multiply(opacity),
+        );
+    }
+}
+
 fn frame_width(ui: &egui::Ui) -> f32 {
     (ui.clip_rect().width() - 4.0).max(0.0)
 }
@@ -495,6 +556,10 @@ pub fn show(ui: &mut egui::Ui) {
         rect.min + rect.size() * egui::vec2(0.935, 0.936),
     );
     paint(ui, opening, &format!("{expression:?}"), expression.bytes());
+    if let Some(elapsed) = state.love_elapsed(time) {
+        paint_love_hearts(ui, opening, elapsed);
+        ui.ctx().request_repaint();
+    }
     paint(
         ui,
         rect,
@@ -606,6 +671,24 @@ mod tests {
         state.tick(41.1, false, 5000);
         assert_eq!(state.visible(41.1), super::Expression::Curious);
         assert!(state.next_random.unwrap() > 41.1 + 18.0);
+    }
+
+    #[test]
+    fn love_hearts_play_once_per_entry_and_end_if_interrupted() {
+        let mut state = Companion::default();
+        state.set_expression(Expression::InLove, 1.0, 0);
+        assert_eq!(state.love_elapsed(1.25), Some(0.25));
+
+        state.set_expression(Expression::InLove, 1.5, 1);
+        state.hold_while_hovered(true, 2.0);
+        assert_eq!(state.visible(2.0), Expression::InLove);
+        assert_eq!(state.love_elapsed(2.0), None);
+
+        state.set_expression(Expression::Happy, 2.25, 2);
+        state.set_expression(Expression::InLove, 2.5, 3);
+        assert_eq!(state.love_elapsed(2.75), Some(0.25));
+        state.set_expression(Expression::Sad, 2.75, 4);
+        assert_eq!(state.love_elapsed(2.75), None);
     }
 
     #[test]
