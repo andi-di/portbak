@@ -24,35 +24,6 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 Choose **Retro**, **Dark Fantasy**, **Modern**, **Frutiger Aero**, or **Midnight Neko** in Settings. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
-Midnight Neko pairs Saya-inspired burgundy and plum-black surfaces with ivory,
-silver, and moss-green accents. Its individual pixel icons distinguish actions,
-backup types, scheduling options, and navigation in both light and dark modes.
-Bold silver silhouettes with subtle bevels, high-contrast light/dark variants and borderless utility
-controls improve readability. Buttons choose icon contrast for their own fill.
-Larger Saya heads with crisp play/pause badges distinguish jobs with automatic
-backups enabled or disabled. Saya's
-pixel head marks the header; her static full-body figure appears on the welcome
-screen, while the sidebar cycles through her refined expressions when clicked.
-An asymmetric vampire estate places a castle and winding stairs at lower right,
-with a silver crescent, two sculpted cloud shapes drifting at different speeds,
-curling mist, layered rocky mountains and thorn roses
-and subtly flickering windows. Larger cursor-aware bats sometimes circle a tower
-and hang from the top edge on individual timers, scatter into separate roaming areas, and return to
-roost after randomized delays. Their near-black light-mode and black dark-mode colors keep the
-bats subdued. The estate also has falling petals and a sparse
-petal/crescent pointer trail. Effects are always enabled in this look. Bats use
-smooth wing motion and face their direction of travel; varied petals tumble
-through the garden. A faceted silver arrowhead and matching pointing gauntlet
-style the normal and clickable cursors, with a compressed hand pose while a
-click is held. Saya's sidebar
-expression stays while hovered and returns to neutral three seconds after the
-pointer leaves, with varied dialogue for each expression. She also reacts on
-randomized timers, job and settings actions, backup failures and restored backups;
-hovering holds her reaction and dialogue against automatic changes; direct clicks
-change her expression immediately.
-The footer's silver crescent and crimson gem animate during backup activity,
-with progress available in its tooltip.
-
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 
 On Linux, the embedded window icon is used directly under X11. Under Wayland, portbak also offers it to compositors supporting `xdg_toplevel_icon_v1` (including current KDE Plasma). This is optional: if unsupported or unsuccessful, the app keeps the compositor’s default icon and starts normally. No `.desktop` file, separate icon file, or installation is needed.
