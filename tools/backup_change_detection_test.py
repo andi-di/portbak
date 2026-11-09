@@ -2,11 +2,13 @@
 """Exercise automatic backup change detection using an isolated, real app process."""
 import argparse
 import ctypes as C
+import errno
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -17,6 +19,97 @@ import zipfile
 INTERVAL = 2.0
 DURATION = 30.0
 POLL = 0.025
+OUTPUT_PREFIX = "portbak-change-detection-"
+TEST_LOCK = ".test.lock"
+
+
+class BusyDirectory(Exception):
+    pass
+
+
+class FileLock:
+    """Use the same native lock family as the application's instance lock."""
+
+    def __init__(self, path):
+        self.file = path.open("a+b")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                self.file.seek(0)
+                msvcrt.locking(self.file.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            self.file.close()
+            if error.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise BusyDirectory(str(path)) from error
+            raise
+
+    def __enter__(self):
+        return self
+
+    def close(self):
+        self.file.close()
+
+    def __exit__(self, *_):
+        self.close()
+
+
+def recognized_output(path):
+    metadata = path.lstat()
+    if (not stat.S_ISDIR(metadata.st_mode) or path.is_symlink()
+            or getattr(metadata, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+        return False
+    report_path = path / "report.json"
+    if report_path.is_symlink():
+        return False
+    try:
+        report = read_json(report_path)
+    except (OSError, ValueError):
+        return False
+    return (isinstance(report, dict) and report.get("platform") in ("linux", "win32")
+            and isinstance(report.get("binary"), str)
+            and isinstance(report.get("started"), str)
+            and isinstance(report.get("rounds"), list)
+            and isinstance(report.get("passed"), bool))
+
+
+def delete_output(output, lock):
+    # Windows cannot remove open lock files; keep them until all other data is gone.
+    try:
+        with FileLock(output / "portbak.lock"):
+            for child in output.iterdir():
+                if child.name in (TEST_LOCK, "portbak.lock", "report.json"):
+                    continue
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+    finally:
+        lock.close()
+    (output / TEST_LOCK).unlink()
+    (output / "portbak.lock").unlink()
+    (output / "report.json").unlink(missing_ok=True)
+    output.rmdir()
+    print(f"Deleted: {output}", flush=True)
+
+
+def cleanup_existing(root):
+    failed = False
+    for output in sorted(root.glob(OUTPUT_PREFIX + "*")):
+        try:
+            if not recognized_output(output):
+                print(f"Skipped (unrecognized): {output}", flush=True)
+                continue
+            lock = FileLock(output / TEST_LOCK)
+            delete_output(output, lock)
+        except BusyDirectory:
+            print(f"Skipped (active): {output}", flush=True)
+        except OSError as error:
+            failed = True
+            print(f"Cleanup failed: {output}: {error}", file=sys.stderr, flush=True)
+    return 1 if failed else 0
 
 
 def read_json(path):
@@ -377,33 +470,64 @@ def verify_version_contents(jobs, expected, index):
     return True
 
 
-def main():
+def finish_report(output, report):
+    report["finished"] = datetime.now(timezone.utc).isoformat()
+    config_path = output / "portbak.json"
+    if config_path.exists():
+        try:
+            report["jobs"] = [{key: job.get(key) for key in
+                ("name", "status", "next_run", "last_success")}
+                for job in read_json(config_path)["jobs"]]
+        except (OSError, ValueError, KeyError) as error:
+            report["diagnostic_error"] = str(error)
+    write_json(output / "report.json", report)
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("binary", nargs="?", type=Path,
-                        default=Path("target/release/portbak.exe" if sys.platform == "win32" else "target/release/portbak"))
-    args = parser.parse_args()
-    output = Path(tempfile.mkdtemp(prefix="portbak-change-detection-"))
-    report = {"platform": sys.platform, "binary": str(args.binary.resolve()),
+    parser.add_argument("binary", nargs="?", type=Path)
+    options = parser.add_mutually_exclusive_group()
+    options.add_argument("--cleanup", action="store_true",
+                         help="delete all artifacts from this run, including on failure")
+    options.add_argument("--cleanup-existing", action="store_true",
+                         help="delete recognized inactive runs in the system temporary directory; do not run a test")
+    args = parser.parse_args(argv)
+    if args.cleanup_existing:
+        if args.binary is not None:
+            parser.error("--cleanup-existing does not accept a binary path")
+        return cleanup_existing(Path(tempfile.gettempdir()))
+    binary = (args.binary or Path("target/release/portbak.exe" if sys.platform == "win32"
+                                 else "target/release/portbak")).resolve()
+    output = Path(tempfile.mkdtemp(prefix=OUTPUT_PREFIX))
+    report = {"platform": sys.platform, "binary": str(binary),
               "started": datetime.now(timezone.utc).isoformat(), "rounds": [], "passed": False}
+    failed = False
+    lock = None
     try:
-        run(args.binary.resolve(), output, report)
+        lock = FileLock(output / TEST_LOCK)
+        run(binary, output, report)
         report["passed"] = True
     except (Exception, KeyboardInterrupt) as error:
         report["error"] = str(error) or type(error).__name__
         print(f"FAIL: {report['error']}", file=sys.stderr, flush=True)
     finally:
-        report["finished"] = datetime.now(timezone.utc).isoformat()
-        config_path = output / "portbak.json"
-        if config_path.exists():
-            try:
-                report["jobs"] = [{key: job.get(key) for key in
-                    ("name", "status", "next_run", "last_success")}
-                    for job in read_json(config_path)["jobs"]]
-            except (OSError, ValueError, KeyError) as error:
-                report["diagnostic_error"] = str(error)
-        write_json(output / "report.json", report)
-        print(f"Artifacts: {output}", flush=True)
-    return 0 if report["passed"] else 1
+        try:
+            finish_report(output, report)
+        except OSError as error:
+            failed = True
+            print(f"Report failed: {output}: {error}", file=sys.stderr, flush=True)
+        try:
+            if args.cleanup and lock is not None:
+                delete_output(output, lock)
+            else:
+                print(f"Artifacts: {output}", flush=True)
+        except (OSError, BusyDirectory) as error:
+            failed = True
+            print(f"Cleanup failed; remaining artifacts: {output}: {error}", file=sys.stderr, flush=True)
+        finally:
+            if lock is not None:
+                lock.close()
+    return 0 if report["passed"] and not failed else 1
 
 
 if __name__ == "__main__":

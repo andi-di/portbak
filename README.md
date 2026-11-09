@@ -118,7 +118,18 @@ The test opens the real app with temporary, preconfigured folder-copy and ZIP jo
 
 Allow extra time for startup, initial backups, and the final unchanged checks. Both jobs must finish each round before the next change; a missed deadline fails with a timing diagnostic rather than skipping an intermediate version. Avoid interacting with the test window or its test folders during the run; browsing backup history pauses scheduling.
 
-The script exits with code `0` on success or `1` on failure and stops its own app process. It leaves the app log, `report.json`, expected source versions, and backups in a printed `portbak-change-detection-*` directory under the system temporary folder. Existing jobs and user data are untouched. No additional Python packages are needed. The verifier's fast checks can be run with `python3 -B -m unittest discover -s tools -p 'test_backup_verifier.py'` (use `py` on Windows).
+The script exits with code `0` on success or `1` on failure and stops its own app process. It leaves the app log, `report.json`, expected source versions, and backups in a printed `portbak-change-detection-*` directory under the system temporary folder. Existing jobs and user data are untouched. No additional Python packages are needed.
+
+Add `--cleanup` to remove the entire temporary folder after the test, including its log and report. This also applies when the test fails or you stop it with Ctrl+C. To delete earlier runs without starting a test, use `--cleanup-existing`:
+
+```sh
+python3 tools/backup_change_detection_test.py target/release/portbak --cleanup
+python3 tools/backup_change_detection_test.py --cleanup-existing
+```
+
+On Windows, use `py` and the `.exe` path. Without either option, artifacts are retained. The standalone cleanup searches only the system temporary directory for recognized `portbak-change-detection-*` folders with valid test reports; it skips active runs, directory links, and unrecognized or incomplete folders. It prints deleted and skipped paths. Cleanup failures return code `1` and report the remaining path; a failed test still returns `1` after successful cleanup. The two options cannot be combined, and `--cleanup-existing` does not accept an executable path.
+
+The verifier's fast checks can be run with `python3 -B -m unittest discover -s tools -p 'test_backup_verifier.py'` (use `py` on Windows).
 
 ### Linux UI smoke test
 
