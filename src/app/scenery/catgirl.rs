@@ -2,6 +2,7 @@
 
 mod dialogue;
 
+use crate::app::rendering::ornaments;
 use crate::app::theme::style::Palette;
 
 use eframe::egui::{self, Color32, Pos2, Rect};
@@ -466,7 +467,43 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
     );
 }
 
-const DIALOGUE_HEIGHT: f32 = 48.0;
+const DIALOGUE_HEIGHT: f32 = 70.0;
+
+fn show_letter(ui: &mut egui::Ui, line: &str) {
+    let palette = Palette::of(ui);
+    ui.add_space(6.0);
+    let letter = egui::Frame::new()
+        .fill(palette.raised)
+        .stroke(egui::Stroke::new(1.0_f32, palette.metal))
+        .corner_radius(3)
+        .inner_margin(egui::Margin::symmetric(16, 9))
+        .show(ui, |ui| {
+            let label = egui::Label::new(egui::RichText::new(line).small().color(palette.ink))
+                .wrap()
+                .halign(egui::Align::Center);
+            ui.add_sized(egui::vec2(ui.available_width(), 32.0), label);
+        });
+
+    let rect = letter.response.rect;
+    let painter = ui.painter();
+    let trim = egui::Stroke::new(1.0_f32, palette.outline);
+    let inset = rect.shrink(3.0);
+    for (corner, direction) in [(inset.left_bottom(), 1.0), (inset.right_bottom(), -1.0)] {
+        painter.line_segment(
+            [
+                corner - egui::vec2(0.0, 8.0),
+                corner + egui::vec2(direction * 8.0, 0.0),
+            ],
+            trim,
+        );
+    }
+    ornaments::diamond_lamp(
+        painter,
+        Rect::from_center_size(rect.center_top(), egui::Vec2::splat(11.0)),
+        palette.bad,
+        false,
+    );
+}
 
 fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
     let painter = ui.painter().with_clip_rect(opening);
@@ -567,13 +604,7 @@ pub fn show(ui: &mut egui::Ui) {
         include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png"),
     );
 
-    ui.add_space(4.0);
-
-    ui.label(
-        egui::RichText::new(state.line(time))
-            .small()
-            .color(Palette::of(ui).dim),
-    );
+    show_letter(ui, state.line(time));
 
     if time < state.until {
         ui.ctx()
