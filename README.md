@@ -100,6 +100,26 @@ The `zig` executable must be in PATH. The output is `target/x86_64-unknown-linux
 - `theme/`: style definitions and the `skins/` registry and presets.
 - `platform/`: platform integration, including the optional Wayland window icon.
 
+### Backup change detection test
+
+Run this manual test from a desktop session with Python 3.9 or newer and a built executable:
+
+```sh
+# Linux (X11 or XWayland, requires libX11)
+python3 tools/backup_change_detection_test.py target/release/portbak
+```
+
+```powershell
+# Windows 10/11 (native desktop session)
+py tools/backup_change_detection_test.py target/release/portbak.exe
+```
+
+The test opens the real app with temporary, preconfigured folder-copy and ZIP jobs, both using a two-second backup interval. Its 30-second change phase contains 15 rounds covering edits (including equal-length content with a preserved modification time), additions, deletions, renames, moves, binary files, hidden and Unicode names, nested folders, empty directories, and combined changes. Every saved version is compared with its expected contents, including earlier backups at the end. A final unchanged check must create no extra backup or update the last successful backup time.
+
+Allow extra time for startup, initial backups, and the final unchanged checks. Both jobs must finish each round before the next change; a missed deadline fails with a timing diagnostic rather than skipping an intermediate version. Avoid interacting with the test window or its test folders during the run; browsing backup history pauses scheduling.
+
+The script exits with code `0` on success or `1` on failure and stops its own app process. It leaves the app log, `report.json`, expected source versions, and backups in a printed `portbak-change-detection-*` directory under the system temporary folder. Existing jobs and user data are untouched. No additional Python packages are needed. The verifier's fast checks can be run with `python3 -B -m unittest discover -s tools -p 'test_backup_change_detection.py'` (use `py` on Windows).
+
 ### Linux UI smoke test
 
 ```sh

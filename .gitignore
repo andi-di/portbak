@@ -13,3 +13,6 @@
 # Temporary directories
 /temp/
 /tmp/
+
+# Python tool caches
+__pycache__/
