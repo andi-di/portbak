@@ -192,14 +192,23 @@ fn job_editor(
 /// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
     let narrow = ui.available_width() < 620.0;
+    let identity_height = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+        80.0
+    } else {
+        60.0
+    };
     if narrow {
-        let (rect, _) =
-            ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width(), identity_height),
+            egui::Sense::hover(),
+        );
         centered_identity(ui, job, rect);
         ui.add_space(8.0);
     }
-    let (rect, _) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width(), 60.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), identity_height),
+        egui::Sense::hover(),
+    );
     let mut action = None;
     ui.scope_builder(
         egui::UiBuilder::new()
@@ -260,7 +269,11 @@ fn job_action_button(
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
     let palette = Palette::of(ui);
-    let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 5.0);
+    let icon_size = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+        egui::Vec2::splat(80.0)
+    } else {
+        sprites::size(ui.ctx(), Sprite::Floppy, 5.0)
+    };
     let font = egui::TextStyle::Heading.resolve(ui.style());
     let name_width = ui
         .painter()

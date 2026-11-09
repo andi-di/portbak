@@ -342,6 +342,10 @@ impl App {
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(width - 24.0);
+                if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                    saya_job_identity(ui, job);
+                    return;
+                }
                 let countdown = job.countdown(Utc::now()).map(|value| value.to_uppercase());
                 let well = style::well(ui.ctx());
                 let countdown_size = countdown.as_ref().map_or(egui::Vec2::ZERO, |text| {
@@ -350,12 +354,7 @@ impl App {
                         .size()
                         + well.total_margin().sum()
                 });
-                let icon_size =
-                    if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
-                        egui::Vec2::splat(48.0)
-                    } else {
-                        sprites::size(ui.ctx(), Sprite::Floppy, 3.0)
-                    };
+                let icon_size = sprites::size(ui.ctx(), Sprite::Floppy, 3.0);
                 let row_height = icon_size
                     .y
                     .max(countdown_size.y)
@@ -373,18 +372,14 @@ impl App {
                 } else {
                     palette.metal
                 };
-                if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
-                    crate::app::rendering::gothic::job_icon(ui.painter(), icon_rect, job.enabled);
-                } else {
-                    sprites::paint_awake(
-                        ui.painter(),
-                        icon_rect.min,
-                        Sprite::Floppy,
-                        3.0,
-                        style::decorative_color(ui.ctx(), tint),
-                        wake,
-                    );
-                }
+                sprites::paint_awake(
+                    ui.painter(),
+                    icon_rect.min,
+                    Sprite::Floppy,
+                    3.0,
+                    style::decorative_color(ui.ctx(), tint),
+                    wake,
+                );
                 let gap = ui.spacing().item_spacing.x;
                 let name_right = if let Some(remaining) = countdown {
                     let rect = egui::Rect::from_center_size(
@@ -440,6 +435,50 @@ impl App {
         );
         ui.add_space(CARD_SHADOW + 4.0);
         response.clicked()
+    }
+}
+
+fn saya_job_identity(ui: &mut egui::Ui, job: &Job) {
+    let palette = Palette::of(ui);
+    let (row, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 72.0), egui::Sense::hover());
+    let icon = egui::Rect::from_min_size(row.min, egui::Vec2::splat(72.0));
+    crate::app::rendering::gothic::job_icon(ui.painter(), icon, job.enabled);
+    let left = icon.right() + ui.spacing().item_spacing.x;
+    let width = (row.right() - left).max(0.0);
+    let mut name = egui::text::LayoutJob::simple(
+        job.name.clone(),
+        egui::TextStyle::Body.resolve(ui.style()),
+        palette.ink,
+        width,
+    );
+    name.wrap.max_rows = 2;
+    name.wrap.break_anywhere = true;
+    let name = ui.painter().layout_job(name);
+    let countdown = job.countdown(Utc::now()).map(|value| {
+        let mut text = egui::text::LayoutJob::simple(
+            value.to_uppercase(),
+            egui::TextStyle::Small.resolve(ui.style()),
+            palette.good,
+            (width - 10.0).max(0.0),
+        );
+        text.wrap.max_rows = 1;
+        text.wrap.break_anywhere = true;
+        ui.painter().layout_job(text)
+    });
+    let extra = countdown.as_ref().map_or(0.0, |text| text.size().y + 12.0);
+    let top = row.center().y - (name.size().y + extra) / 2.0;
+    let painter = ui.painter().with_clip_rect(
+        egui::Rect::from_min_max(egui::pos2(left, row.top()), row.max).intersect(ui.clip_rect()),
+    );
+    painter.galley(egui::pos2(left, top), name.clone(), palette.ink);
+    if let Some(text) = countdown {
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(left, top + name.size().y + 6.0),
+            text.size() + egui::vec2(10.0, 6.0),
+        );
+        painter.rect_filled(rect, 3, palette.sunken);
+        painter.galley(rect.min + egui::vec2(5.0, 3.0), text, palette.good);
     }
 }
 

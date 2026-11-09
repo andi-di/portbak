@@ -29,7 +29,8 @@ silver, and moss-green accents. Its individual pixel icons distinguish actions,
 backup types, scheduling options, and navigation in both light and dark modes.
 Bold silver silhouettes with subtle bevels, high-contrast light/dark variants and borderless utility
 controls improve readability. Buttons choose icon contrast for their own fill.
-Alert and resting Saya heads distinguish jobs with automatic backups enabled or disabled. Saya's
+Larger Saya heads with crisp play/pause badges distinguish jobs with automatic
+backups enabled or disabled. Saya's
 pixel head marks the header; her static full-body figure appears on the welcome
 screen, while the sidebar cycles through her refined expressions when clicked.
 An asymmetric vampire estate places a castle and winding stairs at lower right,

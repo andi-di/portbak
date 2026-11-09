@@ -84,6 +84,33 @@ pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
         dark,
         Palette::of_ctx(painter.ctx()).surface,
     );
+    let radius = rect.width() * 0.16;
+    let center = rect.right_bottom() - Vec2::splat(radius + 1.0);
+    let burgundy = Color32::from_rgb(103, 29, 54);
+    let ivory = Color32::from_rgb(246, 232, 226);
+    painter.circle_filled(center, radius, burgundy);
+    if active {
+        painter.add(egui::Shape::convex_polygon(
+            vec![
+                center + egui::vec2(-radius * 0.34, -radius * 0.52),
+                center + egui::vec2(radius * 0.56, 0.0),
+                center + egui::vec2(-radius * 0.34, radius * 0.52),
+            ],
+            ivory,
+            Stroke::NONE,
+        ));
+    } else {
+        for x in [-0.30, 0.30] {
+            painter.rect_filled(
+                Rect::from_center_size(
+                    center + Vec2::X * radius * x,
+                    egui::vec2(radius * 0.29, radius * 1.02),
+                ),
+                0,
+                ivory,
+            );
+        }
+    }
 }
 
 fn contrast(a: Color32, b: Color32) -> f32 {
@@ -504,8 +531,11 @@ mod tests {
             [241, 208, 202],
             [202, 155, 147],
             [72, 97, 59],
-            [161, 175, 130],
+            [126, 149, 78],
             [246, 232, 226],
+            [107, 15, 31],
+            [181, 171, 171],
+            [18, 14, 19],
         ];
         for (name, dark, light) in [
             (
@@ -531,6 +561,13 @@ mod tests {
                 dark == light,
                 "{name} changes colors or contour between modes"
             );
+            assert!(
+                dark.enumerate_pixels()
+                    .any(|(x, y, pixel)| (50..78).contains(&x)
+                        && (100..118).contains(&y)
+                        && matches!(pixel.0, [107, 15, 31, 255] | [103, 29, 54, 255])),
+                "{name}: missing red gemstone in the choker area"
+            );
             for pixel in dark.pixels().filter(|pixel| pixel[3] > 0) {
                 assert!(
                     palette.contains(&[pixel[0], pixel[1], pixel[2]]),
@@ -539,7 +576,8 @@ mod tests {
             }
             if name != "paused" {
                 assert!(
-                    dark.pixels().any(|pixel| pixel.0 == [72, 97, 59, 255]),
+                    dark.pixels()
+                        .any(|pixel| matches!(pixel.0, [72, 97, 59, 255] | [126, 149, 78, 255])),
                     "{name}: missing moss-green eyes"
                 );
             }
