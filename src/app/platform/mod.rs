@@ -13,7 +13,9 @@ pub(crate) fn open_in_file_manager(path: &std::path::Path) -> anyhow::Result<()>
         if path.is_dir() {
             command.arg(display);
         } else {
-            command.arg(format!("/select,{display}"));
+            // Explorer rejects a quoted `"/select,path"`; only the path may be quoted.
+            // Windows paths cannot contain `"`, so this raw argument stays well-formed.
+            command.raw_arg(format!("/select,\"{display}\""));
         }
         command
     };

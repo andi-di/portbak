@@ -11,11 +11,38 @@ pub const DATE_TIME: &str = "%d.%m.%Y %H:%M:%S";
 pub const DATE: &str = "%a %d.%m.%Y";
 pub const TIME: &str = "%H:%M:%S";
 
+pub const PAGE_PADDING: i8 = 22;
+
+pub fn page_frame(ui: &egui::Ui) -> egui::Frame {
+    egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(0, PAGE_PADDING))
+}
+
+pub fn page_scroll_area(
+    ui: &mut egui::Ui,
+    contents: impl FnOnce(&mut egui::Ui),
+) -> egui::scroll_area::ScrollAreaOutput<()> {
+    ui.scope(|ui| {
+        let scroll = &mut ui.spacing_mut().scroll;
+        scroll.bar_inner_margin = 2.0;
+        scroll.bar_outer_margin = 8.0;
+        egui::ScrollArea::both()
+            .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                // Leave room for widgets that round up while the scrollbar animates.
+                ui.set_max_width((ui.available_width() - 1.0).max(0.0));
+                contents(ui);
+            })
+    })
+    .inner
+}
+
 pub fn local_time(time: DateTime<Utc>, format: &str) -> String {
     time.with_timezone(&Local).format(format).to_string()
 }
 
 /// A left-to-right row tall enough that labels, buttons and inputs share one vertical center.
+/// It wraps in narrow windows, since an overlong row would push the scroll bar out of view.
 pub fn centered_row<R>(
     ui: &mut egui::Ui,
     contents: impl FnOnce(&mut egui::Ui) -> R,
@@ -25,7 +52,7 @@ pub fn centered_row<R>(
         .max(pixel::button_height(ui));
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), height),
-        egui::Layout::left_to_right(egui::Align::Center),
+        egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
         contents,
     )
 }
@@ -54,7 +81,7 @@ pub fn display_path(path: &Path) -> String {
     text.into_owned()
 }
 
-pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
+pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only: bool) -> bool {
     let mut changed = false;
     let error_id = ui.make_persistent_id((label, "open_folder_error"));
     let mut open_error = ui
@@ -82,7 +109,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
             let choose = PixelButton::new("Choose folder …")
                 .sprite(Sprite::Folder)
                 .icon_only();
-            if ui.add(choose).on_hover_text("Choose folder").clicked() {
+            if ui.add(choose).on_hover_text("Choose folder").clicked() && !read_only {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
                     changed = true;
@@ -122,6 +149,25 @@ pub fn retention_warnings(ui: &mut egui::Ui, job: &Job, records: &[Record]) {
     for warning in engine::history::warnings(job, records) {
         alert(ui, gold, &warning);
     }
+}
+
+const BYTES_PER_GIB: f64 = 1_073_741_824.0;
+
+/// Editable byte limit shown in GiB.
+pub fn gib_field(ui: &mut egui::Ui, enabled: bool, bytes: &mut u64) -> egui::Response {
+    let mut gib = *bytes as f64 / BYTES_PER_GIB;
+    // Clamping a stored value mid-edit makes egui discard the text being typed,
+    // so only user input is clamped and bytes are rounded to stay inside the range.
+    let editor = egui::DragValue::new(&mut gib)
+        .speed(0.1)
+        .range(0.001..=100_000.0)
+        .clamp_existing_to_range(false)
+        .suffix(" GiB");
+    let response = ui.add_enabled(enabled, editor);
+    if response.changed() {
+        *bytes = (gib * BYTES_PER_GIB).round() as u64;
+    }
+    response
 }
 
 /// Binary-prefixed size, e.g. `1.5 MiB`; exact byte counts stay available on hover.
@@ -189,6 +235,54 @@ mod tests {
                 });
             });
         });
+    }
+
+    #[test]
+    fn typed_sizes_below_one_gib_are_stored_exactly() {
+        for (typed, expected) in [("0.5", 0.5), ("0.001", 0.001), ("0.004", 0.004)] {
+            let context = egui::Context::default();
+            let mut bytes = 10 * 1024 * 1024 * 1024;
+            let frame = |events: Vec<egui::Event>, bytes: &mut u64| {
+                let input = egui::RawInput {
+                    events,
+                    ..Default::default()
+                };
+                let mut rect = egui::Rect::NOTHING;
+                let _ = context.run_ui(input, |ui| {
+                    egui::CentralPanel::default().show_inside(ui, |ui| {
+                        rect = gib_field(ui, true, bytes).rect;
+                    });
+                });
+                rect
+            };
+            let center = frame(Vec::new(), &mut bytes).center();
+            let press = |pressed| egui::Event::PointerButton {
+                pos: center,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(
+                vec![egui::Event::PointerMoved(center), press(true)],
+                &mut bytes,
+            );
+            frame(vec![press(false)], &mut bytes);
+            frame(Vec::new(), &mut bytes);
+            // One character per frame, like a person typing.
+            for character in typed.chars() {
+                frame(vec![egui::Event::Text(character.into())], &mut bytes);
+            }
+            let enter = egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(vec![enter], &mut bytes);
+            frame(Vec::new(), &mut bytes);
+            assert_eq!(bytes, (expected * BYTES_PER_GIB).round() as u64, "{typed}");
+        }
     }
 
     #[test]

@@ -2,7 +2,8 @@ use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
-    alert, caption, centered_row, local_time, path_picker, retention_warnings, DATE_TIME,
+    alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
+    retention_warnings, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -12,7 +13,6 @@ use uuid::Uuid;
 
 const DEFAULT_MAX_COUNT: usize = 10;
 const MAX_COUNT_LIMIT: usize = 100_000;
-const BYTES_PER_GIB: f64 = 1_073_741_824.0;
 const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -31,6 +31,8 @@ struct Permissions {
     busy: bool,
     /// Activation cannot change during a restore or while the Backups tab is open.
     locked: bool,
+    /// Running, restoring, or queued work for this job.
+    activity: Option<&'static str>,
 }
 
 impl App {
@@ -43,6 +45,7 @@ impl App {
         let permissions = self.selected.map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
+            activity: self.activity_label(id).filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
         let selected = self.selected;
@@ -55,13 +58,11 @@ impl App {
         let mut action = None;
         let mut activation = None;
         let mut add = false;
-        let frame =
-            egui::Frame::central_panel(&ctx.global_style()).inner_margin(egui::Margin::same(22));
         egui::CentralPanel::default()
-            .frame(frame)
+            .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::vertical().show(ui, |ui| {
+                page_scroll_area(ui, |ui| {
                     let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
                     let (Some(job), Some(permissions)) = (job, permissions) else {
                         add = welcome(ui, can_add);
@@ -173,26 +174,35 @@ fn job_editor(
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
-    job_status(ui, job);
+    job_status(ui, job, permissions.activity);
     ui.add_space(14.0);
-    ui.add_enabled_ui(!permissions.busy, |ui| {
-        pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-            folder_settings(ui, job)
-        });
-        pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
-            schedule_settings(ui, job)
-        });
-        pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
-            retention_settings(ui, job, summary)
-        });
+    // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
+    let unchanged = permissions.busy.then(|| job.clone());
+    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+        folder_settings(ui, job, permissions.busy)
     });
+    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        schedule_settings(ui, job)
+    });
+    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+        retention_settings(ui, job, summary)
+    });
+    if let Some(unchanged) = unchanged {
+        *job = unchanged;
+        // Edits are discarded, but a job without a runnable schedule must still stop.
+        if job.enabled && !job.has_runnable_schedule() {
+            job.enabled = false;
+            job.reschedule(Utc::now());
+        }
+    }
     action
 }
 
 /// Keep the identity centered independently of the unequal action groups.
 fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Option<JobAction> {
+    const ACTION_INSET: f32 = 148.0;
     let narrow = ui.available_width() < 620.0;
-    let identity_height = if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
+    let identity_height = if Skin::of(ui.ctx()).finish == style::Finish::Gothic {
         80.0
     } else {
         60.0
@@ -221,7 +231,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
                 "Check now",
                 Sprite::Play,
                 Tone::Accent,
-                !permissions.busy,
+                permissions.busy,
             ) {
                 action = Some(JobAction::Check);
             }
@@ -237,34 +247,37 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
                 "Remove job",
                 Sprite::Trash,
                 Tone::Danger,
-                !permissions.busy,
+                permissions.busy,
             ) {
                 action = Some(JobAction::Remove);
             }
         },
     );
     if !narrow {
-        centered_identity(ui, job, rect.shrink2(egui::vec2(124.0, 0.0)));
+        centered_identity(ui, job, rect.shrink2(egui::vec2(ACTION_INSET, 0.0)));
     }
     action
 }
 
+/// Busy buttons keep their look and ignore clicks, so quick checks do not flash them.
 fn job_action_button(
     ui: &mut egui::Ui,
     label: &str,
     sprite: Sprite,
     tone: Tone,
-    enabled: bool,
+    busy: bool,
 ) -> bool {
     let button = PixelButton::new(label)
         .icon_only()
         .sprite(sprite)
         .tone(tone)
         .min_size(egui::vec2(52.0, 52.0));
-    ui.add_enabled(enabled, button)
-        .on_hover_text(label)
-        .on_disabled_hover_text(label)
-        .clicked()
+    let tooltip = if busy {
+        "Available when this job's current operation finishes"
+    } else {
+        label
+    };
+    ui.add(button).on_hover_text(tooltip).clicked() && !busy
 }
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
@@ -277,7 +290,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
     let font = egui::TextStyle::Heading.resolve(ui.style());
     let name_width = ui
         .painter()
-        .layout_no_wrap(job.name.clone(), font, palette.ink)
+        .layout_no_wrap(job.display_name().to_owned(), font, palette.ink)
         .size()
         .x;
     let width = (icon_size.x + ui.spacing().item_spacing.x + 6.0 + name_width).min(rect.width());
@@ -304,7 +317,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
                 );
             }
             ui.add_space(6.0);
-            ui.add(egui::Label::new(egui::RichText::new(&job.name).heading()).truncate());
+            ui.add(egui::Label::new(egui::RichText::new(job.display_name()).heading()).truncate());
         },
     );
 }
@@ -342,7 +355,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     }
 }
 
-fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
+fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
@@ -351,7 +364,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             .margin(egui::vec2(8.0, 4.0)),
     );
     ui.add_space(ui.spacing().item_spacing.y);
-    path_picker(ui, "Source folder", &mut job.source);
+    path_picker(ui, "Source folder", &mut job.source, read_only);
     ui.add_space(ui.spacing().item_spacing.y);
     centered_row(ui, |ui| {
         ui.add(PixelCheckbox::new(
@@ -359,7 +372,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             "Auto destination folder",
         ));
     });
-    if path_picker(ui, "Destination folder", &mut job.target) {
+    if path_picker(ui, "Destination folder", &mut job.target, read_only) {
         job.auto_destination = false;
     }
     ui.add_space(ui.spacing().item_spacing.y);
@@ -547,14 +560,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                 &mut job.max_bytes,
                 DEFAULT_MAX_BYTES,
                 |ui, bytes| {
-                    let mut gib = *bytes as f64 / BYTES_PER_GIB;
-                    let editor = egui::DragValue::new(&mut gib)
-                        .speed(0.1)
-                        .range(0.001..=100_000.0)
-                        .suffix(" GiB");
-                    if ui.add(editor).changed() {
-                        *bytes = (gib * BYTES_PER_GIB) as u64;
-                    }
+                    gib_field(ui, true, bytes);
                 },
             );
             centered_row(ui, |ui| {
@@ -566,15 +572,14 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
             });
         });
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_top(|ui| {
         sprites::show(ui, Sprite::Shield, 1.0, palette.good);
-        ui.label(
-            egui::RichText::new(
-                "The latest successful backup and protected versions are always kept.",
-            )
-            .small()
-            .color(palette.dim),
-        );
+        let note = egui::RichText::new(
+            "The latest successful backup and protected versions are always kept.",
+        )
+        .small()
+        .color(palette.dim);
+        ui.add(egui::Label::new(note).wrap());
     });
     match summary.map(|summary| &summary.records) {
         Some(Ok(records)) => retention_warnings(ui, job, records),
@@ -608,12 +613,16 @@ fn optional_limit<T>(
     });
 }
 
-fn job_status(ui: &mut egui::Ui, job: &Job) {
+pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     let palette = Palette::of(ui);
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
     ui.horizontal_wrapped(|ui| {
+        if let Some(activity) = activity {
+            ui.label(egui::RichText::new(activity).small().color(palette.gold));
+            ui.label(egui::RichText::new("·").small().color(palette.dim));
+        }
         ui.label(
             egui::RichText::new(format!("Last backup: {last_backup}"))
                 .small()
@@ -633,7 +642,7 @@ fn job_status(ui: &mut egui::Ui, job: &Job) {
 }
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         pixel::choice(
             ui,
             backups,

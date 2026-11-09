@@ -40,8 +40,6 @@ pub static RETRO: Skin = Skin {
         scanlines: true,
         grid: true,
         stripes: true,
-        embers: false,
-        vignette: false,
         wallpaper: false,
         bubbles: false,
         hearts: false,
@@ -79,7 +77,6 @@ const NIGHT: Palette = Palette {
     paper: Color32::from_rgb(0xf4, 0xec, 0xff),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 34),
     sky: Color32::from_rgb(0x0e, 0x08, 0x1d),
-    vignette: Color32::TRANSPARENT,
 };
 
 const DAY: Palette = Palette {
@@ -103,5 +100,4 @@ const DAY: Palette = Palette {
     paper: Color32::from_rgb(0xff, 0xfd, 0xf6),
     scanline: Color32::from_rgba_premultiplied(0, 0, 0, 12),
     sky: Color32::from_rgb(0xe4, 0xd8, 0xbc),
-    vignette: Color32::TRANSPARENT,
 };

@@ -81,7 +81,7 @@ fn run_inner(
     let hash = digest(&entries)?;
     if latest_matches(&root, &manifest, &hash) {
         return Ok(Outcome {
-            message: format!("Unchanged · {skipped} links/special files skipped"),
+            message: format!("Unchanged · {skipped} skipped"),
             created: false,
         });
     }
@@ -249,6 +249,11 @@ fn copy_file(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `count` followed by its noun in singular or plural form, e.g. `1 file` or `3 files`.
+pub(crate) fn counted(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
+}
+
 fn completion_message(
     job: &Job,
     manifest: &Manifest,
@@ -258,7 +263,7 @@ fn completion_message(
 ) -> String {
     let mut parts = vec![
         "Backup complete".to_owned(),
-        format!("{entry_count} files/folders"),
+        counted(entry_count, "file/folder", "files/folders"),
         format!("{skipped} skipped"),
     ];
     let latest = manifest
@@ -483,6 +488,13 @@ fn discard_progress() -> Sender<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn counts_use_singular_only_for_one() {
+        assert_eq!(counted(0, "place", "places"), "0 places");
+        assert_eq!(counted(1, "file/folder", "files/folders"), "1 file/folder");
+        assert_eq!(counted(2, "place", "places"), "2 places");
+    }
 
     fn setup() -> (tempfile::TempDir, Job) {
         let t = tempfile::tempdir().unwrap();

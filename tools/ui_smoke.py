@@ -118,7 +118,7 @@ try:
                 wid = find_window(root)
                 assert wid, "App window not found"
                 subprocess.run(["import", "-window", str(wid), str(case / "screenshot.png")], check=True, timeout=10)
-                x.XResizeWindow(display, wid, 800, 600)
+                x.XResizeWindow(display, wid, 1024, 940)
                 x.XFlush(display)
                 time.sleep(0.5)
                 subprocess.run(["import", "-window", str(wid), str(case / "small-window.png")], check=True, timeout=10)

@@ -1,9 +1,8 @@
 //! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
 
 use crate::app::rendering::glass::{self, Glaze};
-use crate::app::rendering::ornaments;
+use crate::app::rendering::gothic;
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::rendering::{forge, gothic};
 use crate::app::scenery::{aurora, midnight_neko};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
@@ -229,11 +228,7 @@ impl Widget for PixelButton {
                 focused: response.has_focus(),
                 clear: self.tone == Tone::Plain && !self.selected,
             };
-            if finish == Finish::Glass {
-                glass::gel_button(painter, face, &look);
-            } else {
-                forge::plate(painter, face, &look);
-            }
+            glass::gel_button(painter, face, &look);
             face
         };
         let ink = if gothic && enabled {
@@ -306,7 +301,7 @@ fn pixel_face(
     }
 }
 
-/// A check box, square or spiked by skin; the label wraps beside it.
+/// A check box drawn in the skin's style; the label wraps beside it.
 pub struct PixelCheckbox<'a> {
     checked: &'a mut bool,
     label: String,
@@ -399,7 +394,6 @@ impl Widget for PixelCheckbox<'_> {
                     );
                 }
             }
-            Finish::Engraved => forge::spiked_socket(painter, square, border),
             Finish::Glass => glass::check_socket(painter, square, border),
         }
         if checked {
@@ -520,7 +514,6 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
     match Skin::of(ui.ctx()).effects.title_bar {
         TitleBar::Modern => crate::app::rendering::modern::title_bar(ui, title, sprite),
         TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
-        TitleBar::Engraved => ornaments::engraved_title_bar(ui, title, sprite, band),
         TitleBar::Glass => aurora::glass_title_bar(ui, title, sprite, band),
         TitleBar::Gothic => gothic::title_bar(ui, title, sprite),
     }
@@ -683,10 +676,6 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
             painter.circle_filled(rect.center(), 4.0, fill);
             return response;
         }
-        Finish::Engraved => {
-            ornaments::diamond_lamp(painter, rect, fill, lit);
-            return response;
-        }
         Finish::Glass => {
             glass::orb(painter, rect.center(), rect.width() / 2.0 - 0.5, fill, lit);
             return response;
@@ -843,9 +832,6 @@ pub fn paint_scenery(ui: &egui::Ui) {
     if effects.grid {
         paint_grid(ui.painter(), ui.clip_rect(), palette);
     }
-    if effects.embers {
-        ornaments::paint_embers(ui, ui.clip_rect(), palette);
-    }
 }
 
 /// The skin's screen-wide overlays; call after everything else has been laid out.
@@ -854,9 +840,6 @@ pub fn paint_overlays(ctx: &egui::Context) {
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
         midnight_neko::paint_overlays(ctx, palette);
-    }
-    if effects.vignette {
-        ornaments::paint_vignette(ctx, palette);
     }
     if effects.scanlines {
         paint_scanlines(ctx, palette);

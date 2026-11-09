@@ -93,6 +93,15 @@ impl Default for Job {
 }
 
 impl Job {
+    /// The name shown in lists and headings; unnamed jobs stay recognizable.
+    pub fn display_name(&self) -> &str {
+        if self.name.trim().is_empty() {
+            "Unnamed job"
+        } else {
+            &self.name
+        }
+    }
+
     pub fn interval_seconds(&self) -> u32 {
         self.interval_value.clamp(1, self.interval_unit.maximum())
             * self.interval_unit.seconds() as u32
@@ -382,7 +391,7 @@ impl Default for Config {
             theme: Theme::System,
             skin: "retro".into(),
             job_defaults: JobDefaults::default(),
-            sidebar_width: 290.0,
+            sidebar_width: 300.0,
             jobs: vec![],
         }
     }
@@ -430,6 +439,21 @@ pub struct Manifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blank_names_display_as_unnamed() {
+        for (name, shown) in [
+            ("", "Unnamed job"),
+            ("  ", "Unnamed job"),
+            ("Photos", "Photos"),
+        ] {
+            let job = Job {
+                name: name.into(),
+                ..Job::default()
+            };
+            assert_eq!(job.display_name(), shown);
+        }
+    }
 
     #[test]
     fn protected_budget_option_defaults_off_and_is_inherited_independently() {
@@ -874,7 +898,7 @@ mod tests {
         let saved: Config =
             serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();
         assert_eq!(saved.skin, "retro");
-        assert_eq!(saved.sidebar_width, 290.0);
+        assert_eq!(saved.sidebar_width, 300.0);
         assert_eq!(saved.theme, Theme::Light);
     }
 

@@ -1,4 +1,4 @@
-//! Icons by meaning; each skin draws them as pixel sprites or engraved vector glyphs.
+//! Icons by meaning; each skin draws them as pixel sprites or vector icons.
 //!
 //! Pixel sprites are hand-drawn text grids, painted as one mesh per sprite.
 //! Legend: `.` transparent, `K` outline, `W` paper, `M` metal, `S` shade,
@@ -308,7 +308,7 @@ pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
             let width = bitmap.first().map_or(0, |row| row.len());
             egui::vec2(width as f32, bitmap.len() as f32)
         }
-        Finish::Engraved | Finish::Glass => glyphs::grid(sprite),
+        Finish::Glass => glyphs::grid(sprite),
         Finish::Gothic => egui::vec2(12.0, 12.0),
         Finish::Modern => glyphs::grid(sprite) * 0.8,
     };
@@ -320,7 +320,7 @@ pub fn paint(painter: &egui::Painter, origin: Pos2, sprite: Sprite, scale: f32, 
     paint_awake(painter, origin, sprite, scale, tint, 0.0);
 }
 
-/// Like `paint`, with `wake` from 0 to 1 bringing engraved icons to life, e.g. while hovered.
+/// Like `paint`, with `wake` from 0 to 1 bringing glossy icons to life, e.g. while hovered.
 pub fn paint_awake(
     painter: &egui::Painter,
     origin: Pos2,
@@ -339,10 +339,6 @@ pub fn paint_awake(
         Finish::Modern => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
             crate::app::rendering::modern::icon(painter, rect, sprite, tint);
-        }
-        Finish::Engraved => {
-            let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
-            glyphs::paint(painter, rect, sprite, tint, wake);
         }
         Finish::Glass => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));

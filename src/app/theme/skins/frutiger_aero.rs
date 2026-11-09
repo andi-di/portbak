@@ -43,8 +43,6 @@ pub static FRUTIGER_AERO: Skin = Skin {
         scanlines: false,
         grid: false,
         stripes: false,
-        embers: false,
-        vignette: false,
         wallpaper: true,
         bubbles: true,
         hearts: false,
@@ -82,7 +80,6 @@ const AURORA: Palette = Palette {
     paper: Color32::from_rgb(0xf4, 0xfc, 0xff),
     scanline: Color32::TRANSPARENT,
     sky: Color32::from_rgb(0x01, 0x05, 0x16),
-    vignette: Color32::TRANSPARENT,
 };
 
 const CLEAR_SKY: Palette = Palette {
@@ -106,5 +103,4 @@ const CLEAR_SKY: Palette = Palette {
     paper: Color32::from_rgb(0xff, 0xff, 0xff),
     scanline: Color32::TRANSPARENT,
     sky: Color32::from_rgb(0x00, 0x4c, 0xc4),
-    vignette: Color32::TRANSPARENT,
 };
