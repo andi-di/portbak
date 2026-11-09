@@ -174,17 +174,20 @@ fn job_editor(
     let action = job_banner(ui, job, permissions);
     job_status(ui, job);
     ui.add_space(14.0);
-    ui.add_enabled_ui(!permissions.busy, |ui| {
-        pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-            folder_settings(ui, job)
-        });
-        pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
-            schedule_settings(ui, job)
-        });
-        pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
-            retention_settings(ui, job, summary)
-        });
+    // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
+    let unchanged = permissions.busy.then(|| job.clone());
+    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+        folder_settings(ui, job, permissions.busy)
     });
+    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        schedule_settings(ui, job)
+    });
+    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+        retention_settings(ui, job, summary)
+    });
+    if let Some(unchanged) = unchanged {
+        *job = unchanged;
+    }
     action
 }
 
@@ -220,7 +223,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
                 "Check now",
                 Sprite::Play,
                 Tone::Accent,
-                !permissions.busy,
+                permissions.busy,
             ) {
                 action = Some(JobAction::Check);
             }
@@ -236,7 +239,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
                 "Remove job",
                 Sprite::Trash,
                 Tone::Danger,
-                !permissions.busy,
+                permissions.busy,
             ) {
                 action = Some(JobAction::Remove);
             }
@@ -248,22 +251,25 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
     action
 }
 
+/// Busy buttons keep their look and ignore clicks, so quick checks do not flash them.
 fn job_action_button(
     ui: &mut egui::Ui,
     label: &str,
     sprite: Sprite,
     tone: Tone,
-    enabled: bool,
+    busy: bool,
 ) -> bool {
     let button = PixelButton::new(label)
         .icon_only()
         .sprite(sprite)
         .tone(tone)
         .min_size(egui::vec2(52.0, 52.0));
-    ui.add_enabled(enabled, button)
-        .on_hover_text(label)
-        .on_disabled_hover_text(label)
-        .clicked()
+    let tooltip = if busy {
+        "Available when this job's current operation finishes"
+    } else {
+        label
+    };
+    ui.add(button).on_hover_text(tooltip).clicked() && !busy
 }
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
@@ -341,7 +347,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     }
 }
 
-fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
+fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
     caption(ui, "Job name");
     ui.add(
         egui::TextEdit::singleline(&mut job.name)
@@ -350,7 +356,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             .margin(egui::vec2(8.0, 4.0)),
     );
     ui.add_space(ui.spacing().item_spacing.y);
-    path_picker(ui, "Source folder", &mut job.source);
+    path_picker(ui, "Source folder", &mut job.source, read_only);
     ui.add_space(ui.spacing().item_spacing.y);
     centered_row(ui, |ui| {
         ui.add(PixelCheckbox::new(
@@ -358,7 +364,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job) {
             "Auto destination folder",
         ));
     });
-    if path_picker(ui, "Destination folder", &mut job.target) {
+    if path_picker(ui, "Destination folder", &mut job.target, read_only) {
         job.auto_destination = false;
     }
     ui.add_space(ui.spacing().item_spacing.y);

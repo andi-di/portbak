@@ -54,7 +54,7 @@ pub fn display_path(path: &Path) -> String {
     text.into_owned()
 }
 
-pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
+pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only: bool) -> bool {
     let mut changed = false;
     let error_id = ui.make_persistent_id((label, "open_folder_error"));
     let mut open_error = ui
@@ -82,7 +82,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf) -> bool {
             let choose = PixelButton::new("Choose folder …")
                 .sprite(Sprite::Folder)
                 .icon_only();
-            if ui.add(choose).on_hover_text("Choose folder").clicked() {
+            if ui.add(choose).on_hover_text("Choose folder").clicked() && !read_only {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
                     changed = true;
