@@ -468,6 +468,7 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 
 const DIALOGUE_HEIGHT: f32 = 70.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
+const LETTER_TRIM_HEIGHT: f32 = 20.0;
 const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
@@ -475,9 +476,10 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     // The straight rails' outer edges sit 4.8% in from either texture edge.
     let rail_width = portrait.width() * (1.0 - 2.0 * 0.048);
     let width = rail_width.max(180.0_f32.min(frame_width(ui)));
+    let rail_overlap = portrait.height() * 0.04;
     let top = egui::pos2(
         portrait.center().x - width / 2.0,
-        portrait.bottom() - portrait.height() * 0.04,
+        portrait.bottom() - rail_overlap,
     );
     let mut letter_ui = ui.new_child(
         egui::UiBuilder::new()
@@ -487,12 +489,22 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, line: &str) {
     );
     let letter = egui::Frame::new()
         .fill(palette.surface)
-        .inner_margin(egui::Margin::symmetric(16, 12))
+        // Measure the padding from the artwork, which overlaps both ends of the panel.
+        .inner_margin(egui::Margin {
+            left: 16,
+            right: 16,
+            top: 8 + rail_overlap.round() as i8,
+            bottom: 8 + (LETTER_TRIM_HEIGHT - LETTER_TRIM_OVERHANG) as i8,
+        })
         .show(&mut letter_ui, |ui| {
             let label = egui::Label::new(egui::RichText::new(line).small().color(palette.ink))
                 .wrap()
                 .halign(egui::Align::Center);
-            ui.add_sized(egui::vec2(ui.available_width(), 32.0), label);
+            ui.allocate_ui_with_layout(
+                egui::vec2(ui.available_width(), 24.0),
+                egui::Layout::top_down(egui::Align::Center).with_main_align(egui::Align::Center),
+                |ui| ui.add(label),
+            );
         });
 
     let rect = letter.response.rect;
@@ -546,7 +558,7 @@ fn paint_letter_trim(ui: &egui::Ui, rect: Rect) {
         painter.image(
             frame.id(),
             Rect::from_min_max(
-                egui::pos2(edge[0], bottom - 20.0),
+                egui::pos2(edge[0], bottom - LETTER_TRIM_HEIGHT),
                 egui::pos2(edge[1], bottom),
             ),
             Rect::from_min_max(egui::pos2(u0, 0.88), egui::pos2(u1, 1.0)),
