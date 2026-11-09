@@ -481,7 +481,18 @@ pub fn show(ui: &mut egui::Ui) {
         state.select_line(expression, uuid::Uuid::new_v4().as_u128());
     }
 
-    paint(ui, rect, &format!("{expression:?}"), expression.bytes());
+    // Fit each expression inside the opening below the crest and above the ruby.
+    let opening = Rect::from_min_max(
+        rect.min + rect.size() * egui::vec2(0.15, 0.18),
+        rect.min + rect.size() * egui::vec2(0.85, 0.84),
+    );
+    paint(ui, opening, &format!("{expression:?}"), expression.bytes());
+    paint(
+        ui,
+        rect,
+        "portrait-frame",
+        include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png"),
+    );
 
     ui.add_space(4.0);
 
