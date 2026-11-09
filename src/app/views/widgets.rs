@@ -22,7 +22,9 @@ pub fn page_scroll_area(
     contents: impl FnOnce(&mut egui::Ui),
 ) -> egui::scroll_area::ScrollAreaOutput<()> {
     ui.scope(|ui| {
-        ui.spacing_mut().scroll.bar_outer_margin = 8.0;
+        let scroll = &mut ui.spacing_mut().scroll;
+        scroll.bar_inner_margin = 2.0;
+        scroll.bar_outer_margin = 8.0;
         egui::ScrollArea::both()
             .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
             .auto_shrink([false, true])
