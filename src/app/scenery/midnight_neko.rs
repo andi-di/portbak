@@ -14,6 +14,8 @@ const REACTION_RADIUS: f32 = 180.0;
 const CLICK_REACTION_RADIUS: f32 = 320.0;
 const PARTICLE_LIMIT: usize = 72;
 const LIFETIME: f32 = 1.0;
+const CLICK_ESCAPE_SECONDS: f32 = 3.5;
+const CLICK_ESCAPE_SPEED: f32 = 400.0;
 
 #[derive(Clone, Copy)]
 enum Sprite {
@@ -267,7 +269,7 @@ fn postpone_roost(bat: &mut Bat, time: f32) {
 fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: f32, screen: Rect) {
     let mut desired = (target - bat.position).normalized()
         * (target.distance(bat.position) * 2.0).min(if bat.burst_seconds > 0.0 {
-            220.0
+            320.0
         } else {
             65.0
         });
@@ -281,14 +283,14 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
         if away.length() < radius {
             desired = away.normalized()
                 * if bat.burst_seconds > 0.0 {
-                    260.0
+                    CLICK_ESCAPE_SPEED
                 } else {
                     120.0
                 };
             if away.length_sq() < 1.0 {
                 desired = Vec2::X
                     * if bat.burst_seconds > 0.0 {
-                        260.0
+                        CLICK_ESCAPE_SPEED
                     } else {
                         120.0
                     };
@@ -343,9 +345,22 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
             } else {
                 Vec2::angled(noise(bat.seed, bat.cycle) * std::f32::consts::TAU)
             };
-            bat.escape_target = bat.position + direction * screen.size().length();
-            bat.burst_seconds = 2.5;
-            bat.velocity = direction * 260.0;
+            let bounds = screen.shrink2(egui::vec2(
+                (bat.size * 0.5).min(screen.width() * 0.5),
+                (bat.size * 0.5).min(screen.height() * 0.5),
+            ));
+            bat.escape_target = bounds.clamp(bat.position + direction * screen.size().length());
+            bat.burst_seconds = CLICK_ESCAPE_SECONDS;
+            bat.velocity = direction * CLICK_ESCAPE_SPEED;
+        }
+        if bat.burst_seconds > 0.0 && bat.position.distance(bat.escape_target) < 35.0 {
+            let x = if bat.position.x < screen.center().x {
+                0.9
+            } else {
+                0.1
+            };
+            let y = 0.15 + noise(bat.seed, bat.cycle + 72) * 0.7;
+            bat.escape_target = screen.min + screen.size() * egui::vec2(x, y);
         }
         let radius = if pressed {
             CLICK_REACTION_RADIUS
