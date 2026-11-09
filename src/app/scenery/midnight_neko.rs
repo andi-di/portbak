@@ -22,6 +22,8 @@ enum Sprite {
     Castle,
     Moon,
     Cloud,
+    CloudVariant,
+    Mountains,
     Mist,
     BatDown,
     Perched,
@@ -46,6 +48,14 @@ impl Sprite {
             Self::Cloud => (
                 "cloud",
                 include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud.png"),
+            ),
+            Self::CloudVariant => (
+                "cloud-variant",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud-variant.png"),
+            ),
+            Self::Mountains => (
+                "mountains",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/mountains.png"),
             ),
             Self::Mist => (
                 "mist",

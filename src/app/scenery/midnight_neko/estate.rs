@@ -1,7 +1,7 @@
 //! Asymmetric estate layers leave the central workspace open.
 
 use super::{draw, draw_moving, noise, Sprite, SpritePose};
-use eframe::egui::{self, Color32, Rect, Stroke, Vec2};
+use eframe::egui::{self, Color32, Rect, Vec2};
 
 pub(super) fn castle_rect(screen: Rect) -> Rect {
     let size = (screen.width() * 0.47)
@@ -19,34 +19,16 @@ pub(super) fn paint(painter: &egui::Painter) {
     let screen = ctx.content_rect();
     let dark = ctx.global_style().visuals.dark_mode;
     let time = ctx.input(|input| input.time) as f32;
-    let silver = if dark {
-        Color32::from_rgb(166, 157, 177)
-    } else {
-        Color32::from_rgb(80, 69, 89)
-    };
-    for layer in 0..2 {
-        let mut points = vec![screen.left_bottom()];
-        for index in 0..18 {
-            points.push(egui::pos2(
-                screen.left() + screen.width() * index as f32 / 17.0,
-                screen.bottom()
-                    - screen.height()
-                        * (0.12 + noise(index, layer + 201) * 0.15 + layer as f32 * 0.06),
-            ));
-        }
-        for pair in points[1..].windows(2) {
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    pair[0],
-                    pair[1],
-                    egui::pos2(pair[1].x, screen.bottom()),
-                    egui::pos2(pair[0].x, screen.bottom()),
-                ],
-                silver.gamma_multiply(0.055),
-                Stroke::NONE,
-            ));
-        }
-    }
+    let mountains = Rect::from_min_size(
+        egui::pos2(screen.left(), screen.bottom() - screen.height() * 0.42),
+        egui::vec2(screen.width(), screen.height() * 0.42),
+    );
+    draw(
+        painter,
+        mountains,
+        Sprite::Mountains,
+        Color32::WHITE.gamma_multiply(if dark { 0.25 } else { 0.16 }),
+    );
     let radius = (screen.height() * 0.12).clamp(55.0, 100.0);
     let moon = egui::pos2(screen.right() - radius * 1.7, screen.top() + 145.0 + radius);
     draw(
@@ -56,7 +38,7 @@ pub(super) fn paint(painter: &egui::Painter) {
         Color32::WHITE.gamma_multiply(if dark { 0.48 } else { 0.28 }),
     );
     for index in 0..5 {
-        let progress = (time * (0.002 + noise(index, 220) * 0.001) + noise(index, 221)).fract();
+        let progress = (time * (0.0025 + noise(index, 220) * 0.0075) + noise(index, 221)).fract();
         let center = egui::pos2(
             screen.left() - 220.0 + progress * (screen.width() + 440.0),
             screen.top() + 120.0 + noise(index, 222) * screen.height() * 0.35,
@@ -70,7 +52,11 @@ pub(super) fn paint(painter: &egui::Painter) {
         draw_moving(
             painter,
             Rect::from_center_size(center, egui::vec2(width, width * 0.34)),
-            Sprite::Cloud,
+            if index.is_multiple_of(2) {
+                Sprite::Cloud
+            } else {
+                Sprite::CloudVariant
+            },
             color,
             SpritePose {
                 mirrored: index.is_multiple_of(2),
