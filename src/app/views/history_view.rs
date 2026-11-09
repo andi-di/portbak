@@ -44,21 +44,26 @@ impl App {
                         super::editor::job_tabs(ui, &mut self.backups_tab);
                     },
                 );
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    if let Some(history) = &mut self.backup_history {
-                        if history.job.id == id {
-                            response = history_contents(ui, history);
+                egui::ScrollArea::both()
+                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        if let Some(history) = &mut self.backup_history {
+                            if history.job.id == id {
+                                response = history_contents(ui, history);
+                            } else {
+                                ui.label("Finishing protection changes for the previous job ...");
+                            }
+                        } else if destination_missing {
+                            ui.label(
+                                "Choose a destination folder in Job settings to view backups.",
+                            );
                         } else {
-                            ui.label("Finishing protection changes for the previous job ...");
-                        }
-                    } else if destination_missing {
-                        ui.label("Choose a destination folder in Job settings to view backups.");
-                    } else {
-                        ui.label(
+                            ui.label(
                             "Backups will be available when active and queued operations finish.",
                         );
-                    }
-                });
+                        }
+                    });
             });
         if let Some((name, protected)) = response.protection {
             self.save_protection(name, protected, &ctx);

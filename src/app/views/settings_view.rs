@@ -26,9 +26,12 @@ impl App {
             .frame(frame)
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    settings_page(ui, &mut self.config, &mut self.settings_tab);
-                });
+                egui::ScrollArea::both()
+                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        settings_page(ui, &mut self.config, &mut self.settings_tab);
+                    });
             });
     }
 }
@@ -41,7 +44,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
         pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
     });
     ui.add_space(14.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         pixel::choice(
             ui,
             tab,

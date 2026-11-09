@@ -990,4 +990,80 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn narrow_windows_keep_every_view_inside_the_window() {
+        use crate::app::views::settings_view::SettingsTab;
+        const SCREEN: egui::Vec2 = egui::vec2(800.0, 600.0);
+        for sidebar_width in [290.0, 460.0] {
+            for skin in skins::ALL {
+                for view in ["job settings", "backups", "settings", "theme"] {
+                    let ctx = egui::Context::default();
+                    style::install(&ctx, skin);
+                    let mut app = App::new(
+                        Config {
+                            sidebar_width,
+                            jobs: vec![Job {
+                                name: "A job with a fairly long name".into(),
+                                source: "C:/Users/someone/Documents/Projects".into(),
+                                target: "C:/Backups/target".into(),
+                                schedule: crate::model::Schedule::Weekdays,
+                                enabled: true,
+                                next_run: Some(Utc::now()),
+                                ..Job::default()
+                            }],
+                            ..Config::default()
+                        },
+                        std::path::PathBuf::new(),
+                        tempfile::tempfile().unwrap(),
+                    );
+                    if view == "settings" || view == "theme" {
+                        app.toggle_settings();
+                        if view == "theme" {
+                            app.settings_tab = SettingsTab::Theme;
+                        }
+                    } else {
+                        app.selected = Some(app.config.jobs[0].id);
+                        app.backups_tab = view == "backups";
+                    }
+                    let mut overflow = Vec::new();
+                    // Later frames settle sizes measured in earlier ones.
+                    for _ in 0..4 {
+                        let input = egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, SCREEN)),
+                            ..Default::default()
+                        };
+                        let output = ctx.run_ui(input, |ui| {
+                            app.show_header(ui);
+                            app.show_footer(ui);
+                            app.show_job_list(ui);
+                            if app.settings_open {
+                                app.show_settings(ui);
+                            } else {
+                                app.show_job_editor(ui);
+                            }
+                        });
+                        // Scenery meshes and full-width bands may bleed off the edge; controls
+                        // and panels may not.
+                        overflow = output
+                            .shapes
+                            .iter()
+                            .filter(|clipped| !matches!(clipped.shape, egui::Shape::Mesh(_)))
+                            .map(|clipped| clipped.shape.visual_bounding_rect())
+                            .filter(|rect| {
+                                rect.is_finite()
+                                    && rect.width() < SCREEN.x
+                                    && rect.right() > SCREEN.x + 0.5
+                            })
+                            .collect();
+                    }
+                    assert!(
+                        overflow.is_empty(),
+                        "{} {view} with a {sidebar_width} px job list: {overflow:?}",
+                        skin.id
+                    );
+                }
+            }
+        }
+    }
 }

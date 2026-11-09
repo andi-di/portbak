@@ -63,30 +63,33 @@ impl App {
             .frame(frame)
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                    let (Some(job), Some(permissions)) = (job, permissions) else {
-                        add = welcome(ui, can_add);
-                        return;
-                    };
-                    job_tabs(ui, &mut self.backups_tab);
-                    let was_enabled = job.enabled;
-                    let previous = job.clone();
-                    let summary = summaries
-                        .get(&job.id)
-                        .filter(|summary| summary.target == job.target);
-                    action =
-                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
-                    if !permissions.busy {
-                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
-                            self.error =
-                                format!("Could not update automatic destination: {error:#}");
+                egui::ScrollArea::both()
+                    // Overlong content scrolls sideways instead of pushing the scroll bar out of view.
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                        let (Some(job), Some(permissions)) = (job, permissions) else {
+                            add = welcome(ui, can_add);
+                            return;
+                        };
+                        job_tabs(ui, &mut self.backups_tab);
+                        let was_enabled = job.enabled;
+                        let previous = job.clone();
+                        let summary = summaries
+                            .get(&job.id)
+                            .filter(|summary| summary.target == job.target);
+                        action = job_editor(ui, job, &permissions, summary)
+                            .map(|action| (job.id, action));
+                        if !permissions.busy {
+                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                                self.error =
+                                    format!("Could not update automatic destination: {error:#}");
+                            }
                         }
-                    }
-                    if was_enabled != job.enabled {
-                        activation = Some((job.id, was_enabled));
-                    }
-                });
+                        if was_enabled != job.enabled {
+                            activation = Some((job.id, was_enabled));
+                        }
+                    });
             });
         if add {
             self.add_job();
@@ -572,15 +575,14 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
             });
         });
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_top(|ui| {
         sprites::show(ui, Sprite::Shield, 1.0, palette.good);
-        ui.label(
-            egui::RichText::new(
-                "The latest successful backup and protected versions are always kept.",
-            )
-            .small()
-            .color(palette.dim),
-        );
+        let note = egui::RichText::new(
+            "The latest successful backup and protected versions are always kept.",
+        )
+        .small()
+        .color(palette.dim);
+        ui.add(egui::Label::new(note).wrap());
     });
     match summary.map(|summary| &summary.records) {
         Some(Ok(records)) => retention_warnings(ui, job, records),
@@ -652,7 +654,7 @@ fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
 }
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         pixel::choice(
             ui,
             backups,

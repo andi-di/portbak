@@ -16,6 +16,7 @@ pub fn local_time(time: DateTime<Utc>, format: &str) -> String {
 }
 
 /// A left-to-right row tall enough that labels, buttons and inputs share one vertical center.
+/// It wraps in narrow windows, since an overlong row would push the scroll bar out of view.
 pub fn centered_row<R>(
     ui: &mut egui::Ui,
     contents: impl FnOnce(&mut egui::Ui) -> R,
@@ -25,7 +26,7 @@ pub fn centered_row<R>(
         .max(pixel::button_height(ui));
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), height),
-        egui::Layout::left_to_right(egui::Align::Center),
+        egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
         contents,
     )
 }
