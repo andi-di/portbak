@@ -21,16 +21,16 @@ static SCROLL_EDGE: Recipe = Recipe {
     fragment: SCROLL_EDGE_SHADER,
 };
 
-/// Where light falls from when the pointer is away: the upper left, as on iOS.
-const LIGHT: Vec2 = Vec2::new(-0.55, -0.83);
-/// How strongly the pointer pulls the specular edge towards itself.
-const POINTER_PULL: f32 = 0.65;
-/// How far past a piece of glass the pointer must be, in points, to pull its light fully.
-const POINTER_REACH: f32 = 60.0;
+/// Where light falls from: the upper left at 45 degrees, as on iOS, so the brightest highlights
+/// sit on the top-left and bottom-right corners.
+const LIGHT: Vec2 = Vec2::new(
+    -std::f32::consts::FRAC_1_SQRT_2,
+    -std::f32::consts::FRAC_1_SQRT_2,
+);
 /// How long glass takes to brighten under the pointer or settle again.
 pub const HOVER_SECONDS: f32 = 0.15;
 /// Width of the bright line along the rim, in points.
-const RIM: f32 = 1.3;
+const RIM: f32 = 1.5;
 /// How far pressed glass swells, as a fraction of its height, up to `SWELL_LIMIT` points.
 const SWELL: f32 = 0.12;
 const SWELL_LIMIT: f32 = 5.0;
@@ -82,7 +82,7 @@ impl Lens {
             bezel: 26.0,
             depth: 26.0,
             vibrancy: 1.6,
-            shine: if dark { 0.42 } else { 0.62 },
+            shine: if dark { 0.6 } else { 0.7 },
             dispersion: 0.45,
             zoom: 1.0,
             touch: None,
@@ -101,7 +101,7 @@ impl Lens {
             bezel: 16.0,
             depth: 14.0,
             vibrancy: 1.4,
-            shine: if dark { 0.55 } else { 0.8 },
+            shine: if dark { 0.75 } else { 0.85 },
             dispersion: 0.6,
             zoom: 1.0,
             touch: None,
@@ -134,7 +134,6 @@ pub fn glass(ctx: &egui::Context, rect: Rect, radius: f32, lens: &Lens) -> Vec<S
         shapes.extend(plain_glass(rect, radius, lens));
         return shapes;
     }
-    let light = light_towards(ctx, rect);
     let lens = *lens;
     shapes.push(effect.shape(rect, ctx.content_rect(), move |target| {
         let [left, bottom] = target.pixel(rect.left_bottom());
@@ -159,7 +158,7 @@ pub fn glass(ctx: &egui::Context, rect: Rect, radius: f32, lens: &Lens) -> Vec<S
             &[lens.vibrancy, lens.shine, lens.dispersion, lens.zoom],
         );
         // The frame's y axis points up.
-        target.set("u_light", &[light.x, -light.y]);
+        target.set("u_light", &[LIGHT.x, -LIGHT.y]);
         target.set("u_rim", &[target.pixels(RIM)]);
         let (point, strength) = lens.touch.unwrap_or((rect.center(), 0.0));
         let [x, y] = target.pixel(point);
@@ -446,23 +445,6 @@ pub fn scroll_edges(ui: &egui::Ui, viewport: Rect, cut_top: bool, cut_bottom: bo
     }
 }
 
-/// A unit vector from `rect` towards the light, leaning towards the pointer.
-/// The pull grows with the pointer's distance, so the light glides as the pointer crosses the
-/// glass instead of swinging round whenever it passes near the center.
-fn light_towards(ctx: &egui::Context, rect: Rect) -> Vec2 {
-    let reach = rect.size().length() / 2.0 + POINTER_REACH;
-    let offset = ctx
-        .pointer_latest_pos()
-        .map_or(Vec2::ZERO, |pointer| pointer - rect.center());
-    light_leaning(offset, reach)
-}
-
-/// The light leaning towards a pointer `offset` from the glass's center, fully at `reach`.
-fn light_leaning(offset: Vec2, reach: f32) -> Vec2 {
-    let pull = offset / offset.length().max(reach);
-    (LIGHT + pull * POINTER_PULL).normalized()
-}
-
 /// Tinted glass with a bright rim, for GPUs that turn the shader down.
 fn plain_glass(rect: Rect, radius: f32, lens: &Lens) -> [Shape; 2] {
     let strength = lens.tint_strength.max(0.65);
@@ -565,10 +547,14 @@ void main() {
     color = mix(color, u_tint.rgb, u_tint.a);
 
     float facing = dot(normal, u_light);
-    float lit = pow(abs(facing), 1.5) * (facing > 0.0 ? 1.0 : 0.6);
-    float line = 1.0 - smoothstep(0.0, u_rim, inside);
-    float glow = pow(rim, 3.0);
-    float specular = u_optics.y * (line * (0.3 + 0.7 * lit) + glow * lit * 0.4);
+    // Two highlights: full where the edge faces the light, dimmer on the opposite corner where
+    // light leaves the glass. The steep power gathers them on the corners.
+    float lit = pow(max(facing, 0.0), 3.0) + 0.65 * pow(max(-facing, 0.0), 3.0);
+    // A crisp line just inside the edge, clear of its antialiased fringe, lit faintly all round.
+    float line = 1.0 - smoothstep(u_rim * 0.6, u_rim * 1.6, inside);
+    // A soft glow a few points deep that only the lit corners carry.
+    float glow = exp(-inside / (u_rim * 4.0));
+    float specular = u_optics.y * (line * (0.35 + 0.65 * lit) + glow * lit * 0.4);
     // The side away from the light sits a touch deeper in shade, giving the glass thickness.
     float shade = u_optics.y * 0.12 * rim * rim * max(-facing, 0.0);
     color = color * (1.0 - shade) + vec3(specular);
@@ -637,24 +623,5 @@ mod tests {
             panic!("plain glass is a filled body and a rim");
         };
         assert!(body.fill.a() >= 160);
-    }
-
-    #[test]
-    fn light_glides_instead_of_jumping_as_the_pointer_crosses_the_center() {
-        let reach = 100.0;
-        let left = light_leaning(Vec2::new(-2.0, 0.0), reach);
-        let right = light_leaning(Vec2::new(2.0, 0.0), reach);
-        assert!((left - right).length() < 0.05);
-        let far = light_leaning(Vec2::new(reach * 3.0, 0.0), reach);
-        assert!(far.x > left.x && (far.length() - 1.0).abs() < 1e-4);
-    }
-
-    #[test]
-    fn light_leans_towards_the_pointer_and_stays_a_unit_vector() {
-        let ctx = egui::Context::default();
-        let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(100.0, 40.0));
-        let light = light_towards(&ctx, rect);
-        assert!((light.length() - 1.0).abs() < 1e-4);
-        assert!(light.x < 0.0 && light.y < 0.0);
     }
 }
