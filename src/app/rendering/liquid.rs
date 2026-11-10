@@ -44,9 +44,9 @@ const EDGE_REACH: f32 = 30.0;
 const EDGE_FADE: f32 = 10.0;
 /// The strongest blur right at a scroll edge, in points.
 const EDGE_BLUR: f32 = 9.0;
-/// The iOS switch green, which stays bright while green text is darkened for legibility.
-const SWITCH_GREEN: Color32 = Color32::from_rgb(0x34, 0xc7, 0x59);
-const SWITCH_GREEN_DARK: Color32 = Color32::from_rgb(0x30, 0xd1, 0x58);
+/// The iOS system green for fills, which stays bright while green text is darkened for legibility.
+const FILL_GREEN: Color32 = Color32::from_rgb(0x34, 0xc7, 0x59);
+const FILL_GREEN_DARK: Color32 = Color32::from_rgb(0x30, 0xd1, 0x58);
 
 /// How a piece of liquid glass bends, tints and lights what lies behind it.
 #[derive(Clone, Copy)]
@@ -198,7 +198,7 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
         base.tinted(palette.raised, base.tint_strength + 0.12 * look.glow)
     } else {
         // Prominent glass brightens gradually instead of switching to a lighter fill.
-        let tint = look.fill.lerp_to_gamma(Color32::WHITE, 0.16 * look.glow);
+        let tint = vivid(ctx, look.fill).lerp_to_gamma(Color32::WHITE, 0.16 * look.glow);
         Lens {
             vibrancy: 1.2,
             ..base.tinted(tint, 0.8 + 0.06 * look.glow)
@@ -222,6 +222,17 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
     }
 }
 
+/// `fill` as iOS fills controls: the palette's darkened text green becomes the bright system green.
+fn vivid(ctx: &egui::Context, fill: Color32) -> Color32 {
+    if fill != Palette::of_ctx(ctx).good {
+        fill
+    } else if ctx.global_style().visuals.dark_mode {
+        FILL_GREEN_DARK
+    } else {
+        FILL_GREEN
+    }
+}
+
 /// An iOS switch in `rect`: a capsule track filling with green as `on` rises from 0 to 1 and a
 /// white knob that turns into a glass loupe over the track while `press` rises.
 pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled: bool) {
@@ -229,11 +240,7 @@ pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled:
     let dark = ctx.global_style().visuals.dark_mode;
     let off = Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, if dark { 130 } else { 84 });
     let fade = if enabled { 1.0 } else { 0.5 };
-    let green = if dark {
-        SWITCH_GREEN_DARK
-    } else {
-        SWITCH_GREEN
-    };
+    let green = vivid(ctx, Palette::of_ctx(ctx).good);
     let track = off.lerp_to_gamma(green, on).gamma_multiply(fade);
     let radius = rect.height() / 2.0;
     painter.rect_filled(rect, corner(radius), track);
