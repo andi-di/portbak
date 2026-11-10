@@ -204,8 +204,9 @@ pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled:
     let radius = rect.height() / 2.0;
     painter.rect_filled(rect, corner(radius), track);
 
-    let rest = Vec2::new(rect.height() * 1.45 - 4.0, rect.height() - 4.0);
-    let size = rest * (1.0 + 0.3 * press);
+    // A round knob at rest, as on iOS; pressed, it stretches into a wider loupe.
+    let rest = Vec2::splat(rect.height() - 4.0);
+    let size = rest * Vec2::new(1.0 + 0.5 * press, 1.0 + 0.2 * press);
     let travel = rect.width() - rest.x - 4.0;
     let center = Pos2::new(
         rect.left() + 2.0 + rest.x / 2.0 + travel * on,
