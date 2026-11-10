@@ -1,10 +1,12 @@
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
-use crate::app::rendering::pixel::{self, Hint, PixelCheckbox};
+use crate::app::rendering::pixel::{self, Hint};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
-use crate::app::views::widgets::{caption, centered_row, gib_field, page_frame, page_scroll_area};
+use crate::app::views::widgets::{
+    caption, gib_field, page_frame, page_scroll_area, switch_row, switch_row_with,
+};
 use crate::app::App;
 use crate::model::{Config, JobDefaults};
 use eframe::egui;
@@ -72,56 +74,43 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
     ui.label("Defaults apply to new jobs. Each job can override these settings.");
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.auto_destination,
-                "Auto destination folder",
-            ));
-        });
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
-        });
+        switch_row(
+            ui,
+            &mut defaults.auto_destination,
+            "Auto destination folder",
+        );
+        switch_row(ui, &mut defaults.zip, "Compress as ZIP");
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.check_on_enable,
-                "Check immediately when enabled",
-            ));
-        });
+        switch_row(
+            ui,
+            &mut defaults.check_on_enable,
+            "Check immediately when enabled",
+        );
         let mut job = defaults.new_job();
         super::editor::schedule_controls(ui, &mut job);
         defaults.update_schedule(&job);
     });
     pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.rolling,
-                "Enable rolling retention",
-            ));
-        });
+        switch_row(ui, &mut defaults.rolling, "Enable rolling retention");
         ui.add_enabled_ui(defaults.rolling, |ui| {
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(&mut defaults.count_enabled, "Max count"));
+            let counting = defaults.count_enabled;
+            switch_row_with(ui, &mut defaults.count_enabled, "Max count", |ui| {
                 ui.add_enabled(
-                    defaults.count_enabled,
+                    counting,
                     egui::DragValue::new(&mut defaults.max_count).range(1..=100_000),
                 );
             });
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut defaults.size_enabled,
-                    "Max total size",
-                ));
-                gib_field(ui, defaults.size_enabled, &mut defaults.max_bytes);
+            let sizing = defaults.size_enabled;
+            switch_row_with(ui, &mut defaults.size_enabled, "Max total size", |ui| {
+                gib_field(ui, sizing, &mut defaults.max_bytes);
             });
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut defaults.count_protected,
-                    "Count protected backups toward retention limits",
-                ))
-                .hint("Protected backups are never deleted by retention");
-            });
+            switch_row(
+                ui,
+                &mut defaults.count_protected,
+                "Count protected backups toward retention limits",
+            )
+            .hint("Protected backups are never deleted by retention");
         });
     });
 }

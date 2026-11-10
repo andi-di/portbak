@@ -18,6 +18,8 @@ const LIQUID_PADDING: f32 = 3.0;
 /// Size of the iOS 26 switch that stands in for check boxes in liquid glass: wider and lower
 /// than earlier iOS switches.
 const SWITCH: Vec2 = Vec2::new(64.0, 28.0);
+/// Room between a liquid glass switch and the label before it.
+const LIQUID_SWITCH_GAP: f32 = 14.0;
 const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
 pub(crate) fn pointing_hand(response: Response) -> Response {
@@ -350,6 +352,8 @@ fn pixel_face(
 pub struct PixelCheckbox<'a> {
     checked: &'a mut bool,
     label: String,
+    /// Whether the label is painted; an unlabeled box still names itself to assistive tools.
+    labeled: bool,
 }
 
 impl<'a> PixelCheckbox<'a> {
@@ -357,6 +361,15 @@ impl<'a> PixelCheckbox<'a> {
         Self {
             checked,
             label: label.into(),
+            labeled: true,
+        }
+    }
+
+    /// Paints only the box, for rows that show the label themselves.
+    pub fn unlabeled(self) -> Self {
+        Self {
+            labeled: false,
+            ..self
         }
     }
 }
@@ -371,12 +384,20 @@ impl Widget for PixelCheckbox<'_> {
         } else {
             Vec2::splat(ui.spacing().icon_width + 4.0)
         };
-        let spacing = ui.spacing().icon_spacing;
+        let spacing = if finish == Finish::Liquid {
+            LIQUID_SWITCH_GAP
+        } else {
+            ui.spacing().icon_spacing
+        };
         let wrap = (ui.available_width() - indicator.x - spacing).max(40.0);
         let font = TextStyle::Body.resolve(ui.style());
-        let galley = ui
-            .painter()
-            .layout(self.label.clone(), font, Color32::PLACEHOLDER, wrap);
+        let text = if self.labeled {
+            self.label.clone()
+        } else {
+            String::new()
+        };
+        let galley = ui.painter().layout(text, font, Color32::PLACEHOLDER, wrap);
+        let spacing = if self.labeled { spacing } else { 0.0 };
         let size = egui::vec2(
             indicator.x + spacing + galley.size().x,
             indicator.y.max(galley.size().y),
@@ -400,9 +421,16 @@ impl Widget for PixelCheckbox<'_> {
             .first()
             .map_or(indicator.y, |row| row.height())
             .max(indicator.y);
+        // iOS always puts a switch after its label; check boxes lead theirs.
+        let trailing = finish == Finish::Liquid;
+        let indicator_left = if trailing {
+            rect.left() + galley.size().x + spacing
+        } else {
+            rect.left()
+        };
         let square = Rect::from_center_size(
             egui::pos2(
-                rect.left() + indicator.x / 2.0,
+                indicator_left + indicator.x / 2.0,
                 rect.top() + first_line / 2.0,
             ),
             indicator,
@@ -479,11 +507,12 @@ impl Widget for PixelCheckbox<'_> {
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =
             rect.top() + (first_line - galley.rows.first().map_or(0.0, |r| r.height())) / 2.0;
-        painter.galley(
-            egui::pos2(square.right() + spacing, text_top).round(),
-            galley,
-            ink,
-        );
+        let text_left = if trailing {
+            rect.left()
+        } else {
+            square.right() + spacing
+        };
+        painter.galley(egui::pos2(text_left, text_top).round(), galley, ink);
         pointing_hand(response)
     }
 }

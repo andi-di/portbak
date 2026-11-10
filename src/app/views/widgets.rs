@@ -1,5 +1,5 @@
 use crate::app::rendering::liquid;
-use crate::app::rendering::pixel::{self, Hint, PixelButton};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use crate::engine;
@@ -63,6 +63,35 @@ pub fn centered_row<R>(
         egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
         contents,
     )
+}
+
+/// A row toggling `checked`; see `switch_row_with`.
+pub fn switch_row(ui: &mut egui::Ui, checked: &mut bool, label: &str) -> egui::Response {
+    switch_row_with(ui, checked, label, |_| {})
+}
+
+/// A row toggling `checked`, followed by `extras` such as the value it enables. Liquid glass
+/// lays it out like an iOS list row: label and extras leading, the switch at the trailing edge.
+pub fn switch_row_with(
+    ui: &mut egui::Ui,
+    checked: &mut bool,
+    label: &str,
+    extras: impl FnOnce(&mut egui::Ui),
+) -> egui::Response {
+    centered_row(ui, |ui| {
+        if style::Skin::of(ui.ctx()).finish != style::Finish::Liquid {
+            let response = ui.add(PixelCheckbox::new(checked, label));
+            extras(ui);
+            return response;
+        }
+        ui.label(label);
+        extras(ui);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add(PixelCheckbox::new(checked, label).unlabeled())
+        })
+        .inner
+    })
+    .inner
 }
 
 /// A dim, upper-case field caption.

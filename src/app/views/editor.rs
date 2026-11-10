@@ -1,9 +1,9 @@
-use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox, Tone};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
     alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
-    retention_warnings, DATE_TIME,
+    retention_warnings, switch_row, switch_row_with, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -368,18 +368,12 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
     ui.add_space(ui.spacing().item_spacing.y);
     path_picker(ui, "Source folder", &mut job.source, read_only);
     ui.add_space(ui.spacing().item_spacing.y);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.auto_destination,
-            "Auto destination folder",
-        ));
-    });
+    switch_row(ui, &mut job.auto_destination, "Auto destination folder");
     if path_picker(ui, "Destination folder", &mut job.target, read_only) {
         job.auto_destination = false;
     }
     ui.add_space(ui.spacing().item_spacing.y);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
+    switch_row_with(ui, &mut job.zip, "Compress as ZIP", |ui| {
         let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
         sprites::show(ui, Sprite::Package, 2.0, tint);
     });
@@ -399,12 +393,11 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.check_on_enable,
-            "Check immediately when enabled",
-        ));
-    });
+    switch_row(
+        ui,
+        &mut job.check_on_enable,
+        "Check immediately when enabled",
+    );
     scheduling_fields(ui, job, true);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
@@ -540,12 +533,11 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
 
 fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
     let palette = Palette::of(ui);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.rolling,
-            "Enable rolling retention – delete oldest backups automatically",
-        ));
-    });
+    switch_row(
+        ui,
+        &mut job.rolling,
+        "Enable rolling retention – delete oldest backups automatically",
+    );
     ui.add_enabled_ui(job.rolling, |ui| {
         ui.indent("limits", |ui| {
             optional_limit(
@@ -566,13 +558,12 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     gib_field(ui, true, bytes);
                 },
             );
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut job.count_protected,
-                    "Count protected backups toward retention limits",
-                ))
-                .hint("Protected backups are never deleted by retention");
-            });
+            switch_row(
+                ui,
+                &mut job.count_protected,
+                "Count protected backups toward retention limits",
+            )
+            .hint("Protected backups are never deleted by retention");
         });
     });
     ui.horizontal_top(|ui| {
@@ -597,7 +588,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
     }
 }
 
-/// A checkbox that switches a limit on (starting at `default`) or off, plus its value editor.
+/// A switch that turns a limit on (starting at `default`) or off, plus its value editor.
 fn optional_limit<T>(
     ui: &mut egui::Ui,
     label: &str,
@@ -605,15 +596,16 @@ fn optional_limit<T>(
     default: T,
     edit: impl FnOnce(&mut egui::Ui, &mut T),
 ) {
-    centered_row(ui, |ui| {
-        let mut active = limit.is_some();
-        if ui.add(PixelCheckbox::new(&mut active, label)).changed() {
-            *limit = active.then_some(default);
-        }
-        if let Some(value) = limit {
+    let mut active = limit.is_some();
+    let toggled = switch_row_with(ui, &mut active, label, |ui| {
+        if let Some(value) = limit.as_mut() {
             edit(ui, value);
         }
-    });
+    })
+    .changed();
+    if toggled {
+        *limit = active.then_some(default);
+    }
 }
 
 pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
