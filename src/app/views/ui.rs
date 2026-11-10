@@ -286,8 +286,14 @@ impl App {
                         16.0,
                         style::decorative_color(ui.ctx(), palette.accent),
                     );
-                    let color = style::decorative_color(ui.ctx(), palette.gold);
-                    pixel::badge(ui, &self.config.jobs.len().to_string(), color);
+                    let count = self.config.jobs.len().to_string();
+                    // iOS lists counts as secondary text rather than in a badge.
+                    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+                        ui.label(egui::RichText::new(count).color(palette.dim));
+                    } else {
+                        let color = style::decorative_color(ui.ctx(), palette.gold);
+                        pixel::badge(ui, &count, color);
+                    }
                 });
                 ui.add_space(10.0);
                 let new_job = PixelButton::new("New job")
@@ -403,17 +409,12 @@ impl App {
                     egui::pos2(row.left() + icon_size.x / 2.0, row.center().y),
                     icon_size,
                 );
-                let tint = if job.enabled {
-                    palette.good
-                } else {
-                    palette.metal
-                };
                 sprites::paint_awake(
                     ui.painter(),
                     icon_rect.min,
                     Sprite::Floppy,
                     3.0,
-                    style::decorative_color(ui.ctx(), tint),
+                    style::job_symbol_color(ui.ctx(), job.enabled),
                     wake,
                 );
                 let gap = ui.spacing().item_spacing.x;

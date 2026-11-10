@@ -307,11 +307,6 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
             .max_rect(centered)
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
         |ui| {
-            let tint = if job.enabled {
-                palette.good
-            } else {
-                palette.metal
-            };
             if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
                 let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
                 crate::app::scenery::catgirl::paint_emblem(ui, rect);
@@ -320,7 +315,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
                     ui,
                     Sprite::Floppy,
                     5.0,
-                    style::decorative_color(ui.ctx(), tint),
+                    style::job_symbol_color(ui.ctx(), job.enabled),
                 );
             }
             ui.add_space(6.0);

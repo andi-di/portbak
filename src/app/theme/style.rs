@@ -195,6 +195,18 @@ pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
     }
 }
 
+/// A job's symbol color: liquid glass tints enabled jobs with the accent, like iOS sidebar
+/// symbols, and greys out disabled ones.
+pub fn job_symbol_color(ctx: &egui::Context, enabled: bool) -> Color32 {
+    let palette = Palette::of_ctx(ctx);
+    match (Skin::of(ctx).finish, enabled) {
+        (Finish::Liquid, true) => palette.accent,
+        (Finish::Liquid, false) => palette.dim,
+        (_, true) => decorative_color(ctx, palette.good),
+        (_, false) => decorative_color(ctx, palette.metal),
+    }
+}
+
 pub fn metrics(ctx: &egui::Context) -> &'static Metrics {
     &Skin::of(ctx).metrics
 }
