@@ -34,6 +34,11 @@ impl App {
 fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) {
     let palette = Palette::of(ui);
     ui.horizontal(|ui| {
+        // Liquid glass opens with an iOS large title instead of an icon beside the name.
+        if Skin::of(ui.ctx()).finish == Finish::Liquid {
+            pixel::display_label(ui, "SETTINGS", 26.0, palette.ink);
+            return;
+        }
         sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
         ui.add_space(6.0);
         pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
