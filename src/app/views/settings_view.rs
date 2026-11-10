@@ -1,4 +1,5 @@
 use crate::app::rendering::glass::{self, Tint};
+use crate::app::rendering::liquid;
 use crate::app::rendering::pixel::{self, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
@@ -153,15 +154,23 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     if response.clicked() && !selected {
         *selected_id = candidate.id.to_owned();
     }
-    if Skin::of(ui.ctx()).finish == Finish::Glass {
-        let tint = match (selected, response.hovered()) {
-            (true, _) => Tint::Accent,
-            (false, true) => Tint::Hover,
-            (false, false) => Tint::Rest,
-        };
-        ui.painter()
-            .set(background, glass::tile(ui.ctx(), rect, tint));
-        return;
+    let tint = match (selected, response.hovered()) {
+        (true, _) => Tint::Accent,
+        (false, true) => Tint::Hover,
+        (false, false) => Tint::Rest,
+    };
+    match Skin::of(ui.ctx()).finish {
+        Finish::Glass => {
+            ui.painter()
+                .set(background, glass::tile(ui.ctx(), rect, tint));
+            return;
+        }
+        Finish::Liquid => {
+            ui.painter()
+                .set(background, liquid::tile(ui.ctx(), rect, tint));
+            return;
+        }
+        _ => {}
     }
     let fill = match (selected, response.hovered()) {
         (true, _) => palette.accent,

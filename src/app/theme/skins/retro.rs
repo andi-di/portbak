@@ -28,6 +28,7 @@ pub static RETRO: Skin = Skin {
         display_drop: 0.125,
         display_glow: 0.0,
         capitals: true,
+        title_case: false,
     },
     metrics: Metrics {
         border: 2.0,

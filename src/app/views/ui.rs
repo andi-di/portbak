@@ -1,4 +1,5 @@
 use crate::app::rendering::glass::{self, Tint};
+use crate::app::rendering::liquid;
 use crate::app::rendering::ornaments;
 use crate::app::rendering::pixel::{self, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
@@ -102,7 +103,11 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.9);
+                // Liquid glass keeps the top bar clear: only its buttons are glass.
+                let liquid = Skin::of(ui.ctx()).finish == Finish::Liquid;
+                if !liquid {
+                    pixel::panel_decoration(ui, 1.9);
+                }
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -146,7 +151,7 @@ impl App {
                 ui.add_space(12.0);
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
-                if Skin::of(ui.ctx()).finish == Finish::Glass {
+                if liquid || Skin::of(ui.ctx()).finish == Finish::Glass {
                     ui.add_space(8.0);
                     return;
                 }
@@ -180,14 +185,20 @@ impl App {
     fn show_footer(&self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame =
-            pixel::panel_frame(&ctx, palette.sunken).inner_margin(egui::Margin::symmetric(18, 10));
+        // The liquid glass bar is a capsule, so its content keeps clear of the round ends.
+        let side = if Skin::of(&ctx).finish == Finish::Liquid {
+            34
+        } else {
+            18
+        };
+        let frame = pixel::panel_frame(&ctx, palette.sunken)
+            .inner_margin(egui::Margin::symmetric(side, 10));
         egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
                 pixel::panel_decoration(ui, 1.0);
-                if Skin::of(ui.ctx()).finish != Finish::Glass {
+                if !matches!(Skin::of(ui.ctx()).finish, Finish::Glass | Finish::Liquid) {
                     let clip = ui.clip_rect();
                     let rule =
                         egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
@@ -255,6 +266,7 @@ impl App {
             bottom: 8,
         });
         let panel = egui::Panel::left("jobs")
+            .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
             .default_size(clamp_sidebar_width(self.config.sidebar_width))
             .size_range(SIDEBAR_WIDTH)
             .frame(frame)
@@ -503,10 +515,10 @@ fn saya_job_identity(ui: &mut egui::Ui, job: &Job, badge: Option<(String, egui::
 fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
-    let mascot = if skin.finish == Finish::Gothic {
-        crate::app::scenery::catgirl::show_header(ui)
-    } else {
-        sprites::show(ui, skin.wording.mascot, 4.0, palette.hot)
+    let mascot = match skin.finish {
+        Finish::Gothic => crate::app::scenery::catgirl::show_header(ui),
+        Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
+        _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
     if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
@@ -529,7 +541,7 @@ fn logo(ui: &mut egui::Ui) {
             } else {
                 24.0
             },
-            if skin.finish == Finish::Modern {
+            if matches!(skin.finish, Finish::Modern | Finish::Liquid) {
                 palette.ink
             } else {
                 palette.gold
@@ -548,13 +560,15 @@ fn card_shapes(
     selected: bool,
     hovered: bool,
 ) -> Vec<egui::Shape> {
-    if Skin::of(ctx).finish == Finish::Glass {
-        let tint = match (selected, hovered) {
-            (true, _) => Tint::Current,
-            (false, true) => Tint::Hover,
-            (false, false) => Tint::Rest,
-        };
-        return glass::tile(ctx, rect, tint);
+    let tint = match (selected, hovered) {
+        (true, _) => Tint::Current,
+        (false, true) => Tint::Hover,
+        (false, false) => Tint::Rest,
+    };
+    match Skin::of(ctx).finish {
+        Finish::Glass => return glass::tile(ctx, rect, tint),
+        Finish::Liquid => return liquid::tile(ctx, rect, tint),
+        _ => {}
     }
     let palette = palette_of(ctx);
     let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);

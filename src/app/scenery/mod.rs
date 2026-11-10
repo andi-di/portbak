@@ -3,6 +3,7 @@ pub(super) mod aurora;
 pub(super) mod bubbles;
 pub(super) mod catgirl;
 pub(super) mod fishes;
+pub(super) mod liquid_wallpaper;
 pub(super) mod midnight_neko;
 pub(super) mod splashes;
 pub(super) mod wildlife;

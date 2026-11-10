@@ -23,6 +23,7 @@ pub static MODERN: Skin = Skin {
         display_drop: 0.0,
         display_glow: 0.0,
         capitals: false,
+        title_case: false,
     },
     metrics: Metrics {
         border: 1.0,

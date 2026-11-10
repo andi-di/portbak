@@ -141,7 +141,12 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         }
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
-        pixel::display_label(ui, wording.welcome_title, 24.0, palette.gold);
+        let title = if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
+            palette.ink
+        } else {
+            palette.gold
+        };
+        pixel::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(14.0);
         ui.heading("Your folders. Safely backed up.");
         ui.label(
