@@ -79,16 +79,17 @@ pub struct Lens {
 }
 
 impl Lens {
-    /// Regular glass for panes, sidebars, bars and menus.
+    /// Regular glass for panes, sidebars, bars and menus. Like iOS's regular variant it frosts the
+    /// view enough to read on and bends it only gently, since large glass is a thin sheet.
     pub fn pane(ctx: &egui::Context) -> Self {
         let palette = Palette::of_ctx(ctx);
         let dark = ctx.global_style().visuals.dark_mode;
         Self {
             tint: palette.surface,
-            tint_strength: if dark { 0.34 } else { 0.2 },
-            blur: 5.0,
-            bezel: 26.0,
-            depth: 26.0,
+            tint_strength: if dark { 0.34 } else { 0.28 },
+            blur: 12.0,
+            bezel: 20.0,
+            depth: 14.0,
             vibrancy: 1.6,
             shine: if dark { 0.4 } else { 0.45 },
             dispersion: 0.45,
