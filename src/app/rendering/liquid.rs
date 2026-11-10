@@ -330,6 +330,130 @@ fn system_fill(opacity: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, (opacity.clamp(0.0, 1.0) * 255.0) as u8)
 }
 
+/// An iOS segmented control: equal segments on a capsule of glass, the chosen one raised on a
+/// thumb that slides between them. Returns the index of a clicked, unchosen segment.
+pub fn segmented(
+    ui: &mut egui::Ui,
+    segments: &[(&str, Sprite)],
+    chosen: Option<usize>,
+    icon_scale: f32,
+) -> Option<usize> {
+    const INSET: f32 = 3.0;
+    const GAP: f32 = 8.0;
+    const PADDING: f32 = 18.0;
+    let ctx = ui.ctx().clone();
+    let palette = Palette::of(ui);
+    let dark = ui.visuals().dark_mode;
+    let font = egui::TextStyle::Button.resolve(ui.style());
+    let enabled = ui.is_enabled();
+    let ink = if enabled { palette.ink } else { palette.dim };
+    let faces: Vec<_> = segments
+        .iter()
+        .map(|&(label, sprite)| {
+            let text = ui
+                .painter()
+                .layout_no_wrap(style::cased(&ctx, label), font.clone(), ink);
+            (text, sprite, sprites::size(&ctx, sprite, icon_scale))
+        })
+        .collect();
+    let width = faces
+        .iter()
+        .map(|(text, _, icon)| icon.x + GAP + text.size().x)
+        .fold(0.0, f32::max)
+        + PADDING * 2.0;
+    let height = crate::app::rendering::pixel::button_height(ui);
+    let count = segments.len() as f32;
+    let (track, _) = ui.allocate_exact_size(
+        Vec2::new(width * count + INSET * 2.0, height),
+        egui::Sense::hover(),
+    );
+    let id = ui
+        .id()
+        .with(("segmented", segments.first().map(|(label, _)| *label)));
+    let painter = ui.painter();
+    let radius = height / 2.0;
+    let lens = Lens::control(&ctx);
+    painter.extend(glass(
+        &ctx,
+        track,
+        radius,
+        &lens.tinted(palette.raised, lens.tint_strength),
+    ));
+
+    let slot = |index: f32| {
+        Rect::from_min_size(
+            Pos2::new(track.left() + INSET + width * index, track.top() + INSET),
+            Vec2::new(width, height - INSET * 2.0),
+        )
+    };
+    if let Some(chosen) = chosen {
+        let at = ctx.animate_value_with_time(id.with("thumb"), chosen as f32, 0.25);
+        let thumb = slot(at);
+        let fill = if dark {
+            Color32::from_rgb(0x63, 0x63, 0x66).gamma_multiply(if enabled { 1.0 } else { 0.5 })
+        } else {
+            Color32::WHITE.gamma_multiply(if enabled { 1.0 } else { 0.6 })
+        };
+        painter.add(glass::halo(
+            thumb.translate(Vec2::new(0.0, 1.0)),
+            thumb.height() / 2.0,
+            Color32::from_black_alpha(if dark { 60 } else { 28 }),
+            4.0,
+        ));
+        painter.rect_filled(thumb, corner(thumb.height() / 2.0), fill);
+    }
+
+    let mut clicked = None;
+    for (index, (text, sprite, icon)) in faces.into_iter().enumerate() {
+        let rect = slot(index as f32);
+        let response = ui.interact(rect, id.with(index), egui::Sense::click());
+        let selected = chosen == Some(index);
+        response.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::Button,
+                enabled,
+                selected,
+                segments[index].0,
+            )
+        });
+        let hover = ctx.animate_bool_with_time(
+            response.id.with("hover"),
+            enabled && response.hovered() && !selected,
+            HOVER_SECONDS,
+        );
+        if hover > 0.0 {
+            painter.rect_filled(rect, corner(rect.height() / 2.0), system_fill(0.16 * hover));
+        }
+        if response.has_focus() {
+            painter.rect_stroke(
+                rect,
+                corner(rect.height() / 2.0),
+                Stroke::new(2.0_f32, palette.accent.gamma_multiply(0.8)),
+                StrokeKind::Inside,
+            );
+        }
+        let content = Vec2::new(icon.x + GAP + text.size().x, icon.y.max(text.size().y));
+        let origin = rect.center() - content / 2.0;
+        sprites::paint_awake(
+            painter,
+            Pos2::new(origin.x, rect.center().y - icon.y / 2.0),
+            sprite,
+            icon_scale,
+            ink,
+            0.0,
+        );
+        let text_origin = Pos2::new(
+            origin.x + icon.x + GAP,
+            rect.center().y - text.size().y / 2.0,
+        );
+        painter.galley(text_origin.round(), text, ink);
+        if crate::app::rendering::pixel::pointing_hand(response).clicked() && !selected {
+            clicked = Some(index);
+        }
+    }
+    clicked
+}
+
 /// A plain section heading: an accent symbol beside a bold title, as in iOS grouped lists.
 pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite) {
     let palette = Palette::of(ui);

@@ -500,6 +500,29 @@ pub fn choice<T: PartialEq>(
     response
 }
 
+/// One of `options` for `current`: an iOS segmented control in liquid glass, a row of latching
+/// keys otherwise.
+pub fn segmented<T: PartialEq + Copy>(
+    ui: &mut egui::Ui,
+    current: &mut T,
+    options: &[(T, &str, Sprite)],
+) {
+    if Skin::of(ui.ctx()).finish != Finish::Liquid {
+        for &(value, label, sprite) in options {
+            choice(ui, current, value, label, Some(sprite));
+        }
+        return;
+    }
+    let chosen = options.iter().position(|(value, ..)| value == current);
+    let segments: Vec<_> = options
+        .iter()
+        .map(|&(_, label, sprite)| (label, sprite))
+        .collect();
+    if let Some(index) = liquid::segmented(ui, &segments, chosen, ICON_SCALE) {
+        *current = options[index].0;
+    }
+}
+
 /// Total height of a `PixelButton` with a single text line, including its shadow.
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());

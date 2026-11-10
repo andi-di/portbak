@@ -420,14 +420,15 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
-        let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Interval),
-            (Schedule::Daily, "Daily", Sprite::Daily),
-            (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
-        ];
-        for (schedule, label, sprite) in modes {
-            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
-        }
+        pixel::segmented(
+            ui,
+            &mut job.schedule,
+            &[
+                (Schedule::Interval, "Interval", Sprite::Interval),
+                (Schedule::Daily, "Daily", Sprite::Daily),
+                (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
+            ],
+        );
     });
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
@@ -648,14 +649,14 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
     ui.horizontal_wrapped(|ui| {
-        pixel::choice(
+        pixel::segmented(
             ui,
             backups,
-            false,
-            "Job settings",
-            Some(Sprite::JobSettings),
+            &[
+                (false, "Job settings", Sprite::JobSettings),
+                (true, "Backups", Sprite::Chest),
+            ],
         );
-        pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);
 }

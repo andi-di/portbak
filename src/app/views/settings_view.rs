@@ -40,14 +40,14 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
     });
     ui.add_space(14.0);
     ui.horizontal_wrapped(|ui| {
-        pixel::choice(
+        pixel::segmented(
             ui,
             tab,
-            SettingsTab::Jobs,
-            "Job settings",
-            Some(Sprite::JobSettings),
+            &[
+                (SettingsTab::Jobs, "Job settings", Sprite::JobSettings),
+                (SettingsTab::Theme, "Theme", Sprite::Theme),
+            ],
         );
-        pixel::choice(ui, tab, SettingsTab::Theme, "Theme", Some(Sprite::Theme));
     });
     ui.add_space(14.0);
     match tab {
