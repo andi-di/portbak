@@ -166,8 +166,13 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
             return;
         }
         Finish::Liquid => {
+            let hover = ui.ctx().animate_bool_with_time(
+                response.id.with("glass_hover"),
+                response.hovered(),
+                liquid::HOVER_SECONDS,
+            );
             ui.painter()
-                .set(background, liquid::tile(ui.ctx(), rect, tint));
+                .set(background, liquid::tile(ui.ctx(), rect, tint, hover));
             return;
         }
         _ => {}

@@ -25,6 +25,10 @@ static SCROLL_EDGE: Recipe = Recipe {
 const LIGHT: Vec2 = Vec2::new(-0.55, -0.83);
 /// How strongly the pointer pulls the specular edge towards itself.
 const POINTER_PULL: f32 = 0.65;
+/// How far past a piece of glass the pointer must be, in points, to pull its light fully.
+const POINTER_REACH: f32 = 60.0;
+/// How long glass takes to brighten under the pointer or settle again.
+pub const HOVER_SECONDS: f32 = 0.15;
 /// Width of the bright line along the rim, in points.
 const RIM: f32 = 1.3;
 /// How far pressed glass swells, as a fraction of its height, up to `SWELL_LIMIT` points.
@@ -183,9 +187,11 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
     } else if look.clear {
         base.tinted(palette.raised, base.tint_strength + 0.12 * look.glow)
     } else {
+        // Prominent glass brightens gradually instead of switching to a lighter fill.
+        let tint = look.fill.lerp_to_gamma(Color32::WHITE, 0.16 * look.glow);
         Lens {
             vibrancy: 1.2,
-            ..base.tinted(look.fill, 0.8 + 0.08 * look.glow)
+            ..base.tinted(tint, 0.8 + 0.06 * look.glow)
         }
     };
     if press > 0.0 {
@@ -285,9 +291,9 @@ pub fn progress(painter: &egui::Painter, rect: Rect, color: Color32, time: f64, 
     ctx.request_repaint_after(PROGRESS_FRAME);
 }
 
-/// Glass behind a card or row, lit by `tint`: clear at rest, brighter while pointed at and
-/// tinted with the accent when current or chosen.
-pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint) -> Vec<Shape> {
+/// Glass behind a card or row, lit by `tint`: clear at rest and tinted with the accent when
+/// current or chosen; it brightens as `hover` rises from 0 to 1 under the pointer.
+pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint, hover: f32) -> Vec<Shape> {
     let palette = Palette::of_ctx(ctx);
     let dark = ctx.global_style().visuals.dark_mode;
     let radius = style::metrics(ctx).radius as f32 * 0.75;
@@ -298,10 +304,12 @@ pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint) -> Vec<Shape> {
         ..Lens::control(ctx)
     };
     let lens = match tint {
-        Tint::Rest => base,
-        Tint::Hover => base.tinted(palette.raised, base.tint_strength + 0.14),
-        Tint::Current => base.tinted(palette.accent, if dark { 0.38 } else { 0.24 }),
-        Tint::Accent => base.tinted(palette.accent, 0.82),
+        Tint::Rest | Tint::Hover => base.tinted(palette.raised, base.tint_strength + 0.14 * hover),
+        Tint::Current => base.tinted(
+            palette.accent,
+            if dark { 0.38 } else { 0.24 } + 0.06 * hover,
+        ),
+        Tint::Accent => base.tinted(palette.accent, 0.82 + 0.06 * hover),
     };
     let mut shapes = glass(ctx, rect, radius, &lens);
     if tint == Tint::Current {
@@ -439,10 +447,19 @@ pub fn scroll_edges(ui: &egui::Ui, viewport: Rect, cut_top: bool, cut_bottom: bo
 }
 
 /// A unit vector from `rect` towards the light, leaning towards the pointer.
+/// The pull grows with the pointer's distance, so the light glides as the pointer crosses the
+/// glass instead of swinging round whenever it passes near the center.
 fn light_towards(ctx: &egui::Context, rect: Rect) -> Vec2 {
-    let pull = ctx
+    let reach = rect.size().length() / 2.0 + POINTER_REACH;
+    let offset = ctx
         .pointer_latest_pos()
-        .map_or(Vec2::ZERO, |pointer| (pointer - rect.center()).normalized());
+        .map_or(Vec2::ZERO, |pointer| pointer - rect.center());
+    light_leaning(offset, reach)
+}
+
+/// The light leaning towards a pointer `offset` from the glass's center, fully at `reach`.
+fn light_leaning(offset: Vec2, reach: f32) -> Vec2 {
+    let pull = offset / offset.length().max(reach);
     (LIGHT + pull * POINTER_PULL).normalized()
 }
 
@@ -620,6 +637,16 @@ mod tests {
             panic!("plain glass is a filled body and a rim");
         };
         assert!(body.fill.a() >= 160);
+    }
+
+    #[test]
+    fn light_glides_instead_of_jumping_as_the_pointer_crosses_the_center() {
+        let reach = 100.0;
+        let left = light_leaning(Vec2::new(-2.0, 0.0), reach);
+        let right = light_leaning(Vec2::new(2.0, 0.0), reach);
+        assert!((left - right).length() < 0.05);
+        let far = light_leaning(Vec2::new(reach * 3.0, 0.0), reach);
+        assert!(far.x > left.x && (far.length() - 1.0).abs() < 1e-4);
     }
 
     #[test]

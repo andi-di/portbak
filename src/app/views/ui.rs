@@ -457,9 +457,14 @@ impl App {
             });
         let rect = frame.response.rect;
         let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
+        let glass_hover = ui.ctx().animate_bool_with_time(
+            card_id.with("glass_hover"),
+            response.hovered(),
+            liquid::HOVER_SECONDS,
+        );
         ui.painter().set(
             background,
-            card_shapes(ui.ctx(), rect, selected, response.hovered()),
+            card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
         ui.add_space(CARD_SHADOW);
         response.clicked()
@@ -554,11 +559,13 @@ fn logo(ui: &mut egui::Ui) {
     });
 }
 
+/// `glass_hover` eases `hovered` in and out for liquid glass.
 fn card_shapes(
     ctx: &egui::Context,
     rect: egui::Rect,
     selected: bool,
     hovered: bool,
+    glass_hover: f32,
 ) -> Vec<egui::Shape> {
     let tint = match (selected, hovered) {
         (true, _) => Tint::Current,
@@ -567,7 +574,7 @@ fn card_shapes(
     };
     match Skin::of(ctx).finish {
         Finish::Glass => return glass::tile(ctx, rect, tint),
-        Finish::Liquid => return liquid::tile(ctx, rect, tint),
+        Finish::Liquid => return liquid::tile(ctx, rect, tint, glass_hover),
         _ => {}
     }
     let palette = palette_of(ctx);

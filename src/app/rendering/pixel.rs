@@ -204,10 +204,11 @@ impl Widget for PixelButton {
         } else if modern && sunk && enabled {
             mix(base, Color32::BLACK, 0.12)
         } else {
+            // Liquid glass brightens gradually through `glow` instead of switching fills.
             match (enabled, hovered) {
                 (false, _) => palette.surface,
-                (true, true) => mix(base, Color32::WHITE, 0.18),
-                (true, false) => base,
+                (true, true) if finish != Finish::Liquid => mix(base, Color32::WHITE, 0.18),
+                (true, _) => base,
             }
         };
         let painter = ui.painter();
