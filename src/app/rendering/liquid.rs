@@ -582,7 +582,7 @@ void main() {
         float near = length(pixel - u_hover.xy) / max(u_hover.z, 1.0);
         float spot = exp(-near * near) * u_hover.w;
         float halo = exp(-inside / (u_rim * 6.0));
-        color += vec3(spot * (line * 1.2 + halo * 0.5));
+        color += vec3(spot * (line * 0.95 + halo * 0.4));
     }
 
     if (u_touch.w > 0.0) {
