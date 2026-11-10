@@ -1,6 +1,7 @@
-use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use crate::app::rendering::liquid::{self, Frost};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::theme::style::{self, label_font, Palette};
+use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
     alert, caption, display_path, format_bytes, local_time, page_frame, page_scroll_area,
     retention_warnings, DATE, PAGE_PADDING, TIME,
@@ -154,35 +155,61 @@ fn restore_confirmation(
     (confirm, cancel || response.should_close())
 }
 
+/// Padding and corner rounding of the Liquid Glass restore alert.
+const ALERT_MARGIN: i8 = 24;
+const ALERT_RADIUS: f32 = 30.0;
+
 fn restore_modal(
     ctx: &egui::Context,
     history: &BackupHistory,
     app_error: &str,
 ) -> egui::ModalResponse<egui::scroll_area::ScrollAreaOutput<(bool, bool)>> {
+    let liquid = Skin::of(ctx).finish == Finish::Liquid;
+    let mut modal = egui::Modal::new(egui::Id::new("confirm_backup_restore"));
+    if liquid {
+        // An iOS alert: roomy, round and frosted, with its glass painted behind the contents.
+        modal = modal.frame(egui::Frame::new().inner_margin(egui::Margin::same(ALERT_MARGIN)));
+    }
+    modal.show(ctx, |ui| {
+        ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 760.0));
+        if liquid {
+            let margin = egui::Margin::same(ALERT_MARGIN);
+            return liquid::sheet(ui, margin, ALERT_RADIUS, Frost::Menu, |ui| {
+                restore_dialog(ui, history, app_error)
+            });
+        }
+        restore_dialog(ui, history, app_error)
+    })
+}
+
+/// The dialog's scrolling body: details and the cancel and restore buttons.
+fn restore_dialog(
+    ui: &mut egui::Ui,
+    history: &BackupHistory,
+    app_error: &str,
+) -> egui::scroll_area::ScrollAreaOutput<(bool, bool)> {
+    let ctx = ui.ctx().clone();
     let mut confirm = false;
     let mut cancel = false;
-    egui::Modal::new(egui::Id::new("confirm_backup_restore")).show(ctx, |ui| {
-        ui.set_width((ctx.content_rect().width() - 64.0).clamp(240.0, 760.0));
-        egui::ScrollArea::vertical()
-            .min_scrolled_height((ctx.content_rect().height() - 64.0).clamp(120.0, 480.0))
-            .max_height((ctx.content_rect().height() - 64.0).max(120.0))
-            .show(ui, |ui| {
-                ui.heading("Restore backup?");
-                restore_details(ui, history, app_error);
-                ui.horizontal(|ui| {
-                    cancel = ui.add(PixelButton::new("Cancel")).clicked();
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let restore = PixelButton::new("Replace contents and restore")
-                            .sprite(Sprite::Rewind)
-                            .tone(Tone::Danger);
-                        confirm = ui
-                            .add_enabled(history.restorable_selection().is_some(), restore)
-                            .clicked();
-                    });
+    egui::ScrollArea::vertical()
+        .min_scrolled_height((ctx.content_rect().height() - 64.0).clamp(120.0, 480.0))
+        .max_height((ctx.content_rect().height() - 64.0).max(120.0))
+        .show(ui, |ui| {
+            ui.heading("Restore backup?");
+            restore_details(ui, history, app_error);
+            ui.horizontal(|ui| {
+                cancel = ui.add(PixelButton::new("Cancel")).clicked();
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let restore = PixelButton::new("Replace contents and restore")
+                        .sprite(Sprite::Rewind)
+                        .tone(Tone::Danger);
+                    confirm = ui
+                        .add_enabled(history.restorable_selection().is_some(), restore)
+                        .clicked();
                 });
-                (confirm, cancel)
-            })
-    })
+            });
+            (confirm, cancel)
+        })
 }
 
 fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
@@ -224,10 +251,32 @@ fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
 }
 
 fn sunken<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+        return glass_list(ui, contents);
+    }
     style::well(ui.ctx())
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             contents(ui)
+        })
+        .inner
+}
+
+/// A list laid on a sheet of glass, as in iOS inset grouped lists.
+fn glass_list<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    const PADDING: i8 = 12;
+    let radius = style::metrics(ui.ctx()).radius as f32 * 0.75;
+    egui::Frame::new()
+        .inner_margin(egui::Margin::same(PADDING))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            liquid::sheet(
+                ui,
+                egui::Margin::same(PADDING),
+                radius,
+                Frost::Pane,
+                contents,
+            )
         })
         .inner
 }
@@ -379,8 +428,8 @@ fn backup_controls(
             .sprite(Sprite::Rewind)
             .tone(Tone::Danger);
         if ui.add_enabled(!saving && backup.available && source_available, button)
-            .on_hover_text("Restore this backup")
-            .on_disabled_hover_text("Restoration requires an available backup and source folder, with no protection save in progress")
+            .hint("Restore this backup")
+            .disabled_hint("Restoration requires an available backup and source folder, with no protection save in progress")
             .clicked() {
                 restore = Some(backup.record.name.clone());
             }
@@ -390,8 +439,8 @@ fn backup_controls(
             .tone(Tone::Plain);
         if ui
             .add_enabled(backup.available, open)
-            .on_hover_text("Open backup location in file manager")
-            .on_disabled_hover_text("Backup is unavailable")
+            .hint("Open backup location in file manager")
+            .disabled_hint("Backup is unavailable")
             .clicked()
         {
             reveal = Some(backup.record.name.clone());
@@ -400,7 +449,7 @@ fn backup_controls(
         let enabled = !saving && (backup.available || protected);
         let checkbox = PixelCheckbox::new(&mut protected, "Locked");
         ui.add_enabled(enabled, checkbox)
-            .on_hover_text("Protect from retention deletion")
+            .hint("Protect from retention deletion")
             .changed()
             .then(|| (backup.record.name.clone(), protected))
     });

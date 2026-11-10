@@ -1,4 +1,4 @@
-use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
@@ -282,7 +282,7 @@ fn job_action_button(
     } else {
         label
     };
-    ui.add(button).on_hover_text(tooltip).clicked() && !busy
+    ui.add(button).hint(tooltip).clicked() && !busy
 }
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
@@ -351,8 +351,8 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     };
     if ui
         .add_enabled(can_toggle, button)
-        .on_hover_text(tooltip)
-        .on_disabled_hover_text(tooltip)
+        .hint(tooltip)
+        .disabled_hint(tooltip)
         .clicked()
     {
         job.enabled = !job.enabled;
@@ -464,7 +464,7 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
             .range(0..=maximum)
             .custom_formatter(|value, _| format!("{:02}", value as u32)),
     )
-    .on_hover_text(label)
+    .hint(label)
     .changed()
 }
 
@@ -517,7 +517,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
                         );
                     })
                     .response
-                    .on_hover_text("Next check according to the current schedule");
+                    .hint("Next check according to the current schedule");
             }
         },
     );
@@ -573,7 +573,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     &mut job.count_protected,
                     "Count protected backups toward retention limits",
                 ))
-                .on_hover_text("Protected backups are never deleted by retention");
+                .hint("Protected backups are never deleted by retention");
             });
         });
     });

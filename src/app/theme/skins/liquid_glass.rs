@@ -96,7 +96,8 @@ const DAY: Palette = Palette {
     accent_ink: Color32::from_rgb(0xff, 0xff, 0xff),
     hot: Color32::from_rgb(0x5a, 0xc8, 0xfa),
     gold: Color32::from_rgb(0xff, 0x95, 0x00),
-    good: Color32::from_rgb(0x34, 0xc7, 0x59),
+    // iOS's accessible green for text; switches keep the bright fill green.
+    good: Color32::from_rgb(0x24, 0x8a, 0x3d),
     bad: Color32::from_rgb(0xff, 0x3b, 0x30),
     metal: Color32::from_rgb(0x8e, 0x8e, 0x93),
     paper: Color32::from_rgb(0xff, 0xff, 0xff),

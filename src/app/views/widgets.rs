@@ -1,4 +1,5 @@
-use crate::app::rendering::pixel::{self, PixelButton};
+use crate::app::rendering::liquid;
+use crate::app::rendering::pixel::{self, Hint, PixelButton};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use crate::engine;
@@ -25,14 +26,21 @@ pub fn page_scroll_area(
         let scroll = &mut ui.spacing_mut().scroll;
         scroll.bar_inner_margin = 2.0;
         scroll.bar_outer_margin = 8.0;
-        egui::ScrollArea::both()
+        let output = egui::ScrollArea::both()
             .content_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 // Leave room for widgets that round up while the scrollbar animates.
                 ui.set_max_width((ui.available_width() - 1.0).max(0.0));
                 contents(ui);
-            })
+            });
+        if style::Skin::of(ui.ctx()).finish == style::Finish::Liquid {
+            let viewport = output.inner_rect;
+            let offset = output.state.offset.y;
+            let hidden_below = output.content_size.y - viewport.height() - offset;
+            liquid::scroll_edges(ui, viewport, offset > 0.5, hidden_below > 0.5);
+        }
+        output
     })
     .inner
 }
@@ -96,8 +104,8 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
                 .icon_only();
             if ui
                 .add_enabled(!path.as_os_str().is_empty() && path.is_dir(), open)
-                .on_hover_text("Open folder in file manager")
-                .on_disabled_hover_text("Choose an existing folder first")
+                .hint("Open folder in file manager")
+                .disabled_hint("Choose an existing folder first")
                 .clicked()
             {
                 open_error = crate::app::platform::open_in_file_manager(path)
@@ -109,7 +117,7 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
             let choose = PixelButton::new("Choose folder …")
                 .sprite(Sprite::Folder)
                 .icon_only();
-            if ui.add(choose).on_hover_text("Choose folder").clicked() && !read_only {
+            if ui.add(choose).hint("Choose folder").clicked() && !read_only {
                 if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                     *path = folder;
                     changed = true;

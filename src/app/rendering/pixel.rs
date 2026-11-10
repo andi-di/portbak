@@ -2,7 +2,7 @@
 
 use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::gothic;
-use crate::app::rendering::liquid::{self, Lens};
+use crate::app::rendering::liquid::{self, Frost, Lens};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::scenery::{aurora, liquid_wallpaper, midnight_neko};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
@@ -984,34 +984,46 @@ pub fn tooltip(ui: &egui::Ui, rect: Rect, id: egui::Id, text: &str) {
 pub fn popup<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let ctx = ui.ctx().clone();
     let finish = Skin::of(&ctx).finish;
-    if !matches!(finish, Finish::Glass | Finish::Liquid) {
-        return contents(ui);
+    let radius = f32::from(ui.visuals().menu_corner_radius.nw);
+    let margin = ui.spacing().menu_margin;
+    match finish {
+        Finish::Liquid => return liquid::sheet(ui, margin, radius, Frost::Menu, contents),
+        Finish::Glass => {}
+        _ => return contents(ui),
     }
     // Popups may scroll or clip their contents, so the pane goes on a painter reaching the margin.
     let painter = ui.painter().with_clip_rect(ctx.content_rect());
     let backing = painter.add(egui::Shape::Noop);
     let inner = contents(ui);
-    let rect = ui.min_rect() + egui::epaint::MarginF32::from(ui.spacing().menu_margin);
-    let radius = f32::from(ui.visuals().menu_corner_radius.nw);
-    let pane = if finish == Finish::Liquid {
-        // Menus are frosted more heavily than panes so their text reads over anything.
-        let pane = Lens::pane(&ctx);
-        let lens = Lens {
-            blur: 14.0,
-            tint_strength: pane.tint_strength + 0.3,
-            ..pane
-        };
-        liquid::glass(&ctx, rect, radius, &lens)
-    } else {
-        let clear = Glaze::clear(&ctx);
-        let glaze = Glaze {
-            opacity: (clear.opacity * 1.6).min(1.0),
-            ..clear
-        };
-        glass::pane(&ctx, rect, radius, &glaze)
+    let rect = ui.min_rect() + egui::epaint::MarginF32::from(margin);
+    let clear = Glaze::clear(&ctx);
+    let glaze = Glaze {
+        opacity: (clear.opacity * 1.6).min(1.0),
+        ..clear
     };
-    painter.set(backing, pane);
+    painter.set(backing, glass::pane(&ctx, rect, radius, &glaze));
     inner
+}
+
+/// Hover hints drawn like the skin's popups, so glass skins frost them; in place of
+/// `on_hover_text` and `on_disabled_hover_text`.
+pub trait Hint {
+    fn hint(self, text: impl Into<egui::WidgetText>) -> Self;
+    fn disabled_hint(self, text: impl Into<egui::WidgetText>) -> Self;
+}
+
+impl Hint for Response {
+    fn hint(self, text: impl Into<egui::WidgetText>) -> Self {
+        self.on_hover_ui(|ui| {
+            popup(ui, |ui| ui.label(text));
+        })
+    }
+
+    fn disabled_hint(self, text: impl Into<egui::WidgetText>) -> Self {
+        self.on_disabled_hover_ui(|ui| {
+            popup(ui, |ui| ui.label(text));
+        })
+    }
 }
 
 /// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.

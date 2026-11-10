@@ -1,7 +1,7 @@
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
 use crate::app::rendering::ornaments;
-use crate::app::rendering::pixel::{self, PixelButton, Tone};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
@@ -115,7 +115,7 @@ impl App {
                             .icon_only()
                             .sprite(Sprite::Gear)
                             .selected(self.settings_open);
-                        if ui.add(settings).on_hover_text("Settings").clicked() {
+                        if ui.add(settings).hint("Settings").clicked() {
                             self.toggle_settings();
                             if self.settings_open {
                                 crate::app::scenery::catgirl::trigger(
@@ -132,7 +132,7 @@ impl App {
                         };
                         if ui
                             .add(PixelButton::new(label).sprite(sprite).icon_only())
-                            .on_hover_text(format!("Switch to {label} mode"))
+                            .hint(format!("Switch to {label} mode"))
                             .clicked()
                         {
                             self.config.theme = if dark { Theme::Light } else { Theme::Dark };
@@ -240,13 +240,13 @@ impl App {
                             },
                         );
                         if active {
-                            response.on_hover_text(if self.active.is_some() {
+                            response.hint(if self.active.is_some() {
                                 self.progress.as_str()
                             } else {
                                 "Recent backup activity"
                             });
                         } else {
-                            response.on_hover_text("No backup or restore in progress");
+                            response.hint("No backup or restore in progress");
                         }
                     });
                 });

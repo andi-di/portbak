@@ -1,6 +1,6 @@
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
-use crate::app::rendering::pixel::{self, PixelCheckbox};
+use crate::app::rendering::pixel::{self, Hint, PixelCheckbox};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
@@ -115,7 +115,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
                     &mut defaults.count_protected,
                     "Count protected backups toward retention limits",
                 ))
-                .on_hover_text("Protected backups are never deleted by retention");
+                .hint("Protected backups are never deleted by retention");
             });
         });
     });

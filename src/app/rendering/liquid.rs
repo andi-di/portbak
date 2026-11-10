@@ -16,6 +16,11 @@ static LIQUID: Recipe = Recipe {
     fragment: FRAGMENT_SHADER,
 };
 
+static SCROLL_EDGE: Recipe = Recipe {
+    name: "liquid_scroll_edge",
+    fragment: SCROLL_EDGE_SHADER,
+};
+
 /// Where light falls from when the pointer is away: the upper left, as on iOS.
 const LIGHT: Vec2 = Vec2::new(-0.55, -0.83);
 /// How strongly the pointer pulls the specular edge towards itself.
@@ -26,6 +31,14 @@ const RIM: f32 = 1.3;
 const SWELL: f32 = 0.12;
 const SWELL_LIMIT: f32 = 5.0;
 const PROGRESS_FRAME: Duration = Duration::from_millis(30);
+/// How far into a scroll view its edge blurs content, and how far past it the blur fades out.
+const EDGE_REACH: f32 = 30.0;
+const EDGE_FADE: f32 = 10.0;
+/// The strongest blur right at a scroll edge, in points.
+const EDGE_BLUR: f32 = 9.0;
+/// The iOS switch green, which stays bright while green text is darkened for legibility.
+const SWITCH_GREEN: Color32 = Color32::from_rgb(0x34, 0xc7, 0x59);
+const SWITCH_GREEN_DARK: Color32 = Color32::from_rgb(0x30, 0xd1, 0x58);
 
 /// How a piece of liquid glass bends, tints and lights what lies behind it.
 #[derive(Clone, Copy)]
@@ -196,11 +209,15 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
 /// white knob that turns into a glass loupe over the track while `press` rises.
 pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled: bool) {
     let ctx = painter.ctx();
-    let palette = Palette::of_ctx(ctx);
     let dark = ctx.global_style().visuals.dark_mode;
     let off = Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, if dark { 130 } else { 84 });
     let fade = if enabled { 1.0 } else { 0.5 };
-    let track = off.lerp_to_gamma(palette.good, on).gamma_multiply(fade);
+    let green = if dark {
+        SWITCH_GREEN_DARK
+    } else {
+        SWITCH_GREEN
+    };
+    let track = off.lerp_to_gamma(green, on).gamma_multiply(fade);
     let radius = rect.height() / 2.0;
     painter.rect_filled(rect, corner(radius), track);
 
@@ -343,6 +360,84 @@ pub fn ink_on(fill: Color32) -> Color32 {
     }
 }
 
+/// How heavily a glass sheet is frosted.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Frost {
+    /// Regular pane glass, for lists laid on the page.
+    Pane,
+    /// Heavily frosted glass that keeps text legible over anything: menus, tooltips, alerts.
+    Menu,
+}
+
+/// `contents` on a sheet of glass reaching `margin` past them with `radius` corners. The sheet
+/// is painted beneath the contents once their size is known.
+pub fn sheet<R>(
+    ui: &mut egui::Ui,
+    margin: egui::Margin,
+    radius: f32,
+    frost: Frost,
+    contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    let ctx = ui.ctx().clone();
+    // Menus may scroll or clip their contents, so their glass goes on a painter reaching the
+    // margin; lists stay clipped to the page they scroll in.
+    let painter = match frost {
+        Frost::Menu => ui.painter().with_clip_rect(ctx.content_rect()),
+        Frost::Pane => ui.painter().clone(),
+    };
+    let backing = painter.add(Shape::Noop);
+    let inner = contents(ui);
+    let rect = ui.min_rect() + egui::epaint::MarginF32::from(margin);
+    let pane = Lens::pane(&ctx);
+    let lens = match frost {
+        Frost::Pane => pane,
+        Frost::Menu => Lens {
+            blur: 14.0,
+            tint_strength: pane.tint_strength + 0.3,
+            ..pane
+        },
+    };
+    painter.set(backing, glass(&ctx, rect, radius, &lens));
+    inner
+}
+
+/// The iOS scroll edge effect over a scroll view's `viewport`: content blurs progressively as it
+/// nears an edge it is cut off at, then fades into the backdrop instead of ending in a hard line.
+pub fn scroll_edges(ui: &egui::Ui, viewport: Rect, cut_top: bool, cut_bottom: bool) {
+    let ctx = ui.ctx();
+    let effect = Effect::of(ctx, &SCROLL_EDGE);
+    if !effect.available() {
+        return;
+    }
+    let painter = ui
+        .painter()
+        .with_clip_rect(viewport.expand2(Vec2::new(0.0, EDGE_FADE)));
+    for (cut, edge, side) in [
+        (cut_top, viewport.top(), 1.0_f32),
+        (cut_bottom, viewport.bottom(), -1.0),
+    ] {
+        if !cut {
+            continue;
+        }
+        let (inner, outer) = (edge + side * EDGE_REACH, edge - side * EDGE_FADE);
+        let band = Rect::from_x_y_ranges(viewport.x_range(), inner.min(outer)..=inner.max(outer));
+        painter.add(effect.shape(band, ctx.content_rect(), move |target| {
+            let [_, edge_px] = target.pixel(Pos2::new(viewport.left(), edge));
+            target.set("u_edge", &[edge_px]);
+            // Into the content is down the screen at the top edge, which is down the frame too.
+            target.set("u_side", &[-side]);
+            target.set(
+                "u_reach",
+                &[
+                    target.pixels(EDGE_REACH),
+                    target.pixels(EDGE_FADE),
+                    target.pixels(EDGE_BLUR),
+                ],
+            );
+        }));
+    }
+}
+
 /// A unit vector from `rect` towards the light, leaning towards the pointer.
 fn light_towards(ctx: &egui::Context, rect: Rect) -> Vec2 {
     let pull = ctx
@@ -466,6 +561,32 @@ void main() {
         color += vec3(u_touch.w * 0.3 * exp(-reach * reach * 2.0));
     }
     out_color = vec4(clamp(color, 0.0, 1.0) * mask, mask);
+}
+"#;
+
+/// Blurs content more the closer it lies to the edge, then lets the blur fade past the edge so
+/// the clipped content melts into whatever lies beyond.
+const SCROLL_EDGE_SHADER: &str = r#"
+// The edge's height in pixels, and which way the content lies from it: +1 up, -1 down.
+uniform float u_edge;
+uniform float u_side;
+// Reach into the content, fade past the edge and the strongest blur, in pixels.
+uniform vec3 u_reach;
+
+void main() {
+    vec2 pixel = v_uv * u_size;
+    float into = (pixel.y - u_edge) * u_side;
+    float strength = clamp(1.0 - into / u_reach.x, 0.0, 1.0);
+    float alpha = into < 0.0 ? clamp(1.0 + into / u_reach.y, 0.0, 1.0) : 1.0;
+    float reach = u_reach.z * strength * strength;
+    vec3 sum = vec3(0.0);
+    const int TAPS = 16;
+    for (int tap = 0; tap < TAPS; tap++) {
+        float step_out = (float(tap) + 0.5) / float(TAPS);
+        float angle = float(tap) * 2.39996;
+        sum += frame(pixel + vec2(cos(angle), sin(angle)) * reach * sqrt(step_out)).rgb;
+    }
+    out_color = vec4(sum / float(TAPS) * alpha, alpha);
 }
 "#;
 
