@@ -157,11 +157,9 @@ pub fn glass(ctx: &egui::Context, rect: Rect, radius: f32, lens: &Lens) -> Vec<S
                 target.pixels(lens.depth),
             ],
         );
-        let tint = egui::Rgba::from(lens.tint);
-        target.set(
-            "u_tint",
-            &[tint.r(), tint.g(), tint.b(), lens.tint_strength],
-        );
+        // The frame holds sRGB-encoded values, so the tint is mixed in gamma space too.
+        let [r, g, b, _] = lens.tint.to_normalized_gamma_f32();
+        target.set("u_tint", &[r, g, b, lens.tint_strength]);
         target.set(
             "u_optics",
             &[lens.vibrancy, lens.shine, lens.dispersion, lens.zoom],
