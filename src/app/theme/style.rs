@@ -347,6 +347,8 @@ fn liquid_visuals(visuals: &mut egui::Visuals, palette: &Palette) {
     } else {
         Color32::from_white_alpha(150)
     };
+    // The wallpaper runs unbroken behind every panel; only glass lies on it.
+    visuals.panel_fill = Color32::TRANSPARENT;
     visuals.extreme_bg_color = fill(if visuals.dark_mode { 70 } else { 34 });
     visuals.code_bg_color = visuals.extreme_bg_color;
     visuals.faint_bg_color = fill(20);
