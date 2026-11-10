@@ -47,6 +47,8 @@ const EDGE_BLUR: f32 = 9.0;
 /// The iOS system green for fills, which stays bright while green text is darkened for legibility.
 const FILL_GREEN: Color32 = Color32::from_rgb(0x34, 0xc7, 0x59);
 const FILL_GREEN_DARK: Color32 = Color32::from_rgb(0x30, 0xd1, 0x58);
+/// Width of a resting iOS 26 switch knob over its height.
+const KNOB_ASPECT: f32 = 1.6;
 
 /// How a piece of liquid glass bends, tints and lights what lies behind it.
 #[derive(Clone, Copy)]
@@ -238,16 +240,17 @@ fn vivid(ctx: &egui::Context, fill: Color32) -> Color32 {
 pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled: bool) {
     let ctx = painter.ctx();
     let dark = ctx.global_style().visuals.dark_mode;
-    let off = Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, if dark { 130 } else { 84 });
+    // iOS's system fill: 16% grey in light mode, 32% in dark.
+    let off = Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, if dark { 82 } else { 52 });
     let fade = if enabled { 1.0 } else { 0.5 };
     let green = vivid(ctx, Palette::of_ctx(ctx).good);
     let track = off.lerp_to_gamma(green, on).gamma_multiply(fade);
     let radius = rect.height() / 2.0;
     painter.rect_filled(rect, corner(radius), track);
 
-    // A round knob at rest, as on iOS; pressed, it stretches into a wider loupe.
-    let rest = Vec2::splat(rect.height() - 4.0);
-    let size = rest * Vec2::new(1.0 + 0.5 * press, 1.0 + 0.2 * press);
+    // iOS 26 rests on a capsule knob; pressed, it swells past the track into a glass loupe.
+    let rest = Vec2::new((rect.height() - 4.0) * KNOB_ASPECT, rect.height() - 4.0);
+    let size = rest * Vec2::new(1.0 + 0.3 * press, 1.0 + 0.4 * press);
     let travel = rect.width() - rest.x - 4.0;
     let center = Pos2::new(
         rect.left() + 2.0 + rest.x / 2.0 + travel * on,

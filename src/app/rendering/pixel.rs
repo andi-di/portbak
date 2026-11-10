@@ -15,8 +15,9 @@ use std::time::Duration;
 const ICON_SCALE: f32 = 2.0;
 /// Extra vertical padding of liquid glass capsules, which stand a little taller than other buttons.
 const LIQUID_PADDING: f32 = 3.0;
-/// Size of the iOS switch that stands in for check boxes in liquid glass.
-const SWITCH: Vec2 = Vec2::new(46.0, 26.0);
+/// Size of the iOS 26 switch that stands in for check boxes in liquid glass: wider and lower
+/// than earlier iOS switches.
+const SWITCH: Vec2 = Vec2::new(64.0, 28.0);
 const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
 pub(crate) fn pointing_hand(response: Response) -> Response {
