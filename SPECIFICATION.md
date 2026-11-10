@@ -50,7 +50,7 @@ Provide:
   - The top bar has no pane; its buttons are glass circles. Buttons are glass capsules, prominent ones accent-tinted with white text. Remove and power symbol buttons stay clear glass with a red or green symbol; pressed glass swells and lights up under the pointer.
   - Check boxes are iOS 26 switches: a wide, low track with a capsule knob that becomes a magnifying glass loupe while pressed.
   - Glass never sits on glass: job rows and theme cards are clear, take a grey fill on hover or when selected, and the chosen theme card is filled with the accent.
-  - Job and settings tabs and the schedule modes are iOS segmented controls: equal segments on a glass capsule with a thumb that slides to the chosen one.
+  - Job and settings tabs and the schedule modes are iOS segmented controls: equal segments on a glass capsule with a thumb that slides to the chosen one and swells into glass while pressed, never clipped by the page edge.
   - Accent, green and red fills use the iOS system colors. The empty state shows a still grey symbol; backup lists use plain grey date headers and blue folder symbols; job symbols are blue (grey when disabled) and the job count is plain grey text; Settings opens with a large title.
   - Pages blur content progressively where it scrolls out of view at the top or bottom edge, fading it into the backdrop.
 - Midnight Neko uses 32-pixel utility and job action icons and a 40-pixel New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.

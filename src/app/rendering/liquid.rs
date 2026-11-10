@@ -38,6 +38,8 @@ const RIM: f32 = 1.5;
 /// How far pressed glass swells, as a fraction of its height, up to `SWELL_LIMIT` points.
 const SWELL: f32 = 0.12;
 const SWELL_LIMIT: f32 = 5.0;
+/// Room glass needs above it for its shadow and swell when it opens a clipped scroll view.
+pub const HEADROOM: f32 = 12.0;
 const PROGRESS_FRAME: Duration = Duration::from_millis(30);
 /// How far into a scroll view its edge blurs content, and how far past it the blur fades out.
 const EDGE_REACH: f32 = 30.0;
@@ -347,7 +349,6 @@ pub fn segmented(
     const PADDING: f32 = 18.0;
     let ctx = ui.ctx().clone();
     let palette = Palette::of(ui);
-    let dark = ui.visuals().dark_mode;
     let font = egui::TextStyle::Button.resolve(ui.style());
     let enabled = ui.is_enabled();
     let ink = if enabled { palette.ink } else { palette.dim };
@@ -390,27 +391,14 @@ pub fn segmented(
             Vec2::new(width, height - INSET * 2.0),
         )
     };
-    if let Some(chosen) = chosen {
-        let at = ctx.animate_value_with_time(id.with("thumb"), chosen as f32, 0.25);
-        let thumb = slot(at);
-        let fill = if dark {
-            Color32::from_rgb(0x63, 0x63, 0x66).gamma_multiply(if enabled { 1.0 } else { 0.5 })
-        } else {
-            Color32::WHITE.gamma_multiply(if enabled { 1.0 } else { 0.6 })
-        };
-        painter.add(glass::halo(
-            thumb.translate(Vec2::new(0.0, 1.0)),
-            thumb.height() / 2.0,
-            Color32::from_black_alpha(if dark { 60 } else { 28 }),
-            4.0,
-        ));
-        painter.rect_filled(thumb, corner(thumb.height() / 2.0), fill);
-    }
-
+    // Whether a segment is held is only known after the segments, so the thumb goes in later.
+    let thumb_slot = painter.add(Shape::Noop);
+    let mut held = false;
     let mut clicked = None;
     for (index, (text, sprite, icon)) in faces.into_iter().enumerate() {
         let rect = slot(index as f32);
         let response = ui.interact(rect, id.with(index), egui::Sense::click());
+        held |= enabled && response.is_pointer_button_down_on();
         let selected = chosen == Some(index);
         response.widget_info(|| {
             egui::WidgetInfo::selected(
@@ -455,7 +443,45 @@ pub fn segmented(
             clicked = Some(index);
         }
     }
+    if let Some(chosen) = chosen {
+        let at = ctx.animate_value_with_time(id.with("thumb"), chosen as f32, 0.25);
+        let press = ctx.animate_bool_with_time(id.with("press"), held, 0.12);
+        painter.set(thumb_slot, thumb(&ctx, slot(at), press, enabled));
+    }
     clicked
+}
+
+/// The segmented control's raised thumb over `rect`. While `press` rises from 0 to 1 it swells
+/// and clears into a glass lens, as iOS 26 thumbs do under a finger.
+fn thumb(ctx: &egui::Context, rect: Rect, press: f32, enabled: bool) -> Vec<Shape> {
+    let dark = ctx.global_style().visuals.dark_mode;
+    let rect = rect.expand(press * (rect.height() * SWELL).min(SWELL_LIMIT));
+    let radius = rect.height() / 2.0;
+    let fill = if dark {
+        Color32::from_rgb(0x63, 0x63, 0x66).gamma_multiply(if enabled { 1.0 } else { 0.5 })
+    } else {
+        Color32::WHITE.gamma_multiply(if enabled { 1.0 } else { 0.6 })
+    };
+    let mut shapes = vec![glass::halo(
+        rect.translate(Vec2::new(0.0, 1.0)),
+        radius,
+        Color32::from_black_alpha(if dark { 60 } else { 28 }),
+        4.0,
+    )];
+    if press > 0.01 {
+        let lens = Lens {
+            zoom: 1.0 + 0.1 * press,
+            shadow: 0.0,
+            ..Lens::control(ctx).tinted(fill, 0.3)
+        };
+        shapes.extend(glass(ctx, rect, radius, &lens));
+    }
+    shapes.push(Shape::rect_filled(
+        rect,
+        corner(radius),
+        fill.gamma_multiply(1.0 - 0.7 * press),
+    ));
+    shapes
 }
 
 /// A plain section heading: an accent symbol beside a bold title, as in iOS grouped lists.

@@ -645,6 +645,10 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
 }
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
+    // The tabs open the page's scroll view, which would clip their shadow and swell.
+    if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
+        ui.add_space(crate::app::rendering::liquid::HEADROOM);
+    }
     ui.horizontal_wrapped(|ui| {
         pixel::segmented(
             ui,
