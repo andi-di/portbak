@@ -147,7 +147,13 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         let title = if liquid { palette.ink } else { palette.gold };
         pixel::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(14.0);
-        ui.heading("Your folders. Safely backed up.");
+        let tagline = "Your folders. Safely backed up.";
+        if liquid {
+            // iOS empty states describe themselves in plain secondary text below the bold title.
+            ui.label(egui::RichText::new(tagline).color(palette.dim));
+        } else {
+            ui.heading(tagline);
+        }
         ui.label(
             egui::RichText::new("Create a backup job and select source and destination folders.")
                 .color(palette.dim),

@@ -72,7 +72,13 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
 
 fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
-    ui.label("Defaults apply to new jobs. Each job can override these settings.");
+    let note = "Defaults apply to new jobs. Each job can override these settings.";
+    // iOS sets explanatory notes in secondary grey, leaving black for content.
+    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+        ui.label(egui::RichText::new(note).color(palette.dim));
+    } else {
+        ui.label(note);
+    }
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
         switch_row(
             ui,
