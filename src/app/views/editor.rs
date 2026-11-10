@@ -126,9 +126,11 @@ impl App {
 /// The empty state: a bobbing floppy and one big button; returns whether it was pressed.
 fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let palette = Palette::of(ui);
+    // Liquid glass follows iOS's empty state: a still, secondary symbol and no arcade prompt.
+    let liquid = Skin::of(ui.ctx()).finish == style::Finish::Liquid;
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if Skin::of(ui.ctx()).effects.hearts || pixel::blink(ui, 0.6) {
+        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || pixel::blink(ui, 0.6) {
             0.0
         } else {
             6.0
@@ -137,15 +139,12 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         if Skin::of(ui.ctx()).effects.hearts {
             crate::app::scenery::catgirl::show_welcome(ui);
         } else {
-            sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+            let symbol = if liquid { palette.dim } else { palette.hot };
+            sprites::show(ui, Sprite::Floppy, 10.0, symbol);
         }
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
-        let title = if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
-            palette.ink
-        } else {
-            palette.gold
-        };
+        let title = if liquid { palette.ink } else { palette.gold };
         pixel::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(14.0);
         ui.heading("Your folders. Safely backed up.");
@@ -159,6 +158,9 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
             .tone(Tone::Accent)
             .min_size(egui::vec2(240.0, 52.0));
         let clicked = ui.add_enabled(can_add, start).clicked();
+        if liquid {
+            return clicked;
+        }
         ui.add_space(14.0);
         let prompt = if pixel::blink(ui, 0.5) {
             wording.welcome_prompt
