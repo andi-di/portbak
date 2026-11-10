@@ -310,7 +310,7 @@ pub fn size(ctx: &egui::Context, sprite: Sprite, scale: f32) -> Vec2 {
         }
         Finish::Glass => glyphs::grid(sprite),
         Finish::Gothic => egui::vec2(12.0, 12.0),
-        Finish::Modern => glyphs::grid(sprite) * 0.8,
+        Finish::Modern | Finish::Liquid => glyphs::grid(sprite) * 0.8,
     };
     grid * scale
 }
@@ -336,7 +336,7 @@ pub fn paint_awake(
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
             crate::app::rendering::gothic::icon(painter, rect, sprite, tint);
         }
-        Finish::Modern => {
+        Finish::Modern | Finish::Liquid => {
             let rect = Rect::from_min_size(origin, size(painter.ctx(), sprite, scale));
             crate::app::rendering::modern::icon(painter, rect, sprite, tint);
         }

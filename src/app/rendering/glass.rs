@@ -607,7 +607,8 @@ fn soft_shadow(rect: Rect, radius: f32, palette: &Palette, reach: f32) -> Shape 
     })
 }
 
-fn halo(rect: Rect, radius: f32, color: Color32, reach: f32) -> Shape {
+/// `color` spreading `reach` points out from a rounded edge, leaving the inside clear.
+pub fn halo(rect: Rect, radius: f32, color: Color32, reach: f32) -> Shape {
     aura(rect, radius, reach, |_| color)
 }
 

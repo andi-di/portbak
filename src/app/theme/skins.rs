@@ -1,6 +1,7 @@
 //! Registry of available skins. A new look is one more `Skin` value listed in `ALL`.
 
 mod frutiger_aero;
+mod liquid_glass;
 mod midnight_neko;
 mod modern;
 mod retro;
@@ -12,6 +13,7 @@ pub static ALL: &[&Skin] = &[
     &modern::MODERN,
     &frutiger_aero::FRUTIGER_AERO,
     &midnight_neko::MIDNIGHT_NEKO,
+    &liquid_glass::LIQUID_GLASS,
 ];
 
 pub fn default() -> &'static Skin {

@@ -34,6 +34,8 @@ pub enum Finish {
     Glass,
     /// Matte gothic panels, silver ornaments and crimson accents.
     Gothic,
+    /// iOS-style liquid glass lenses, capsule controls, switches and line symbols.
+    Liquid,
 }
 
 /// Flavor text in the display face; plain instructions stay the same in every skin.
@@ -93,6 +95,8 @@ pub struct Typography {
     pub display_glow: f32,
     /// Buttons, badges, captions and title bars are set in capitals.
     pub capitals: bool,
+    /// Display labels written in capitals are set in title case instead.
+    pub title_case: bool,
 }
 
 pub struct Metrics {
@@ -133,6 +137,8 @@ pub enum TitleBar {
     Glass,
     /// Matte gothic panels, silver ornaments and crimson accents.
     Gothic,
+    /// A bold heading beside an accent symbol, straight on the glass.
+    Liquid,
 }
 
 impl Skin {
@@ -180,12 +186,24 @@ pub fn face_font(ctx: &egui::Context, size: f32) -> FontId {
 
 /// Matte looks keep decorative details neutral; status colors retain their meaning.
 pub fn decorative_color(ctx: &egui::Context, original: Color32) -> Color32 {
-    if Skin::of(ctx).finish == Finish::Modern {
+    if matches!(Skin::of(ctx).finish, Finish::Modern | Finish::Liquid) {
         Palette::of_ctx(ctx).ink
     } else if Skin::of(ctx).finish == Finish::Gothic {
         Palette::of_ctx(ctx).metal
     } else {
         original
+    }
+}
+
+/// A job's symbol color: liquid glass tints enabled jobs with the accent, like iOS sidebar
+/// symbols, and greys out disabled ones.
+pub fn job_symbol_color(ctx: &egui::Context, enabled: bool) -> Color32 {
+    let palette = Palette::of_ctx(ctx);
+    match (Skin::of(ctx).finish, enabled) {
+        (Finish::Liquid, true) => palette.accent,
+        (Finish::Liquid, false) => palette.dim,
+        (_, true) => decorative_color(ctx, palette.good),
+        (_, false) => decorative_color(ctx, palette.metal),
     }
 }
 
@@ -196,6 +214,22 @@ pub fn metrics(ctx: &egui::Context) -> &'static Metrics {
 /// `color` at the skin's panel opacity, for panels, sections and cards.
 pub fn glazed(ctx: &egui::Context, color: Color32) -> Color32 {
     color.gamma_multiply(Skin::of(ctx).effects.opacity)
+}
+
+/// Display `text` as the skin sets it: words in capitals become title case where it asks.
+pub fn titled(ctx: &egui::Context, text: &str) -> String {
+    if !Skin::of(ctx).typography.title_case || text.chars().any(char::is_lowercase) {
+        return text.to_owned();
+    }
+    text.split(' ')
+        .map(|word| {
+            let mut letters = word.chars();
+            letters.next().map_or_else(String::new, |first| {
+                first.to_string() + &letters.as_str().to_lowercase()
+            })
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// `text` in capitals when the skin sets its labels that way.
@@ -214,6 +248,7 @@ pub fn well(ctx: &egui::Context) -> egui::Frame {
     let stroke = match Skin::of(ctx).finish {
         Finish::Glass => Stroke::new(1.0_f32, palette.hot.gamma_multiply(0.8)),
         Finish::Modern | Finish::Gothic => Stroke::new(1.0_f32, palette.outline),
+        Finish::Liquid => Stroke::NONE,
         Finish::Pixel => Stroke::new(2.0_f32, palette.outline),
     };
     egui::Frame::new()
@@ -308,6 +343,47 @@ fn apply(style: &mut egui::Style, skin: &Skin, palette: &Palette) {
         style.visuals.window_stroke = Stroke::new(1.0_f32, palette.outline);
         style.visuals.selection.bg_fill = palette.accent;
     }
+    if skin.finish == Finish::Liquid {
+        style.spacing.scroll = egui::style::ScrollStyle::floating();
+        style.spacing.scroll.handle_min_length = 24.0;
+        liquid_visuals(&mut style.visuals, palette);
+    }
+}
+
+/// iOS fills: borderless translucent grey fields, a hairline glass rim on popups and accent
+/// selection; the glass itself is painted by the widgets.
+fn liquid_visuals(visuals: &mut egui::Visuals, palette: &Palette) {
+    let fill = |alpha| Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, alpha);
+    let rim = if visuals.dark_mode {
+        Color32::from_white_alpha(40)
+    } else {
+        Color32::from_white_alpha(150)
+    };
+    // The wallpaper runs unbroken behind every panel; only glass lies on it.
+    visuals.panel_fill = Color32::TRANSPARENT;
+    visuals.extreme_bg_color = fill(if visuals.dark_mode { 70 } else { 34 });
+    visuals.code_bg_color = visuals.extreme_bg_color;
+    visuals.faint_bg_color = fill(20);
+    visuals.window_stroke = Stroke::new(1.0_f32, rim);
+    visuals.window_shadow.color = Color32::from_black_alpha(40);
+    visuals.popup_shadow.color = Color32::from_black_alpha(30);
+    visuals.selection.bg_fill = palette.accent.gamma_multiply(0.45);
+    visuals.selection.stroke = Stroke::new(1.0_f32, palette.accent);
+    visuals.handle_shape = egui::style::HandleShape::Circle;
+    let widgets = &mut visuals.widgets;
+    for (state, alpha) in [
+        (&mut widgets.inactive, 40),
+        (&mut widgets.hovered, 64),
+        (&mut widgets.active, 90),
+        (&mut widgets.open, 64),
+    ] {
+        state.bg_fill = fill(alpha);
+        state.weak_bg_fill = fill(alpha);
+        state.bg_stroke = Stroke::NONE;
+    }
+    widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, fill(60));
+    widgets.hovered.bg_stroke = Stroke::new(1.0_f32, palette.accent.gamma_multiply(0.6));
+    widgets.active.fg_stroke = Stroke::new(1.0_f32, palette.ink);
 }
 
 fn apply_visuals(visuals: &mut egui::Visuals, skin: &Skin, palette: &Palette) {

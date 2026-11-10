@@ -2,8 +2,9 @@
 
 use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::gothic;
+use crate::app::rendering::liquid::{self, Frost, Lens};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::{aurora, midnight_neko};
+use crate::app::scenery::{aurora, liquid_wallpaper, midnight_neko};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -12,6 +13,13 @@ use eframe::egui::{
 use std::time::Duration;
 
 const ICON_SCALE: f32 = 2.0;
+/// Extra vertical padding of liquid glass capsules, which stand a little taller than other buttons.
+const LIQUID_PADDING: f32 = 3.0;
+/// Size of the iOS 26 switch that stands in for check boxes in liquid glass: wider and lower
+/// than earlier iOS switches.
+const SWITCH: Vec2 = Vec2::new(64.0, 28.0);
+/// Room between a liquid glass switch and the label before it.
+const LIQUID_SWITCH_GAP: f32 = 14.0;
 const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
 pub(crate) fn pointing_hand(response: Response) -> Response {
@@ -152,6 +160,15 @@ impl Widget for PixelButton {
             padding.y = padding.y.min(6.0);
         }
         let finish = Skin::of(ui.ctx()).finish;
+        if finish == Finish::Liquid {
+            padding.y += LIQUID_PADDING;
+            // Symbol buttons are glass circles, text buttons roomy capsules.
+            padding.x = if self.icon_only {
+                padding.y + (icon.y - icon.x) / 2.0
+            } else {
+                padding.x + 6.0
+            };
+        }
         // Plates and gels press straight down, so they only need room below.
         let margin = if finish == Finish::Pixel {
             Vec2::splat(m.lift)
@@ -173,6 +190,11 @@ impl Widget for PixelButton {
         let glow = ui
             .ctx()
             .animate_bool_with_time(response.id.with("glow"), hovered, 0.15);
+        let press = ui.ctx().animate_bool_with_time(
+            response.id.with("press"),
+            enabled && response.is_pointer_button_down_on(),
+            0.12,
+        );
         let base = self.base_fill(palette);
         let fill = if modern && self.tone == Tone::Plain && !self.selected {
             if !enabled {
@@ -185,14 +207,33 @@ impl Widget for PixelButton {
         } else if modern && sunk && enabled {
             mix(base, Color32::BLACK, 0.12)
         } else {
+            // Liquid glass brightens gradually through `glow` instead of switching fills.
             match (enabled, hovered) {
                 (false, _) => palette.surface,
-                (true, true) => mix(base, Color32::WHITE, 0.18),
-                (true, false) => base,
+                (true, true) if finish != Finish::Liquid => mix(base, Color32::WHITE, 0.18),
+                (true, _) => base,
             }
         };
+        let plain = self.tone == Tone::Plain && !self.selected;
+        // iOS toolbars tint destructive and confirming symbols on clear glass instead of filling it.
+        let symbol_on_glass = finish == Finish::Liquid
+            && self.icon_only
+            && matches!(self.tone, Tone::Danger | Tone::Good)
+            && !self.selected;
         let painter = ui.painter();
-        let face = if modern {
+        let face = if finish == Finish::Liquid {
+            let face = Rect::from_min_size(rect.min, face_size);
+            let look = FaceLook {
+                fill,
+                enabled,
+                pressed: sunk,
+                glow,
+                focused: response.has_focus(),
+                clear: plain || symbol_on_glass,
+            };
+            liquid::button(painter, face, &look, press);
+            face
+        } else if modern {
             let face = Rect::from_min_size(rect.min, face_size);
             if finish == Finish::Gothic {
                 if !utility || hovered || sunk || response.has_focus() {
@@ -226,14 +267,18 @@ impl Widget for PixelButton {
                 pressed: sunk,
                 glow,
                 focused: response.has_focus(),
-                clear: self.tone == Tone::Plain && !self.selected,
+                clear: plain,
             };
             glass::gel_button(painter, face, &look);
             face
         };
         let ink = if gothic && enabled {
             gothic::foreground(fill)
-        } else if modern && self.tone == Tone::Plain && !self.selected {
+        } else if symbol_on_glass && enabled {
+            base
+        } else if finish == Finish::Liquid && enabled && !plain {
+            liquid::ink_on(fill)
+        } else if (modern || finish == Finish::Liquid) && plain {
             if enabled {
                 palette.ink
             } else {
@@ -250,7 +295,9 @@ impl Widget for PixelButton {
         if let Some(sprite) = self.sprite {
             let tint = match (enabled, self.tone, self.selected) {
                 (false, ..) => palette.dim,
-                (true, Tone::Plain, false) if finish == Finish::Gothic => ink,
+                (true, Tone::Plain, false) if matches!(finish, Finish::Gothic | Finish::Liquid) => {
+                    ink
+                }
                 (true, Tone::Plain, false) => palette.accent,
                 _ => ink,
             };
@@ -305,6 +352,8 @@ fn pixel_face(
 pub struct PixelCheckbox<'a> {
     checked: &'a mut bool,
     label: String,
+    /// Whether the label is painted; an unlabeled box still names itself to assistive tools.
+    labeled: bool,
 }
 
 impl<'a> PixelCheckbox<'a> {
@@ -312,6 +361,15 @@ impl<'a> PixelCheckbox<'a> {
         Self {
             checked,
             label: label.into(),
+            labeled: true,
+        }
+    }
+
+    /// Paints only the box, for rows that show the label themselves.
+    pub fn unlabeled(self) -> Self {
+        Self {
+            labeled: false,
+            ..self
         }
     }
 }
@@ -320,16 +378,29 @@ impl Widget for PixelCheckbox<'_> {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
-        let box_side = ui.spacing().icon_width + 4.0;
-        let spacing = ui.spacing().icon_spacing;
-        let wrap = (ui.available_width() - box_side - spacing).max(40.0);
+        let finish = Skin::of(ui.ctx()).finish;
+        let indicator = if finish == Finish::Liquid {
+            SWITCH
+        } else {
+            Vec2::splat(ui.spacing().icon_width + 4.0)
+        };
+        let spacing = if finish == Finish::Liquid {
+            LIQUID_SWITCH_GAP
+        } else {
+            ui.spacing().icon_spacing
+        };
+        let wrap = (ui.available_width() - indicator.x - spacing).max(40.0);
         let font = TextStyle::Body.resolve(ui.style());
-        let galley = ui
-            .painter()
-            .layout(self.label.clone(), font, Color32::PLACEHOLDER, wrap);
+        let text = if self.labeled {
+            self.label.clone()
+        } else {
+            String::new()
+        };
+        let galley = ui.painter().layout(text, font, Color32::PLACEHOLDER, wrap);
+        let spacing = if self.labeled { spacing } else { 0.0 };
         let size = egui::vec2(
-            box_side + spacing + galley.size().x,
-            box_side.max(galley.size().y),
+            indicator.x + spacing + galley.size().x,
+            indicator.y.max(galley.size().y),
         );
         let (rect, mut response) = ui.allocate_exact_size(size, Sense::click());
         if response.clicked() {
@@ -348,18 +419,39 @@ impl Widget for PixelCheckbox<'_> {
         let first_line = galley
             .rows
             .first()
-            .map_or(box_side, |row| row.height())
-            .max(box_side);
+            .map_or(indicator.y, |row| row.height())
+            .max(indicator.y);
+        // iOS always puts a switch after its label; check boxes lead theirs.
+        let trailing = finish == Finish::Liquid;
+        let indicator_left = if trailing {
+            rect.left() + galley.size().x + spacing
+        } else {
+            rect.left()
+        };
         let square = Rect::from_center_size(
-            egui::pos2(rect.left() + box_side / 2.0, rect.top() + first_line / 2.0),
-            Vec2::splat(box_side),
+            egui::pos2(
+                indicator_left + indicator.x / 2.0,
+                rect.top() + first_line / 2.0,
+            ),
+            indicator,
         );
         let border = match (enabled, response.hovered()) {
             (false, _) => palette.shade,
             (true, true) => palette.accent,
             (true, false) => palette.outline,
         };
-        match Skin::of(ui.ctx()).finish {
+        match finish {
+            Finish::Liquid => {
+                let on = ui
+                    .ctx()
+                    .animate_bool_with_time(response.id.with("on"), checked, 0.25);
+                let press = ui.ctx().animate_bool_with_time(
+                    response.id.with("press"),
+                    enabled && response.is_pointer_button_down_on(),
+                    0.15,
+                );
+                liquid::switch(painter, square, on, press, enabled);
+            }
             Finish::Pixel => {
                 painter.rect_filled(square, 0.0, palette.sunken);
                 bevel(
@@ -396,7 +488,7 @@ impl Widget for PixelCheckbox<'_> {
             }
             Finish::Glass => glass::check_socket(painter, square, border),
         }
-        if checked {
+        if checked && finish != Finish::Liquid {
             let tint = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic)
                 && enabled
             {
@@ -415,11 +507,12 @@ impl Widget for PixelCheckbox<'_> {
         let ink = if enabled { palette.ink } else { palette.dim };
         let text_top =
             rect.top() + (first_line - galley.rows.first().map_or(0.0, |r| r.height())) / 2.0;
-        painter.galley(
-            egui::pos2(square.right() + spacing, text_top).round(),
-            galley,
-            ink,
-        );
+        let text_left = if trailing {
+            rect.left()
+        } else {
+            square.right() + spacing
+        };
+        painter.galley(egui::pos2(text_left, text_top).round(), galley, ink);
         pointing_hand(response)
     }
 }
@@ -444,13 +537,36 @@ pub fn choice<T: PartialEq>(
     response
 }
 
+/// One of `options` for `current`: an iOS segmented control in liquid glass, a row of latching
+/// keys otherwise.
+pub fn segmented<T: PartialEq + Copy>(
+    ui: &mut egui::Ui,
+    current: &mut T,
+    options: &[(T, &str, Sprite)],
+) {
+    if Skin::of(ui.ctx()).finish != Finish::Liquid {
+        for &(value, label, sprite) in options {
+            choice(ui, current, value, label, Some(sprite));
+        }
+        return;
+    }
+    let chosen = options.iter().position(|(value, ..)| value == current);
+    let segments: Vec<_> = options
+        .iter()
+        .map(|&(_, label, sprite)| (label, sprite))
+        .collect();
+    if let Some(index) = liquid::segmented(ui, &segments, chosen, ICON_SCALE) {
+        *current = options[index].0;
+    }
+}
+
 /// Total height of a `PixelButton` with a single text line, including its shadow.
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
-    let content = if Skin::of(ui.ctx()).finish == Finish::Gothic {
-        ui.text_style_height(&TextStyle::Button).max(40.0)
-    } else {
-        ui.text_style_height(&TextStyle::Button)
+    let content = match Skin::of(ui.ctx()).finish {
+        Finish::Gothic => ui.text_style_height(&TextStyle::Button).max(40.0),
+        Finish::Liquid => ui.text_style_height(&TextStyle::Button) + LIQUID_PADDING * 2.0,
+        _ => ui.text_style_height(&TextStyle::Button),
     };
     content + (ui.spacing().button_padding.y + m.border * 2.0) * 2.0 + m.lift
 }
@@ -465,7 +581,8 @@ pub fn section<R>(
 ) -> R {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
-    let glassy = Skin::of(ui.ctx()).finish == Finish::Glass;
+    let finish = Skin::of(ui.ctx()).finish;
+    let glassy = matches!(finish, Finish::Glass | Finish::Liquid);
     let margin = egui::Margin {
         left: 0,
         top: 0,
@@ -503,8 +620,14 @@ pub fn section<R>(
         );
     }
     if glassy {
+        let ctx = ui.ctx();
         let rect = framed.response.rect - egui::epaint::MarginF32::from(margin);
-        let pane = glass::pane(ui.ctx(), rect, m.radius as f32, &Glaze::clear(ui.ctx()));
+        let radius = m.radius as f32;
+        let pane = if finish == Finish::Liquid {
+            liquid::glass(ctx, rect, radius, &Lens::pane(ctx))
+        } else {
+            glass::pane(ctx, rect, radius, &Glaze::clear(ctx))
+        };
         ui.painter().set(backing, pane);
     }
     framed.inner
@@ -516,6 +639,7 @@ pub fn title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color32) 
         TitleBar::Striped => striped_title_bar(ui, title, sprite, band),
         TitleBar::Glass => aurora::glass_title_bar(ui, title, sprite, band),
         TitleBar::Gothic => gothic::title_bar(ui, title, sprite),
+        TitleBar::Liquid => liquid::title_bar(ui, title, sprite),
     }
 }
 
@@ -575,6 +699,7 @@ fn striped_title_bar(ui: &mut egui::Ui, title: &str, sprite: Sprite, band: Color
 pub fn display_label(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> Response {
     let palette = Palette::of(ui);
     let typography = &Skin::of(ui.ctx()).typography;
+    let text = &style::titled(ui.ctx(), text);
     let size = size * typography.display_scale;
     let font = style::face_font(ui.ctx(), size);
     let galley = ui
@@ -623,7 +748,7 @@ pub fn halo(painter: &egui::Painter, origin: Pos2, text: &str, font: &egui::Font
 pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
     let m = style::metrics(ui.ctx());
     let palette = Palette::of(ui);
-    let ink = if Skin::of(ui.ctx()).finish == Finish::Modern {
+    let ink = if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Liquid) {
         crate::app::rendering::modern::foreground(fill)
     } else {
         readable_on(fill, palette)
@@ -638,19 +763,20 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: Color32) -> Response {
         Sense::hover(),
     );
     let painter = ui.painter();
-    if Skin::of(ui.ctx()).finish == Finish::Glass {
-        glass::pill(painter, rect, fill);
-        painter.galley(rect.min + padding + Vec2::splat(m.border), galley, ink);
-        return response;
+    match Skin::of(ui.ctx()).finish {
+        Finish::Glass => glass::pill(painter, rect, fill),
+        Finish::Liquid => liquid::pill(painter, rect, fill),
+        _ => {
+            let radius = style::control_radius(ui.ctx());
+            painter.rect_filled(rect, radius, fill);
+            painter.rect_stroke(
+                rect,
+                radius,
+                Stroke::new(m.border, palette.outline),
+                StrokeKind::Inside,
+            );
+        }
     }
-    let radius = style::control_radius(ui.ctx());
-    painter.rect_filled(rect, radius, fill);
-    painter.rect_stroke(
-        rect,
-        radius,
-        Stroke::new(m.border, palette.outline),
-        StrokeKind::Inside,
-    );
     painter.galley(rect.min + padding + Vec2::splat(m.border), galley, ink);
     response
 }
@@ -678,6 +804,10 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
         }
         Finish::Glass => {
             glass::orb(painter, rect.center(), rect.width() / 2.0 - 0.5, fill, lit);
+            return response;
+        }
+        Finish::Liquid => {
+            liquid::dot(painter, rect.center(), fill, lit);
             return response;
         }
     }
@@ -710,9 +840,17 @@ pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: boo
     if active {
         ui.ctx().request_repaint_after(MARQUEE_FRAME);
     }
-    if Skin::of(ui.ctx()).finish == Finish::Glass {
-        glass::progress(painter, rect, color, ui.input(|input| input.time), active);
-        return response;
+    let time = ui.input(|input| input.time);
+    match Skin::of(ui.ctx()).finish {
+        Finish::Glass => {
+            glass::progress(painter, rect, color, time, active);
+            return response;
+        }
+        Finish::Liquid => {
+            liquid::progress(painter, rect, color, time, active);
+            return response;
+        }
+        _ => {}
     }
     painter.rect_filled(rect, 0.0, palette.sunken);
     painter.rect_stroke(
@@ -723,7 +861,7 @@ pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: boo
     );
     let track = rect.shrink(m.border + 2.0);
     let cells = ((track.width() + GAP) / (CELL + GAP)).floor().max(1.0) as usize;
-    let step = (ui.input(|input| input.time) * 14.0) as usize % (cells + TRAIL);
+    let step = (time * 14.0) as usize % (cells + TRAIL);
     for cell in 0..cells {
         let behind = step
             .checked_sub(cell)
@@ -768,7 +906,7 @@ pub fn stripes(painter: &egui::Painter, rect: Rect, palette: &Palette) {
 
 /// The frame of a side, top or bottom panel; glass skins paint their own pane instead of a fill.
 pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
-    if Skin::of(ctx).finish == Finish::Glass {
+    if matches!(Skin::of(ctx).finish, Finish::Glass | Finish::Liquid) {
         egui::Frame::new()
     } else if Skin::of(ctx).finish == Finish::Gothic {
         egui::Frame::new()
@@ -794,6 +932,18 @@ pub fn panel_decoration(ui: &egui::Ui, density: f32) {
         );
         return;
     }
+    if Skin::of(ctx).finish == Finish::Liquid {
+        // A floating sheet of glass; short bars round off into capsules.
+        let rect = ui.clip_rect().shrink(INSET + 2.0);
+        let radius = (style::metrics(ctx).radius as f32 + 4.0).min(rect.height() / 2.0);
+        let pane = Lens::pane(ctx);
+        let lens = Lens {
+            tint_strength: (pane.tint_strength * density).min(0.9),
+            ..pane
+        };
+        ui.painter().extend(liquid::glass(ctx, rect, radius, &lens));
+        return;
+    }
     if Skin::of(ctx).finish != Finish::Glass {
         return;
     }
@@ -813,6 +963,8 @@ pub fn paint_underlay(ctx: &egui::Context) {
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
         midnight_neko::paint_background(ctx, palette);
+    } else if Skin::of(ctx).finish == Finish::Liquid {
+        liquid_wallpaper::paint(ctx);
     } else if effects.wallpaper {
         aurora::paint_wallpaper(ctx, palette);
     }
@@ -892,22 +1044,47 @@ pub fn tooltip(ui: &egui::Ui, rect: Rect, id: egui::Id, text: &str) {
 /// The contents of a dropdown, menu or tooltip; glass skins frost the popup behind them.
 pub fn popup<R>(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let ctx = ui.ctx().clone();
-    if Skin::of(&ctx).finish != Finish::Glass {
-        return contents(ui);
+    let finish = Skin::of(&ctx).finish;
+    let radius = f32::from(ui.visuals().menu_corner_radius.nw);
+    let margin = ui.spacing().menu_margin;
+    match finish {
+        Finish::Liquid => return liquid::sheet(ui, margin, radius, Frost::Menu, contents),
+        Finish::Glass => {}
+        _ => return contents(ui),
     }
     // Popups may scroll or clip their contents, so the pane goes on a painter reaching the margin.
     let painter = ui.painter().with_clip_rect(ctx.content_rect());
     let backing = painter.add(egui::Shape::Noop);
     let inner = contents(ui);
-    let rect = ui.min_rect() + egui::epaint::MarginF32::from(ui.spacing().menu_margin);
+    let rect = ui.min_rect() + egui::epaint::MarginF32::from(margin);
     let clear = Glaze::clear(&ctx);
     let glaze = Glaze {
         opacity: (clear.opacity * 1.6).min(1.0),
         ..clear
     };
-    let radius = f32::from(ui.visuals().menu_corner_radius.nw);
     painter.set(backing, glass::pane(&ctx, rect, radius, &glaze));
     inner
+}
+
+/// Hover hints drawn like the skin's popups, so glass skins frost them; in place of
+/// `on_hover_text` and `on_disabled_hover_text`.
+pub trait Hint {
+    fn hint(self, text: impl Into<egui::WidgetText>) -> Self;
+    fn disabled_hint(self, text: impl Into<egui::WidgetText>) -> Self;
+}
+
+impl Hint for Response {
+    fn hint(self, text: impl Into<egui::WidgetText>) -> Self {
+        self.on_hover_ui(|ui| {
+            popup(ui, |ui| ui.label(text));
+        })
+    }
+
+    fn disabled_hint(self, text: impl Into<egui::WidgetText>) -> Self {
+        self.on_disabled_hover_ui(|ui| {
+            popup(ui, |ui| ui.label(text));
+        })
+    }
 }
 
 /// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.

@@ -1,9 +1,12 @@
 use crate::app::rendering::glass::{self, Tint};
-use crate::app::rendering::pixel::{self, PixelCheckbox};
+use crate::app::rendering::liquid;
+use crate::app::rendering::pixel::{self, Hint};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
-use crate::app::views::widgets::{caption, centered_row, gib_field, page_frame, page_scroll_area};
+use crate::app::views::widgets::{
+    caption, gib_field, page_frame, page_scroll_area, switch_row, switch_row_with,
+};
 use crate::app::App;
 use crate::model::{Config, JobDefaults};
 use eframe::egui;
@@ -33,20 +36,25 @@ impl App {
 fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) {
     let palette = Palette::of(ui);
     ui.horizontal(|ui| {
+        // Liquid glass opens with an iOS large title instead of an icon beside the name.
+        if Skin::of(ui.ctx()).finish == Finish::Liquid {
+            pixel::display_label(ui, "SETTINGS", 26.0, palette.ink);
+            return;
+        }
         sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
         ui.add_space(6.0);
         pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
     });
     ui.add_space(14.0);
     ui.horizontal_wrapped(|ui| {
-        pixel::choice(
+        pixel::segmented(
             ui,
             tab,
-            SettingsTab::Jobs,
-            "Job settings",
-            Some(Sprite::JobSettings),
+            &[
+                (SettingsTab::Jobs, "Job settings", Sprite::JobSettings),
+                (SettingsTab::Theme, "Theme", Sprite::Theme),
+            ],
         );
-        pixel::choice(ui, tab, SettingsTab::Theme, "Theme", Some(Sprite::Theme));
     });
     ui.add_space(14.0);
     match tab {
@@ -64,58 +72,51 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
 
 fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     let palette = Palette::of(ui);
-    ui.label("Defaults apply to new jobs. Each job can override these settings.");
+    let note = "Defaults apply to new jobs. Each job can override these settings.";
+    // iOS sets explanatory notes in secondary grey, leaving black for content.
+    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+        ui.label(egui::RichText::new(note).color(palette.dim));
+    } else {
+        ui.label(note);
+    }
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.auto_destination,
-                "Auto destination folder",
-            ));
-        });
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(&mut defaults.zip, "Compress as ZIP"));
-        });
+        switch_row(
+            ui,
+            &mut defaults.auto_destination,
+            "Auto destination folder",
+        );
+        switch_row(ui, &mut defaults.zip, "Compress as ZIP");
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.check_on_enable,
-                "Check immediately when enabled",
-            ));
-        });
+        switch_row(
+            ui,
+            &mut defaults.check_on_enable,
+            "Check immediately when enabled",
+        );
         let mut job = defaults.new_job();
         super::editor::schedule_controls(ui, &mut job);
         defaults.update_schedule(&job);
     });
     pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
-        centered_row(ui, |ui| {
-            ui.add(PixelCheckbox::new(
-                &mut defaults.rolling,
-                "Enable rolling retention",
-            ));
-        });
+        switch_row(ui, &mut defaults.rolling, "Enable rolling retention");
         ui.add_enabled_ui(defaults.rolling, |ui| {
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(&mut defaults.count_enabled, "Max count"));
+            let counting = defaults.count_enabled;
+            switch_row_with(ui, &mut defaults.count_enabled, "Max count", |ui| {
                 ui.add_enabled(
-                    defaults.count_enabled,
+                    counting,
                     egui::DragValue::new(&mut defaults.max_count).range(1..=100_000),
                 );
             });
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut defaults.size_enabled,
-                    "Max total size",
-                ));
-                gib_field(ui, defaults.size_enabled, &mut defaults.max_bytes);
+            let sizing = defaults.size_enabled;
+            switch_row_with(ui, &mut defaults.size_enabled, "Max total size", |ui| {
+                gib_field(ui, sizing, &mut defaults.max_bytes);
             });
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut defaults.count_protected,
-                    "Count protected backups toward retention limits",
-                ))
-                .on_hover_text("Protected backups are never deleted by retention");
-            });
+            switch_row(
+                ui,
+                &mut defaults.count_protected,
+                "Count protected backups toward retention limits",
+            )
+            .hint("Protected backups are never deleted by retention");
         });
     });
 }
@@ -153,15 +154,28 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     if response.clicked() && !selected {
         *selected_id = candidate.id.to_owned();
     }
-    if Skin::of(ui.ctx()).finish == Finish::Glass {
-        let tint = match (selected, response.hovered()) {
-            (true, _) => Tint::Accent,
-            (false, true) => Tint::Hover,
-            (false, false) => Tint::Rest,
-        };
-        ui.painter()
-            .set(background, glass::tile(ui.ctx(), rect, tint));
-        return;
+    let tint = match (selected, response.hovered()) {
+        (true, _) => Tint::Accent,
+        (false, true) => Tint::Hover,
+        (false, false) => Tint::Rest,
+    };
+    match Skin::of(ui.ctx()).finish {
+        Finish::Glass => {
+            ui.painter()
+                .set(background, glass::tile(ui.ctx(), rect, tint));
+            return;
+        }
+        Finish::Liquid => {
+            let hover = ui.ctx().animate_bool_with_time(
+                response.id.with("glass_hover"),
+                response.hovered(),
+                liquid::HOVER_SECONDS,
+            );
+            ui.painter()
+                .set(background, liquid::tile(ui.ctx(), rect, tint, hover));
+            return;
+        }
+        _ => {}
     }
     let fill = match (selected, response.hovered()) {
         (true, _) => palette.accent,

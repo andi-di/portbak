@@ -1,6 +1,7 @@
 use crate::app::rendering::glass::{self, Tint};
+use crate::app::rendering::liquid;
 use crate::app::rendering::ornaments;
-use crate::app::rendering::pixel::{self, PixelButton, Tone};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
@@ -102,7 +103,11 @@ impl App {
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.9);
+                // Liquid glass keeps the top bar clear: only its buttons are glass.
+                let liquid = Skin::of(ui.ctx()).finish == Finish::Liquid;
+                if !liquid {
+                    pixel::panel_decoration(ui, 1.9);
+                }
                 ui.horizontal(|ui| {
                     logo(ui);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -110,7 +115,7 @@ impl App {
                             .icon_only()
                             .sprite(Sprite::Gear)
                             .selected(self.settings_open);
-                        if ui.add(settings).on_hover_text("Settings").clicked() {
+                        if ui.add(settings).hint("Settings").clicked() {
                             self.toggle_settings();
                             if self.settings_open {
                                 crate::app::scenery::catgirl::trigger(
@@ -127,7 +132,7 @@ impl App {
                         };
                         if ui
                             .add(PixelButton::new(label).sprite(sprite).icon_only())
-                            .on_hover_text(format!("Switch to {label} mode"))
+                            .hint(format!("Switch to {label} mode"))
                             .clicked()
                         {
                             self.config.theme = if dark { Theme::Light } else { Theme::Dark };
@@ -146,7 +151,7 @@ impl App {
                 ui.add_space(12.0);
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
-                if Skin::of(ui.ctx()).finish == Finish::Glass {
+                if liquid || Skin::of(ui.ctx()).finish == Finish::Glass {
                     ui.add_space(8.0);
                     return;
                 }
@@ -180,14 +185,20 @@ impl App {
     fn show_footer(&self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame =
-            pixel::panel_frame(&ctx, palette.sunken).inner_margin(egui::Margin::symmetric(18, 10));
+        // The liquid glass bar is a capsule, so its content keeps clear of the round ends.
+        let side = if Skin::of(&ctx).finish == Finish::Liquid {
+            34
+        } else {
+            18
+        };
+        let frame = pixel::panel_frame(&ctx, palette.sunken)
+            .inner_margin(egui::Margin::symmetric(side, 10));
         egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
                 pixel::panel_decoration(ui, 1.0);
-                if Skin::of(ui.ctx()).finish != Finish::Glass {
+                if !matches!(Skin::of(ui.ctx()).finish, Finish::Glass | Finish::Liquid) {
                     let clip = ui.clip_rect();
                     let rule =
                         egui::Rect::from_min_size(clip.left_top(), egui::vec2(clip.width(), 3.0));
@@ -229,13 +240,13 @@ impl App {
                             },
                         );
                         if active {
-                            response.on_hover_text(if self.active.is_some() {
+                            response.hint(if self.active.is_some() {
                                 self.progress.as_str()
                             } else {
                                 "Recent backup activity"
                             });
                         } else {
-                            response.on_hover_text("No backup or restore in progress");
+                            response.hint("No backup or restore in progress");
                         }
                     });
                 });
@@ -248,13 +259,20 @@ impl App {
     fn show_job_list(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
+        // The liquid glass sidebar floats inset in its panel; content keeps iOS's margin inside it.
+        let inset = if Skin::of(&ctx).finish == Finish::Liquid {
+            8
+        } else {
+            0
+        };
         let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
-            left: 16,
-            right: 14,
-            top: 16,
-            bottom: 8,
+            left: 16 + inset,
+            right: 14 + inset,
+            top: 16 + inset / 2,
+            bottom: 8 + inset,
         });
         let panel = egui::Panel::left("jobs")
+            .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
             .default_size(clamp_sidebar_width(self.config.sidebar_width))
             .size_range(SIDEBAR_WIDTH)
             .frame(frame)
@@ -268,8 +286,14 @@ impl App {
                         16.0,
                         style::decorative_color(ui.ctx(), palette.accent),
                     );
-                    let color = style::decorative_color(ui.ctx(), palette.gold);
-                    pixel::badge(ui, &self.config.jobs.len().to_string(), color);
+                    let count = self.config.jobs.len().to_string();
+                    // iOS lists counts as secondary text rather than in a badge.
+                    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+                        ui.label(egui::RichText::new(count).color(palette.dim));
+                    } else {
+                        let color = style::decorative_color(ui.ctx(), palette.gold);
+                        pixel::badge(ui, &count, color);
+                    }
                 });
                 ui.add_space(10.0);
                 let new_job = PixelButton::new("New job")
@@ -385,17 +409,12 @@ impl App {
                     egui::pos2(row.left() + icon_size.x / 2.0, row.center().y),
                     icon_size,
                 );
-                let tint = if job.enabled {
-                    palette.good
-                } else {
-                    palette.metal
-                };
                 sprites::paint_awake(
                     ui.painter(),
                     icon_rect.min,
                     Sprite::Floppy,
                     3.0,
-                    style::decorative_color(ui.ctx(), tint),
+                    style::job_symbol_color(ui.ctx(), job.enabled),
                     wake,
                 );
                 let gap = ui.spacing().item_spacing.x;
@@ -445,9 +464,14 @@ impl App {
             });
         let rect = frame.response.rect;
         let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
+        let glass_hover = ui.ctx().animate_bool_with_time(
+            card_id.with("glass_hover"),
+            response.hovered(),
+            liquid::HOVER_SECONDS,
+        );
         ui.painter().set(
             background,
-            card_shapes(ui.ctx(), rect, selected, response.hovered()),
+            card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
         ui.add_space(CARD_SHADOW);
         response.clicked()
@@ -503,10 +527,10 @@ fn saya_job_identity(ui: &mut egui::Ui, job: &Job, badge: Option<(String, egui::
 fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
-    let mascot = if skin.finish == Finish::Gothic {
-        crate::app::scenery::catgirl::show_header(ui)
-    } else {
-        sprites::show(ui, skin.wording.mascot, 4.0, palette.hot)
+    let mascot = match skin.finish {
+        Finish::Gothic => crate::app::scenery::catgirl::show_header(ui),
+        Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
+        _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
     if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
@@ -529,7 +553,7 @@ fn logo(ui: &mut egui::Ui) {
             } else {
                 24.0
             },
-            if skin.finish == Finish::Modern {
+            if matches!(skin.finish, Finish::Modern | Finish::Liquid) {
                 palette.ink
             } else {
                 palette.gold
@@ -542,19 +566,23 @@ fn logo(ui: &mut egui::Ui) {
     });
 }
 
+/// `glass_hover` eases `hovered` in and out for liquid glass.
 fn card_shapes(
     ctx: &egui::Context,
     rect: egui::Rect,
     selected: bool,
     hovered: bool,
+    glass_hover: f32,
 ) -> Vec<egui::Shape> {
-    if Skin::of(ctx).finish == Finish::Glass {
-        let tint = match (selected, hovered) {
-            (true, _) => Tint::Current,
-            (false, true) => Tint::Hover,
-            (false, false) => Tint::Rest,
-        };
-        return glass::tile(ctx, rect, tint);
+    let tint = match (selected, hovered) {
+        (true, _) => Tint::Current,
+        (false, true) => Tint::Hover,
+        (false, false) => Tint::Rest,
+    };
+    match Skin::of(ctx).finish {
+        Finish::Glass => return glass::tile(ctx, rect, tint),
+        Finish::Liquid => return liquid::tile(ctx, rect, tint, glass_hover),
+        _ => {}
     }
     let palette = palette_of(ctx);
     let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);

@@ -22,7 +22,7 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 **The app must be running for scheduled backups.** You can minimize it. Closing the window immediately exits without confirmation, stops scheduling, and terminates running operations. Missed checks are caught up once on startup or resume. Schedules use the local time zone: a time skipped by daylight saving is moved to the first valid minute, and a repeated time runs only once.
 
-Choose **Retro**, **Modern**, **Frutiger Aero**, or **Midnight Neko** in Settings. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
+Choose **Retro**, **Modern**, **Frutiger Aero**, **Midnight Neko**, or **Liquid Glass** in Settings. Frutiger Aero and Liquid Glass use OpenGL 3 shaders for their glass and fall back to simpler translucent panes without it. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
 The minimum window size is 1024 × 940 logical pixels. The job sidebar is at least 300 logical pixels wide. In Midnight Neko, Saya's square portrait and attached dialogue box use the full sidebar width, and the job list scrolls above them.
 

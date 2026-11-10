@@ -1,9 +1,9 @@
-use crate::app::rendering::pixel::{self, PixelButton, PixelCheckbox, Tone};
+use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
     alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
-    retention_warnings, DATE_TIME,
+    retention_warnings, switch_row, switch_row_with, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
 use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
@@ -126,9 +126,11 @@ impl App {
 /// The empty state: a bobbing floppy and one big button; returns whether it was pressed.
 fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let palette = Palette::of(ui);
+    // Liquid glass follows iOS's empty state: a still, secondary symbol and no arcade prompt.
+    let liquid = Skin::of(ui.ctx()).finish == style::Finish::Liquid;
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if Skin::of(ui.ctx()).effects.hearts || pixel::blink(ui, 0.6) {
+        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || pixel::blink(ui, 0.6) {
             0.0
         } else {
             6.0
@@ -137,13 +139,21 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         if Skin::of(ui.ctx()).effects.hearts {
             crate::app::scenery::catgirl::show_welcome(ui);
         } else {
-            sprites::show(ui, Sprite::Floppy, 10.0, palette.hot);
+            let symbol = if liquid { palette.dim } else { palette.hot };
+            sprites::show(ui, Sprite::Floppy, 10.0, symbol);
         }
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
-        pixel::display_label(ui, wording.welcome_title, 24.0, palette.gold);
+        let title = if liquid { palette.ink } else { palette.gold };
+        pixel::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(14.0);
-        ui.heading("Your folders. Safely backed up.");
+        let tagline = "Your folders. Safely backed up.";
+        if liquid {
+            // iOS empty states describe themselves in plain secondary text below the bold title.
+            ui.label(egui::RichText::new(tagline).color(palette.dim));
+        } else {
+            ui.heading(tagline);
+        }
         ui.label(
             egui::RichText::new("Create a backup job and select source and destination folders.")
                 .color(palette.dim),
@@ -154,6 +164,9 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
             .tone(Tone::Accent)
             .min_size(egui::vec2(240.0, 52.0));
         let clicked = ui.add_enabled(can_add, start).clicked();
+        if liquid {
+            return clicked;
+        }
         ui.add_space(14.0);
         let prompt = if pixel::blink(ui, 0.5) {
             wording.welcome_prompt
@@ -277,7 +290,7 @@ fn job_action_button(
     } else {
         label
     };
-    ui.add(button).on_hover_text(tooltip).clicked() && !busy
+    ui.add(button).hint(tooltip).clicked() && !busy
 }
 
 fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
@@ -300,11 +313,6 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
             .max_rect(centered)
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
         |ui| {
-            let tint = if job.enabled {
-                palette.good
-            } else {
-                palette.metal
-            };
             if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
                 let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
                 crate::app::scenery::catgirl::paint_emblem(ui, rect);
@@ -313,7 +321,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
                     ui,
                     Sprite::Floppy,
                     5.0,
-                    style::decorative_color(ui.ctx(), tint),
+                    style::job_symbol_color(ui.ctx(), job.enabled),
                 );
             }
             ui.add_space(6.0);
@@ -346,8 +354,8 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     };
     if ui
         .add_enabled(can_toggle, button)
-        .on_hover_text(tooltip)
-        .on_disabled_hover_text(tooltip)
+        .hint(tooltip)
+        .disabled_hint(tooltip)
         .clicked()
     {
         job.enabled = !job.enabled;
@@ -366,18 +374,12 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
     ui.add_space(ui.spacing().item_spacing.y);
     path_picker(ui, "Source folder", &mut job.source, read_only);
     ui.add_space(ui.spacing().item_spacing.y);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.auto_destination,
-            "Auto destination folder",
-        ));
-    });
+    switch_row(ui, &mut job.auto_destination, "Auto destination folder");
     if path_picker(ui, "Destination folder", &mut job.target, read_only) {
         job.auto_destination = false;
     }
     ui.add_space(ui.spacing().item_spacing.y);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(&mut job.zip, "Compress as ZIP"));
+    switch_row_with(ui, &mut job.zip, "Compress as ZIP", |ui| {
         let tint = style::decorative_color(ui.ctx(), Palette::of(ui).gold);
         sprites::show(ui, Sprite::Package, 2.0, tint);
     });
@@ -397,12 +399,11 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.check_on_enable,
-            "Check immediately when enabled",
-        ));
-    });
+    switch_row(
+        ui,
+        &mut job.check_on_enable,
+        "Check immediately when enabled",
+    );
     scheduling_fields(ui, job, true);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
@@ -415,14 +416,15 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
-        let modes: [(Schedule, &str, Sprite); 3] = [
-            (Schedule::Interval, "Interval", Sprite::Interval),
-            (Schedule::Daily, "Daily", Sprite::Daily),
-            (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
-        ];
-        for (schedule, label, sprite) in modes {
-            pixel::choice(ui, &mut job.schedule, schedule, label, Some(sprite));
-        }
+        pixel::segmented(
+            ui,
+            &mut job.schedule,
+            &[
+                (Schedule::Interval, "Interval", Sprite::Interval),
+                (Schedule::Daily, "Daily", Sprite::Daily),
+                (Schedule::Weekdays, "Weekdays", Sprite::Weekdays),
+            ],
+        );
     });
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
@@ -459,7 +461,7 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
             .range(0..=maximum)
             .custom_formatter(|value, _| format!("{:02}", value as u32)),
     )
-    .on_hover_text(label)
+    .hint(label)
     .changed()
 }
 
@@ -512,7 +514,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
                         );
                     })
                     .response
-                    .on_hover_text("Next check according to the current schedule");
+                    .hint("Next check according to the current schedule");
             }
         },
     );
@@ -537,12 +539,11 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
 
 fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
     let palette = Palette::of(ui);
-    centered_row(ui, |ui| {
-        ui.add(PixelCheckbox::new(
-            &mut job.rolling,
-            "Enable rolling retention – delete oldest backups automatically",
-        ));
-    });
+    switch_row(
+        ui,
+        &mut job.rolling,
+        "Enable rolling retention – delete oldest backups automatically",
+    );
     ui.add_enabled_ui(job.rolling, |ui| {
         ui.indent("limits", |ui| {
             optional_limit(
@@ -563,13 +564,12 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
                     gib_field(ui, true, bytes);
                 },
             );
-            centered_row(ui, |ui| {
-                ui.add(PixelCheckbox::new(
-                    &mut job.count_protected,
-                    "Count protected backups toward retention limits",
-                ))
-                .on_hover_text("Protected backups are never deleted by retention");
-            });
+            switch_row(
+                ui,
+                &mut job.count_protected,
+                "Count protected backups toward retention limits",
+            )
+            .hint("Protected backups are never deleted by retention");
         });
     });
     ui.horizontal_top(|ui| {
@@ -594,7 +594,7 @@ fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedH
     }
 }
 
-/// A checkbox that switches a limit on (starting at `default`) or off, plus its value editor.
+/// A switch that turns a limit on (starting at `default`) or off, plus its value editor.
 fn optional_limit<T>(
     ui: &mut egui::Ui,
     label: &str,
@@ -602,15 +602,16 @@ fn optional_limit<T>(
     default: T,
     edit: impl FnOnce(&mut egui::Ui, &mut T),
 ) {
-    centered_row(ui, |ui| {
-        let mut active = limit.is_some();
-        if ui.add(PixelCheckbox::new(&mut active, label)).changed() {
-            *limit = active.then_some(default);
-        }
-        if let Some(value) = limit {
+    let mut active = limit.is_some();
+    let toggled = switch_row_with(ui, &mut active, label, |ui| {
+        if let Some(value) = limit.as_mut() {
             edit(ui, value);
         }
-    });
+    })
+    .changed();
+    if toggled {
+        *limit = active.then_some(default);
+    }
 }
 
 pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
@@ -642,15 +643,19 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
 }
 
 pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
+    // The tabs open the page's scroll view, which would clip their shadow and swell.
+    if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
+        ui.add_space(crate::app::rendering::liquid::HEADROOM);
+    }
     ui.horizontal_wrapped(|ui| {
-        pixel::choice(
+        pixel::segmented(
             ui,
             backups,
-            false,
-            "Job settings",
-            Some(Sprite::JobSettings),
+            &[
+                (false, "Job settings", Sprite::JobSettings),
+                (true, "Backups", Sprite::Chest),
+            ],
         );
-        pixel::choice(ui, backups, true, "Backups", Some(Sprite::Chest));
     });
     ui.add_space(14.0);
 }

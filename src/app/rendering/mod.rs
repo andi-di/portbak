@@ -3,6 +3,7 @@ pub(super) mod glass;
 pub(super) mod glossy;
 pub(super) mod glyphs;
 pub(super) mod gothic;
+pub(super) mod liquid;
 pub(super) mod modern;
 pub(super) mod ornaments;
 pub(super) mod pixel;
