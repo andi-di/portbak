@@ -29,6 +29,8 @@ const LIGHT: Vec2 = Vec2::new(
 );
 /// How long glass takes to brighten under the pointer or settle again.
 pub const HOVER_SECONDS: f32 = 0.15;
+/// How much brighter the rim shines under the pointer, so hovered glass clearly catches light.
+const HOVER_SHINE: f32 = 0.9;
 /// Width of the bright line along the rim, in points.
 const RIM: f32 = 1.5;
 /// How far pressed glass swells, as a fraction of its height, up to `SWELL_LIMIT` points.
@@ -193,6 +195,7 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
             ..base.tinted(tint, 0.8 + 0.06 * look.glow)
         }
     };
+    lens.shine *= 1.0 + HOVER_SHINE * look.glow;
     if press > 0.0 {
         let point = ctx
             .pointer_latest_pos()
@@ -309,6 +312,10 @@ pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint, hover: f32) -> Vec<Shap
             if dark { 0.38 } else { 0.24 } + 0.06 * hover,
         ),
         Tint::Accent => base.tinted(palette.accent, 0.82 + 0.06 * hover),
+    };
+    let lens = Lens {
+        shine: lens.shine * (1.0 + HOVER_SHINE * hover),
+        ..lens
     };
     let mut shapes = glass(ctx, rect, radius, &lens);
     if tint == Tint::Current {
