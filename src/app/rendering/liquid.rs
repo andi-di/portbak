@@ -29,8 +29,10 @@ const LIGHT: Vec2 = Vec2::new(
 );
 /// How long glass takes to brighten under the pointer or settle again.
 pub const HOVER_SECONDS: f32 = 0.15;
-/// How much brighter the rim shines under the pointer, so hovered glass clearly catches light.
-const HOVER_SHINE: f32 = 0.9;
+/// Radius of the light the pointer casts on a hovered rim, as a multiple of the glass's height,
+/// and never smaller than `HOVER_REACH_MIN` points.
+const HOVER_REACH: f32 = 0.75;
+const HOVER_REACH_MIN: f32 = 22.0;
 /// Width of the bright line along the rim, in points.
 const RIM: f32 = 1.5;
 /// How far pressed glass swells, as a fraction of its height, up to `SWELL_LIMIT` points.
@@ -68,6 +70,8 @@ pub struct Lens {
     pub zoom: f32,
     /// A glow where the pointer presses, from 0 to 1.
     pub touch: Option<(Pos2, f32)>,
+    /// How strongly the rim lights up around the pointer, from 0 to 1.
+    pub hover: f32,
     /// The soft shadow below the glass, as an opacity.
     pub shadow: f32,
 }
@@ -84,10 +88,11 @@ impl Lens {
             bezel: 26.0,
             depth: 26.0,
             vibrancy: 1.6,
-            shine: if dark { 0.6 } else { 0.7 },
+            shine: if dark { 0.4 } else { 0.45 },
             dispersion: 0.45,
             zoom: 1.0,
             touch: None,
+            hover: 0.0,
             shadow: if dark { 0.38 } else { 0.10 },
         }
     }
@@ -103,10 +108,11 @@ impl Lens {
             bezel: 16.0,
             depth: 14.0,
             vibrancy: 1.4,
-            shine: if dark { 0.75 } else { 0.85 },
+            shine: if dark { 0.5 } else { 0.55 },
             dispersion: 0.6,
             zoom: 1.0,
             touch: None,
+            hover: 0.0,
             shadow: if dark { 0.32 } else { 0.12 },
         }
     }
@@ -137,6 +143,7 @@ pub fn glass(ctx: &egui::Context, rect: Rect, radius: f32, lens: &Lens) -> Vec<S
         return shapes;
     }
     let lens = *lens;
+    let pointer = ctx.pointer_latest_pos();
     shapes.push(effect.shape(rect, ctx.content_rect(), move |target| {
         let [left, bottom] = target.pixel(rect.left_bottom());
         let [right, top] = target.pixel(rect.right_top());
@@ -168,6 +175,10 @@ pub fn glass(ctx: &egui::Context, rect: Rect, radius: f32, lens: &Lens) -> Vec<S
             "u_touch",
             &[x, y, target.pixels(rect.height().max(24.0)), strength],
         );
+        let reach = (rect.height() * HOVER_REACH).max(HOVER_REACH_MIN);
+        let [x, y] = target.pixel(pointer.unwrap_or(rect.center()));
+        let strength = if pointer.is_some() { lens.hover } else { 0.0 };
+        target.set("u_hover", &[x, y, target.pixels(reach), strength]);
     }));
     shapes
 }
@@ -195,7 +206,7 @@ pub fn button(painter: &egui::Painter, face: Rect, look: &FaceLook, press: f32) 
             ..base.tinted(tint, 0.8 + 0.06 * look.glow)
         }
     };
-    lens.shine *= 1.0 + HOVER_SHINE * look.glow;
+    lens.hover = look.glow;
     if press > 0.0 {
         let point = ctx
             .pointer_latest_pos()
@@ -313,10 +324,7 @@ pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint, hover: f32) -> Vec<Shap
         ),
         Tint::Accent => base.tinted(palette.accent, 0.82 + 0.06 * hover),
     };
-    let lens = Lens {
-        shine: lens.shine * (1.0 + HOVER_SHINE * hover),
-        ..lens
-    };
+    let lens = Lens { hover, ..lens };
     let mut shapes = glass(ctx, rect, radius, &lens);
     if tint == Tint::Current {
         shapes.push(Shape::rect_stroke(
@@ -489,6 +497,8 @@ uniform vec2 u_light;
 uniform float u_rim;
 // Touch point and glow radius in pixels, and its strength.
 uniform vec4 u_touch;
+// Pointer position and light radius in pixels, and how strongly it lights the rim.
+uniform vec4 u_hover;
 
 // Signed distance to the outline, negative inside. Corners sit between a circle and a
 // superellipse, like Apple's continuous corners; capsules and circles keep true round ends.
@@ -565,6 +575,15 @@ void main() {
     // The side away from the light sits a touch deeper in shade, giving the glass thickness.
     float shade = u_optics.y * 0.12 * rim * rim * max(-facing, 0.0);
     color = color * (1.0 - shade) + vec3(specular);
+
+    // A hovered rim catches the pointer's light: the edge nearest it shines brightly, fading
+    // along the rim with distance, with a softer glow just inside.
+    if (u_hover.w > 0.0) {
+        float near = length(pixel - u_hover.xy) / max(u_hover.z, 1.0);
+        float spot = exp(-near * near) * u_hover.w;
+        float halo = exp(-inside / (u_rim * 6.0));
+        color += vec3(spot * (line * 1.2 + halo * 0.5));
+    }
 
     if (u_touch.w > 0.0) {
         float reach = length(pixel - u_touch.xy) / max(u_touch.z, 1.0);
