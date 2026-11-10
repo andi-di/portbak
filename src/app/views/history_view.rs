@@ -218,7 +218,7 @@ fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
     caption(ui, "Source folder to replace");
     sunken(ui, |ui| {
         ui.horizontal(|ui| {
-            sprites::show(ui, Sprite::FolderBackup, 2.0, palette.gold);
+            sprites::show(ui, Sprite::FolderBackup, 2.0, backup_tint(ui));
             ui.add(egui::Label::new(display_path(source)).wrap());
         });
     });
@@ -324,10 +324,30 @@ fn backup_list(
     response
 }
 
+/// The color of backup symbols: blue like iOS Files folders in liquid glass, gold otherwise.
+fn backup_tint(ui: &egui::Ui) -> egui::Color32 {
+    let palette = Palette::of(ui);
+    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+        palette.accent
+    } else {
+        palette.gold
+    }
+}
+
 /// A dated divider that opens each calendar day's group.
 fn day_header(ui: &mut egui::Ui, backup: &Backup) {
     let palette = Palette::of(ui);
     ui.add_space(4.0);
+    if Skin::of(ui.ctx()).finish == Finish::Liquid {
+        // An iOS list section header: plain secondary text, no marker or rule.
+        let date = local_time(backup.record.created, DATE);
+        ui.label(
+            egui::RichText::new(date)
+                .font(label_font(ui.ctx()))
+                .color(palette.dim),
+        );
+        return;
+    }
     ui.horizontal(|ui| {
         sprites::show(ui, Sprite::Cursor, 2.0, palette.gold);
         let date = local_time(backup.record.created, DATE).to_uppercase();
@@ -349,19 +369,18 @@ fn backup_row<R>(
     backup: &Backup,
     trailing: impl FnOnce(&mut egui::Ui) -> R,
 ) -> R {
-    let palette = Palette::of(ui);
     let mut size = egui::Rect::NOTHING;
     let frame = egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
-                let (sprite, tint) = if backup.zip {
-                    (Sprite::Package, palette.gold)
+                let sprite = if backup.zip {
+                    Sprite::Package
                 } else {
-                    (Sprite::FolderBackup, palette.gold)
+                    Sprite::FolderBackup
                 };
-                sprites::show(ui, sprite, 2.0, tint);
+                sprites::show(ui, sprite, 2.0, backup_tint(ui));
                 let text_width = (ui.available_width() - 184.0).max(40.0);
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
                     size = backup_text(ui, backup);
