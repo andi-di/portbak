@@ -259,11 +259,17 @@ impl App {
     fn show_job_list(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
+        // The liquid glass sidebar floats inset in its panel; content keeps iOS's margin inside it.
+        let inset = if Skin::of(&ctx).finish == Finish::Liquid {
+            8
+        } else {
+            0
+        };
         let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
-            left: 16,
-            right: 14,
-            top: 16,
-            bottom: 8,
+            left: 16 + inset,
+            right: 14 + inset,
+            top: 16 + inset / 2,
+            bottom: 8 + inset,
         });
         let panel = egui::Panel::left("jobs")
             .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
