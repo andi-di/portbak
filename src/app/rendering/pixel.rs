@@ -212,6 +212,12 @@ impl Widget for PixelButton {
                 (true, _) => base,
             }
         };
+        let plain = self.tone == Tone::Plain && !self.selected;
+        // iOS toolbars tint destructive and confirming symbols on clear glass instead of filling it.
+        let symbol_on_glass = finish == Finish::Liquid
+            && self.icon_only
+            && matches!(self.tone, Tone::Danger | Tone::Good)
+            && !self.selected;
         let painter = ui.painter();
         let face = if finish == Finish::Liquid {
             let face = Rect::from_min_size(rect.min, face_size);
@@ -221,7 +227,7 @@ impl Widget for PixelButton {
                 pressed: sunk,
                 glow,
                 focused: response.has_focus(),
-                clear: self.tone == Tone::Plain && !self.selected,
+                clear: plain || symbol_on_glass,
             };
             liquid::button(painter, face, &look, press);
             face
@@ -259,14 +265,15 @@ impl Widget for PixelButton {
                 pressed: sunk,
                 glow,
                 focused: response.has_focus(),
-                clear: self.tone == Tone::Plain && !self.selected,
+                clear: plain,
             };
             glass::gel_button(painter, face, &look);
             face
         };
-        let plain = self.tone == Tone::Plain && !self.selected;
         let ink = if gothic && enabled {
             gothic::foreground(fill)
+        } else if symbol_on_glass && enabled {
+            base
         } else if finish == Finish::Liquid && enabled && !plain {
             liquid::ink_on(fill)
         } else if (modern || finish == Finish::Liquid) && plain {
