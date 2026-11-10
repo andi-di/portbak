@@ -309,37 +309,25 @@ pub fn progress(painter: &egui::Painter, rect: Rect, color: Color32, time: f64, 
     ctx.request_repaint_after(PROGRESS_FRAME);
 }
 
-/// Glass behind a card or row, lit by `tint`: clear at rest and tinted with the accent when
-/// current or chosen; it brightens as `hover` rises from 0 to 1 under the pointer.
+/// The highlight behind a row or card on a glass pane. iOS never stacks glass on glass, so rows
+/// are clear at rest, take a grey fill as `hover` rises from 0 to 1 or while current, and the
+/// chosen card is filled with the accent.
 pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint, hover: f32) -> Vec<Shape> {
     let palette = Palette::of_ctx(ctx);
     let dark = ctx.global_style().visuals.dark_mode;
-    let radius = style::metrics(ctx).radius as f32 * 0.75;
-    let base = Lens {
-        blur: 4.0,
-        bezel: 14.0,
-        depth: 10.0,
-        ..Lens::control(ctx)
+    let radius = (style::metrics(ctx).radius as f32 * 0.75).min(rect.height() / 2.0);
+    let selected = if dark { 0.36 } else { 0.2 };
+    let fill = match tint {
+        Tint::Rest | Tint::Hover => system_fill(0.12 * hover),
+        Tint::Current => system_fill(selected + 0.06 * hover),
+        Tint::Accent => palette.accent.lerp_to_gamma(Color32::WHITE, 0.1 * hover),
     };
-    let lens = match tint {
-        Tint::Rest | Tint::Hover => base.tinted(palette.raised, base.tint_strength + 0.14 * hover),
-        Tint::Current => base.tinted(
-            palette.accent,
-            if dark { 0.38 } else { 0.24 } + 0.06 * hover,
-        ),
-        Tint::Accent => base.tinted(palette.accent, 0.82 + 0.06 * hover),
-    };
-    let lens = Lens { hover, ..lens };
-    let mut shapes = glass(ctx, rect, radius, &lens);
-    if tint == Tint::Current {
-        shapes.push(Shape::rect_stroke(
-            rect,
-            corner(radius),
-            Stroke::new(1.5_f32, palette.accent.gamma_multiply(0.7)),
-            StrokeKind::Inside,
-        ));
-    }
-    shapes
+    vec![Shape::rect_filled(rect, corner(radius), fill)]
+}
+
+/// iOS's translucent grey fill at `opacity`.
+fn system_fill(opacity: f32) -> Color32 {
+    Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, (opacity.clamp(0.0, 1.0) * 255.0) as u8)
 }
 
 /// A plain section heading: an accent symbol beside a bold title, as in iOS grouped lists.
