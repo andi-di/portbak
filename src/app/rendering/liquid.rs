@@ -102,14 +102,15 @@ impl Lens {
         }
     }
 
-    /// Clearer, more strongly bent glass for buttons, cards and other small controls.
+    /// Clearer, more strongly bent glass for buttons, cards and other small controls. Dark glass
+    /// is tinted more heavily so that, as on iOS, it reads as neutral grey over vivid wallpaper.
     pub fn control(ctx: &egui::Context) -> Self {
         let palette = Palette::of_ctx(ctx);
         let dark = ctx.global_style().visuals.dark_mode;
         Self {
             tint: palette.raised,
-            tint_strength: if dark { 0.16 } else { 0.24 },
-            blur: 2.0,
+            tint_strength: if dark { 0.42 } else { 0.24 },
+            blur: 4.0,
             bezel: 16.0,
             depth: 14.0,
             vibrancy: 1.4,
