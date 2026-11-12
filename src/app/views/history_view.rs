@@ -381,19 +381,22 @@ fn backup_row<R>(
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            ui.horizontal(|ui| {
+            ui.vertical(|ui| {
                 let sprite = if backup.zip {
                     Sprite::Package
                 } else {
                     Sprite::FolderBackup
                 };
                 sprites::show(ui, sprite, 2.0, backup_tint(ui));
-                let text_width = (ui.available_width() - 220.0).max(40.0);
+                let text_width = ui.available_width();
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
                     size = backup_text(ui, backup);
                 });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), trailing)
-                    .inner
+                ui.with_layout(
+                    egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true),
+                    trailing,
+                )
+                .inner
             })
             .inner
         });
