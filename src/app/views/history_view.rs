@@ -14,6 +14,7 @@ use eframe::egui;
 /// Changes are applied after the history state is no longer borrowed.
 #[derive(Default)]
 struct HistoryResponse {
+    delete: Option<String>,
     restore: Option<String>,
     reveal: Option<String>,
     protection: Option<(String, bool)>,
@@ -68,6 +69,9 @@ impl App {
                     }
                 });
             });
+        if let Some(name) = response.delete {
+            self.delete_backup(name, &ctx);
+        }
         if let Some((name, protected)) = response.protection {
             self.save_protection(name, protected, &ctx);
         }
@@ -136,7 +140,7 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
         }
     }
     if dialog.saving {
-        ui.label("Saving protection ...");
+        ui.label("Updating backups ...");
     }
     if !dialog.error.is_empty() {
         alert(ui, palette.bad, &dialog.error);
@@ -310,6 +314,9 @@ fn backup_list(
                 day_header(ui, backup);
             }
             let row = backup_controls(ui, backup, saving, source_available);
+            if row.delete.is_some() {
+                response.delete = row.delete;
+            }
             if row.protection.is_some() {
                 response.protection = row.protection;
             }
@@ -381,7 +388,7 @@ fn backup_row<R>(
                     Sprite::FolderBackup
                 };
                 sprites::show(ui, sprite, 2.0, backup_tint(ui));
-                let text_width = (ui.available_width() - 184.0).max(40.0);
+                let text_width = (ui.available_width() - 220.0).max(40.0);
                 ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
                     size = backup_text(ui, backup);
                 });
@@ -439,9 +446,22 @@ fn backup_controls(
     saving: bool,
     source_available: bool,
 ) -> HistoryResponse {
+    let mut delete = None;
     let mut restore = None;
     let mut reveal = None;
     let change = backup_row(ui, backup, |ui| {
+        let trash = PixelButton::new("Delete backup")
+            .icon_only()
+            .sprite(Sprite::Trash)
+            .tone(Tone::Danger);
+        if ui
+            .add_enabled(!saving && !backup.record.protected, trash)
+            .hint("Permanently delete this backup immediately")
+            .disabled_hint("Unlock the backup first; wait for pending changes")
+            .clicked()
+        {
+            delete = Some(backup.record.name.clone());
+        }
         let button = PixelButton::new("Restore backup")
             .icon_only()
             .sprite(Sprite::Rewind)
@@ -473,6 +493,7 @@ fn backup_controls(
             .then(|| (backup.record.name.clone(), protected))
     });
     HistoryResponse {
+        delete,
         restore,
         reveal,
         protection: change,

@@ -22,6 +22,11 @@ const AUTOSAVE_DELAY: Duration = Duration::from_millis(600);
 const TICK_INTERVAL: Duration = Duration::from_millis(500);
 
 enum Event {
+    Deleted {
+        error: Option<String>,
+        request: Uuid,
+        result: Result<LoadedHistory, String>,
+    },
     Progress(String),
     Finished {
         job: Uuid,
@@ -364,6 +369,31 @@ impl App {
         self.start_worker(job, Operation::Restore(name), ctx);
     }
 
+    fn delete_backup(&mut self, name: String, ctx: &egui::Context) {
+        if !self.is_idle() {
+            return;
+        }
+        let Some(history) = &mut self.backup_history else {
+            return;
+        };
+        if history.saving {
+            return;
+        }
+        history.saving = true;
+        history.error.clear();
+        let request = history.request;
+        let job = history.job.clone();
+        self.spawn_task(ctx, move || {
+            let deletion = engine::history::delete(&job, &name);
+            let result = load_history(&job).map_err(describe);
+            Event::Deleted {
+                request,
+                error: deletion.err().map(describe),
+                result,
+            }
+        });
+    }
+
     fn save_protection(&mut self, name: String, protected: bool, ctx: &egui::Context) {
         let Some(dialog) = &mut self.backup_history else {
             return;
@@ -454,6 +484,18 @@ impl App {
 
     fn handle(&mut self, event: Event, ctx: &egui::Context) {
         match event {
+            Event::Deleted {
+                request,
+                result,
+                error,
+            } => {
+                if let Some(history) = self.pending_history(request) {
+                    history.saving = false;
+                    history.error = error.unwrap_or_default();
+                }
+                self.history_loaded(request, result);
+            }
+
             Event::Progress(message) => self.progress = message,
             Event::Finished { job, result } => self.finish_operation(job, result, ctx),
             Event::HistoryLoaded { request, result } => self.history_loaded(request, result),
