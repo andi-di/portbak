@@ -381,19 +381,41 @@ fn backup_row<R>(
         .inner_margin(egui::Margin::symmetric(10, 6))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            ui.vertical(|ui| {
-                let sprite = if backup.zip {
-                    Sprite::Package
+            let wide = ui.available_width() >= 600.0;
+            let layout = if wide {
+                egui::Layout::left_to_right(egui::Align::Center)
+            } else {
+                egui::Layout::top_down(egui::Align::Min)
+            };
+            ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 60.0), layout, |ui| {
+                let details_width = if wide {
+                    ui.available_width() - 300.0
                 } else {
-                    Sprite::FolderBackup
+                    ui.available_width()
                 };
-                sprites::show(ui, sprite, 2.0, backup_tint(ui));
-                let text_width = ui.available_width();
-                ui.allocate_ui(egui::vec2(text_width, 0.0), |ui| {
-                    size = backup_text(ui, backup);
-                });
-                ui.with_layout(
-                    egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true),
+                ui.allocate_ui_with_layout(
+                    egui::vec2(details_width, 0.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        let sprite = if backup.zip {
+                            Sprite::Package
+                        } else {
+                            Sprite::FolderBackup
+                        };
+                        sprites::show(ui, sprite, 2.0, backup_tint(ui));
+                        let text_width = ui.available_width();
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(text_width, 0.0),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
+                                size = backup_text(ui, backup);
+                            },
+                        );
+                    },
+                );
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width().min(290.0), 36.0),
+                    egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
                     trailing,
                 )
                 .inner
@@ -608,7 +630,8 @@ mod tests {
                                 history_contents(ui, &mut history);
                             });
                             assert!(
-                                output.content_size.x <= width + 1.0,
+                                output.content_size.x <= width + 1.0
+                                    && output.content_size.y < 400.0,
                                 "{} {theme:?}: width={width}, content={:?}",
                                 skin.id,
                                 output.content_size
