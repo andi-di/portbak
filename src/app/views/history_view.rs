@@ -394,7 +394,7 @@ fn backup_row<R>(
                     ui.available_width()
                 };
                 ui.allocate_ui_with_layout(
-                    egui::vec2(details_width, 0.0),
+                    egui::vec2(details_width, 36.0),
                     egui::Layout::left_to_right(egui::Align::Center),
                     |ui| {
                         let sprite = if backup.zip {
@@ -405,7 +405,7 @@ fn backup_row<R>(
                         sprites::show(ui, sprite, 2.0, backup_tint(ui));
                         let text_width = ui.available_width();
                         ui.allocate_ui_with_layout(
-                            egui::vec2(text_width, 0.0),
+                            egui::vec2(text_width, 36.0),
                             egui::Layout::top_down(egui::Align::Min),
                             |ui| {
                                 size = backup_text(ui, backup);
