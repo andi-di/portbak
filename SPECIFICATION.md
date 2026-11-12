@@ -353,3 +353,5 @@ The initial version does not require cloud storage, encryption, compression form
 When rebuilding from this document, implement the complete behavior and acceptance scenarios before adding optional features. Document any unavoidable platform limitation rather than silently changing backup or deletion rules.
 
 - Open the app with no backup job selected; select a job only on explicit user action.
+
+- In the Backups tab, the trash button permanently deletes an unlocked version immediately, without confirmation, including the newest or last version. Unlock protected versions first. Missing versions are removed from history.

@@ -42,6 +42,25 @@ pub fn list(job: &Job) -> Result<Vec<Backup>> {
     Ok(backups)
 }
 
+/// Removes only an unlocked version owned by this job.
+pub fn delete(job: &Job, name: &str) -> Result<()> {
+    let target = destination(job)?;
+    let _lock = lock_destination(&target)?;
+    let mut manifest = read_manifest(&target, job.id)?;
+    let index = manifest
+        .records
+        .iter()
+        .position(|record| record.name == name)
+        .context("Selected backup is no longer in this job's history")?;
+    anyhow::ensure!(
+        !manifest.records[index].protected,
+        "Unlock this backup before deleting it"
+    );
+    super::remove_backup(&target.join(name))?;
+    manifest.records.remove(index);
+    save(&manifest_path(&target, job.id), &manifest)
+}
+
 pub fn set_protected(job: &Job, name: &str, protected: bool) -> Result<()> {
     let target = destination(job)?;
     let _lock = lock_destination(&target)?;
@@ -109,6 +128,23 @@ mod tests {
     use crate::model::Manifest;
     use chrono::Utc;
     use std::{fs, path::PathBuf};
+
+    #[test]
+    fn manual_delete_requires_unlock_and_allows_last_missing_version() {
+        let (_directory, job, original, path) = fixture(vec![record(0, true, 10)]);
+        let name = &original.records[0].name;
+        assert!(delete(&job, name).is_err());
+        assert!(job.target.join(name).exists());
+        set_protected(&job, name, false).unwrap();
+        delete(&job, name).unwrap();
+        assert!(!job.target.join(name).exists());
+        assert!(load::<Manifest>(&path).unwrap().records.is_empty());
+        assert!(delete(&job, name).is_err());
+        save(&path, &original).unwrap();
+        set_protected(&job, name, false).unwrap();
+        delete(&job, name).unwrap();
+        assert!(list(&job).unwrap().is_empty());
+    }
 
     #[test]
     fn capacity_warning_uses_singular_for_one_place() {
