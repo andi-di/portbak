@@ -414,8 +414,8 @@ fn backup_row<R>(
                     },
                 );
                 ui.allocate_ui_with_layout(
-                    egui::vec2(ui.available_width().min(290.0), 36.0),
-                    egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
+                    egui::vec2(ui.available_width(), 36.0),
+                    egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true),
                     trailing,
                 )
                 .inner
