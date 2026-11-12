@@ -177,9 +177,13 @@ impl App {
         self.active.is_none() && self.queue.is_empty()
     }
 
-    /// Restoration and browsing backups must not race with scheduled backups.
+    /// Keep destructive actions and protection changes separate from backup execution.
     fn scheduling_paused(&self) -> bool {
-        self.restoring || self.backup_history.is_some()
+        self.restoring
+            || self
+                .backup_history
+                .as_ref()
+                .is_some_and(|history| history.saving || history.confirming_restore)
     }
 
     fn can_add_job(&self) -> bool {
@@ -596,13 +600,15 @@ impl App {
     }
 
     fn start_next_queued(&mut self, ctx: &egui::Context) {
-        if self.active.is_some() || self.backup_history.is_some() {
+        if self.active.is_some() || self.scheduling_paused() {
             return;
         }
         let Some(id) = self.queue.pop_front() else {
             return;
         };
         if let Some(job) = self.job(id).cloned() {
+            // Reload the visible history after the worker finishes, including retention changes.
+            self.backup_history = None;
             self.start_worker(job, Operation::Backup, ctx);
         }
     }
@@ -863,20 +869,51 @@ mod tests {
     }
 
     #[test]
-    fn backup_history_pauses_scheduling_and_cancel_changes_nothing() {
+    fn browsing_history_runs_due_backup_without_input_and_reloads_versions() {
         let (_directory, mut app, name) = restore_fixture();
-        let due = app.config.jobs[0].next_run;
         select_restore(&mut app, &name);
+        app.backups_tab = true;
+        let job = app.config.jobs[0].clone();
+        std::fs::write(job.source.join("file"), "changed").unwrap();
         let context = egui::Context::default();
         app.tick(&context);
-        app.enqueue(app.config.jobs[0].id);
-        assert!(app.active.is_none());
-        assert!(app.queue.is_empty());
-        app.backups_tab = false;
-        app.close_inactive_history();
+        assert_eq!(app.active, Some(job.id));
         assert!(app.backup_history.is_none());
+        assert!(app.config.jobs[0].next_run > job.next_run);
+        tick_until(&mut app, &context, |app| app.active.is_none());
+        assert!(app.active.is_none());
+        app.open_history(job.id, &context);
+        tick_until(&mut app, &context, |app| dialog(app).backups.is_some());
+        assert_eq!(
+            dialog(&app)
+                .backups
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
+        );
         assert!(app.config.jobs[0].enabled);
-        assert_eq!(app.config.jobs[0].next_run, due);
+    }
+
+    #[test]
+    fn history_mutations_pause_due_backups_until_finished() {
+        let (_directory, mut app, name) = restore_fixture();
+        select_restore(&mut app, &name);
+        let context = egui::Context::default();
+        app.backup_history.as_mut().unwrap().saving = true;
+        app.tick(&context);
+        assert!(app.active.is_none());
+        app.backup_history.as_mut().unwrap().saving = false;
+        app.backup_history.as_mut().unwrap().confirming_restore = true;
+        app.tick(&context);
+        assert!(app.active.is_none());
+        app.backup_history.as_mut().unwrap().confirming_restore = false;
+        app.tick(&context);
+        assert!(app.active.is_some());
+        tick_until(&mut app, &context, |app| app.active.is_none());
+        assert!(app.active.is_none());
     }
 
     #[test]
@@ -985,6 +1022,7 @@ mod tests {
     #[test]
     fn manager_saves_protection_and_reports_errors_without_changing_activation() {
         let (_directory, mut app, name) = restore_fixture();
+        app.config.jobs[0].next_run = Some(Utc::now() + chrono::Duration::hours(1));
         select_restore(&mut app, &name);
         let context = egui::Context::default();
         app.save_protection(name.clone(), true, &context);
@@ -1020,6 +1058,7 @@ mod tests {
     #[test]
     fn manager_history_does_not_require_source_folder() {
         let (_directory, mut app, _name) = restore_fixture();
+        app.config.jobs[0].next_run = Some(Utc::now() + chrono::Duration::hours(1));
         app.config.jobs[0].source.push("missing");
         let context = egui::Context::default();
         app.open_history(app.config.jobs[0].id, &context);
