@@ -646,7 +646,7 @@ pub fn section<R>(
         ui.spacing_mut().item_spacing.y = 0.0;
         title_bar(ui, title, sprite, band);
         egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(12, 8))
+            .inner_margin(egui::Margin::symmetric(16, 10))
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 5.0;
                 ui.set_min_width(ui.available_width());
