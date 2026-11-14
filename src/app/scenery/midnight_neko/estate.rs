@@ -95,7 +95,12 @@ pub(super) fn paint(painter: &egui::Painter) {
 }
 
 fn paint_mist(painter: &egui::Painter, rect: Rect, color: Color32, time: f32, layer: u32) {
-    let Some(texture) = texture(painter, Sprite::Mist) else {
+    let sprite = if layer.is_multiple_of(2) {
+        Sprite::Mist
+    } else {
+        Sprite::MistVeil
+    };
+    let Some(texture) = texture(painter, sprite) else {
         return;
     };
     const COLUMNS: u32 = 24;

@@ -26,6 +26,7 @@ enum Sprite {
     CloudBank,
     Mountains,
     Mist,
+    MistVeil,
     BatDown,
     Perched,
     Petal,
@@ -65,6 +66,10 @@ impl Sprite {
             Self::Mist => (
                 "mist",
                 include_bytes!("../../../assets/themes/midnight-neko/scenery/mist.png"),
+            ),
+            Self::MistVeil => (
+                "mist-veil",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/mist-veil.png"),
             ),
             Self::BatDown => (
                 "bat_down",

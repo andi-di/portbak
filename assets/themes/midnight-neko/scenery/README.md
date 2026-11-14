@@ -16,3 +16,7 @@ built-in imagegen from the neighboring `cloud-variant.png` style reference.
 The full prompt is in `cloud-bank.prompt.txt`. Large scenery textures are fitted
 to a 1024-pixel maximum side when loaded. Four cool blue-violet mist layers drift,
 ripple independently and fade at their edges. Sixteen bats roam and roost.
+
+`mist-veil.png` adds a low, gauzy ribbon variation to the original curled mist.
+The four fog layers alternate the two sprites. It was generated with built-in
+imagegen using `mist.png` as a style reference; see `mist-veil.prompt.txt`.
