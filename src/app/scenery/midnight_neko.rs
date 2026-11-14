@@ -589,6 +589,11 @@ pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
             );
         }
     }
+    // Native dialogs and unfocused windows must not retain a painted cursor.
+    if crate::app::views::widgets::folder_dialog_open(ctx) || !ctx.input(|input| input.focused) {
+        ctx.set_cursor_icon(egui::CursorIcon::Default);
+        return;
+    }
     // Editing and resize cursors retain their native shapes.
     let cursor = ctx.output(|output| output.cursor_icon);
     let pointer = ctx.input(|input| input.pointer.hover_pos());

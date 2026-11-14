@@ -118,6 +118,13 @@ pub fn display_path(path: &Path) -> String {
     text.into_owned()
 }
 
+pub fn folder_dialog_open(ctx: &egui::Context) -> bool {
+    ctx.data_mut(|data| {
+        data.get_temp::<bool>(egui::Id::new("folder_dialog_open"))
+            .unwrap_or(false)
+    })
+}
+
 pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only: bool) -> bool {
     let mut changed = false;
     let error_id = ui.make_persistent_id((label, "open_folder_error"));
@@ -125,6 +132,24 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
         .ctx()
         .data_mut(|data| data.get_temp::<String>(error_id))
         .unwrap_or_default();
+    let picker_id = ui.make_persistent_id((label, "folder_dialog"));
+    type Picker = std::sync::Arc<std::sync::Mutex<Option<Option<PathBuf>>>>;
+    let pending = ui.ctx().data_mut(|data| data.get_temp::<Picker>(picker_id));
+    if let Some(pending) = &pending {
+        let result = pending
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take();
+        if let Some(result) = result {
+            ui.ctx().data_mut(|data| data.remove::<Picker>(picker_id));
+            if let Some(folder) = result {
+                if !read_only {
+                    *path = folder;
+                    changed = true;
+                }
+            }
+        }
+    }
     caption(ui, label);
     centered_row(ui, |ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -146,11 +171,27 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
             let choose = PixelButton::new("Choose folder …")
                 .sprite(Sprite::Folder)
                 .icon_only();
-            if ui.add(choose).hint("Choose folder").clicked() && !read_only {
-                if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                    *path = folder;
-                    changed = true;
-                }
+            if ui
+                .add_enabled(
+                    !folder_dialog_open(ui.ctx()) && pending.is_none() && !read_only,
+                    choose,
+                )
+                .hint("Choose folder")
+                .clicked()
+            {
+                let result: Picker = Default::default();
+                ui.ctx()
+                    .data_mut(|data| data.insert_temp(picker_id, result.clone()));
+                let ctx = ui.ctx().clone();
+                ctx.data_mut(|data| data.insert_temp(egui::Id::new("folder_dialog_open"), true));
+                std::thread::spawn(move || {
+                    let folder = rfd::FileDialog::new().pick_folder();
+                    *result.lock().unwrap_or_else(|error| error.into_inner()) = Some(folder);
+                    ctx.data_mut(|data| {
+                        data.insert_temp(egui::Id::new("folder_dialog_open"), false)
+                    });
+                    ctx.request_repaint();
+                });
             }
             let mut text = display_path(path);
             let editor = egui::TextEdit::singleline(&mut text)
