@@ -74,8 +74,10 @@ impl App {
                     let summary = summaries
                         .get(&job.id)
                         .filter(|summary| summary.target == job.target);
-                    action =
-                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
+                    action = ui
+                        .push_id(job.id, |ui| job_editor(ui, job, &permissions, summary))
+                        .inner
+                        .map(|action| (job.id, action));
                     if !permissions.busy {
                         if let Err(error) = job.update_auto_destination(&previous, app_dir) {
                             self.error =
@@ -239,13 +241,21 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
         |ui| {
             activation_button(ui, job, permissions.locked);
-            if job_action_button(
-                ui,
-                "Check now",
-                Sprite::Play,
-                Tone::Accent,
-                permissions.busy,
-            ) {
+            let can_check = !job.source.as_os_str().is_empty()
+                && !job.target.as_os_str().is_empty()
+                && job.has_runnable_schedule();
+            if ui
+                .add_enabled_ui(can_check, |ui| {
+                    job_action_button(
+                        ui,
+                        "Check now",
+                        Sprite::Play,
+                        Tone::Accent,
+                        permissions.busy,
+                    )
+                })
+                .inner
+            {
                 action = Some(JobAction::Check);
             }
         },
@@ -399,12 +409,13 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
+    scheduling_fields(ui, job, true);
+    ui.add_space(16.0);
     switch_row(
         ui,
         &mut job.check_on_enable,
         "Check immediately when enabled",
     );
-    scheduling_fields(ui, job, true);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
@@ -426,6 +437,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
             ],
         );
     });
+    ui.add_space(8.0);
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
         Schedule::Daily => time_row(ui, job, show_next_check),
@@ -476,11 +488,9 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         .size()
         .y
         + style::well(ui.ctx()).total_margin().sum().y;
-    let row_height =
-        ui.spacing()
-            .interact_size
-            .y
-            .max(if show_next_check { readout_height } else { 0.0 });
+    let row_height = pixel::button_height(ui)
+        .max(ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0)
+        .max(if show_next_check { readout_height } else { 0.0 });
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), row_height),
         egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
@@ -619,26 +629,42 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
-    ui.horizontal_wrapped(|ui| {
-        if let Some(activity) = activity {
-            ui.label(egui::RichText::new(activity).small().color(palette.gold));
-            ui.label(egui::RichText::new("·").small().color(palette.dim));
-        }
-        ui.label(
-            egui::RichText::new(format!("Last backup: {last_backup}"))
-                .small()
-                .color(palette.dim),
-        );
-        if !job.status.starts_with("Error") {
-            ui.label(
-                egui::RichText::new(format!("· {}", job.status))
-                    .small()
-                    .color(palette.dim),
-            );
+    let mut status = format!("Last backup: {last_backup}");
+    if let Some(activity) = activity {
+        status = format!("{activity} · {status}");
+    }
+    let error = job.status.starts_with("Error");
+    if !error {
+        status.push_str(&format!(" · {}", job.status));
+    }
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let width = ui.available_width();
+    let left = ui
+        .painter()
+        .layout(status, font.clone(), palette.dim, width);
+    let right = error.then(|| {
+        ui.painter()
+            .layout(job.status.clone(), font, palette.bad, width)
+    });
+    let wrap = right
+        .as_ref()
+        .is_some_and(|text| left.size().x + ui.spacing().item_spacing.x + text.size().x > width);
+    let gap = ui.spacing().item_spacing.y;
+    let height = right.as_ref().map_or(left.size().y, |text| {
+        if wrap {
+            left.size().y + gap + text.size().y
+        } else {
+            left.size().y.max(text.size().y)
         }
     });
-    if job.status.starts_with("Error") {
-        alert(ui, palette.bad, &job.status);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    ui.painter().galley(rect.min, left.clone(), palette.dim);
+    if let Some(text) = right {
+        let origin = egui::pos2(
+            rect.right() - text.size().x,
+            rect.top() + if wrap { left.size().y + gap } else { 0.0 },
+        );
+        ui.painter().galley(origin, text, palette.bad);
     }
 }
 

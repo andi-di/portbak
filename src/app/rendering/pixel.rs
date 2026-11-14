@@ -20,7 +20,6 @@ const LIQUID_PADDING: f32 = 3.0;
 const SWITCH: Vec2 = Vec2::new(64.0, 28.0);
 /// Room between a liquid glass switch and the label before it.
 const LIQUID_SWITCH_GAP: f32 = 14.0;
-const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
 pub(crate) fn pointing_hand(response: Response) -> Response {
     let ctx = &response.ctx;
@@ -825,61 +824,6 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     response
 }
 
-/// A themed activity track with identical geometry while idle and active.
-pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: bool) -> Response {
-    let m = style::metrics(ui.ctx());
-    if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-        return crate::app::rendering::modern::progress(ui, width, color, active);
-    }
-    const CELL: f32 = 8.0;
-    const GAP: f32 = 2.0;
-    const TRAIL: usize = 6;
-    let palette = Palette::of(ui);
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 18.0), Sense::hover());
-    let painter = ui.painter();
-    if active {
-        ui.ctx().request_repaint_after(MARQUEE_FRAME);
-    }
-    let time = ui.input(|input| input.time);
-    match Skin::of(ui.ctx()).finish {
-        Finish::Glass => {
-            glass::progress(painter, rect, color, time, active);
-            return response;
-        }
-        Finish::Liquid => {
-            liquid::progress(painter, rect, color, time, active);
-            return response;
-        }
-        _ => {}
-    }
-    painter.rect_filled(rect, 0.0, palette.sunken);
-    painter.rect_stroke(
-        rect,
-        0.0,
-        Stroke::new(m.border, palette.outline),
-        StrokeKind::Inside,
-    );
-    let track = rect.shrink(m.border + 2.0);
-    let cells = ((track.width() + GAP) / (CELL + GAP)).floor().max(1.0) as usize;
-    let step = (time * 14.0) as usize % (cells + TRAIL);
-    for cell in 0..cells {
-        let behind = step
-            .checked_sub(cell)
-            .filter(|distance| active && *distance < TRAIL);
-        let fill = match behind {
-            Some(distance) => mix(color, palette.sunken, distance as f32 / TRAIL as f32),
-            None => mix(palette.sunken, palette.outline, 0.4),
-        };
-        let min = egui::pos2(track.left() + cell as f32 * (CELL + GAP), track.top());
-        painter.rect_filled(
-            Rect::from_min_size(min, egui::vec2(CELL, track.height())),
-            0.0,
-            fill,
-        );
-    }
-    response
-}
-
 /// True during the "on" half of a blink cycle; schedules the repaint for the next flip.
 pub fn blink(ui: &egui::Ui, period: f64) -> bool {
     let time = ui.input(|input| input.time);
@@ -1153,31 +1097,6 @@ pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn activity_track_keeps_its_size_when_idle_in_every_theme() {
-        for skin in skins::ALL {
-            for theme in [egui::Theme::Light, egui::Theme::Dark] {
-                let context = egui::Context::default();
-                style::install(&context, skin);
-                context.set_theme(theme);
-                let mut active_size = None;
-                let mut idle_size = None;
-                let _ = context.run_ui(egui::RawInput::default(), |ui| {
-                    active_size = Some(
-                        activity_track(ui, 80.0, Palette::of(ui).gold, true)
-                            .rect
-                            .size(),
-                    );
-                    idle_size = Some(
-                        activity_track(ui, 80.0, Palette::of(ui).gold, false)
-                            .rect
-                            .size(),
-                    );
-                });
-                assert_eq!(active_size, idle_size, "{} {theme:?}", skin.id);
-            }
-        }
-    }
     use super::*;
     use crate::app::theme::skins;
 

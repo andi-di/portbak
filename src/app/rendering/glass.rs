@@ -220,57 +220,6 @@ pub fn sphere(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32
     }));
 }
 
-/// An indeterminate progress bar: a glossy gel filling a glass track, with light running through.
-pub fn progress(painter: &egui::Painter, track: Rect, color: Color32, time: f64, active: bool) {
-    const RADIUS: f32 = 6.0;
-    let ctx = painter.ctx();
-    let palette = Palette::of_ctx(ctx);
-    let time = time as f32;
-    painter.add(gradient(
-        track,
-        [RADIUS; 4],
-        style::glazed(ctx, mix(palette.sunken, palette.shade, 0.35)),
-        style::glazed(ctx, palette.raised),
-    ));
-    let inner = track.shrink(2.0);
-    if active {
-        let fill = mix(color, Color32::WHITE, 0.15).gamma_multiply(GEL_OPACITY);
-        painter.add(gradient(
-            inner,
-            [RADIUS - 2.0; 4],
-            fill,
-            mix(color, Color32::BLACK, 0.15).gamma_multiply(GEL_OPACITY),
-        ));
-        // Diagonal stripes marching along the gel, the classic busy bar.
-        let outline = rounded(inner, [RADIUS - 2.0; 4]);
-        let stripe = 14.0;
-        let offset = (time * 30.0) % (stripe * 2.0);
-        let mut x = inner.left() - inner.height() - stripe * 2.0 + offset;
-        while x < inner.right() + stripe {
-            let band = [
-                egui::pos2(x, inner.bottom()),
-                egui::pos2(x + inner.height(), inner.top()),
-                egui::pos2(x + inner.height() + stripe, inner.top()),
-                egui::pos2(x + stripe, inner.bottom()),
-            ];
-            let clipped = clip(&band, &outline);
-            if clipped.len() >= 3 {
-                painter.add(Shape::convex_polygon(
-                    clipped,
-                    Color32::WHITE.gamma_multiply(0.16),
-                    Stroke::NONE,
-                ));
-            }
-            x += stripe * 2.0;
-        }
-        painter.add(sweep_band(&outline, inner, (time * 0.6).fract(), 0.8));
-        painter.add(gloss(inner, RADIUS - 2.0, 0.9));
-    }
-    let edge = Stroke::new(1.0_f32, palette.outline.gamma_multiply(0.5));
-    painter.rect_stroke(track, corner(RADIUS), edge, StrokeKind::Inside);
-    painter.add(inner_highlight(track, RADIUS));
-}
-
 /// The shapes of a glass tile behind a card or row, lit by `tint`.
 pub fn tile(ctx: &egui::Context, rect: Rect, tint: Tint) -> Vec<Shape> {
     let palette = Palette::of_ctx(ctx);

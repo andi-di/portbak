@@ -353,3 +353,12 @@ The initial version does not require cloud storage, encryption, compression form
 When rebuilding from this document, implement the complete behavior and acceptance scenarios before adding optional features. Document any unavoidable platform limitation rather than silently changing backup or deletion rules.
 
 - Open the app with no backup job selected; select a job only on explicit user action.
+
+- Clicking the app name or icon, or pressing Esc, returns to the start screen. Esc dismisses an open restore confirmation first.
+- Removing the selected job selects its preceding neighbor, or the next job when removing the first. Removing the last job returns to the start screen.
+- Check now is disabled until source and destination are selected and the schedule is runnable.
+- Folder selection keeps the main window responsive, including animations and cursor movement.
+- Keyboard focus follows the toolbar's visual order and visibly highlights job cards.
+- The footer shows a single activity light with progress in its tooltip.
+- Scheduling modes use consistent spacing; Check immediately when enabled follows the schedule fields with a separate gap.
+- Job errors align to the right of the check status and wrap when space is insufficient.

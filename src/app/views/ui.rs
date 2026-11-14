@@ -40,6 +40,16 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         pixel::paint_underlay(&ctx);
         let before = self.config.clone();
+        if !self
+            .backup_history
+            .as_ref()
+            .is_some_and(|history| history.confirming_restore)
+            && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+        {
+            self.selected = None;
+            self.settings_open = false;
+            self.backups_tab = false;
+        }
         self.show_header(ui);
         self.show_footer(ui);
         self.show_job_list(ui);
@@ -109,43 +119,64 @@ impl App {
                     pixel::panel_decoration(ui, 1.9);
                 }
                 ui.horizontal(|ui| {
-                    logo(ui);
+                    let brand = ui.horizontal(logo);
+                    if ui
+                        .interact(
+                            brand.response.rect,
+                            ui.id().with("home"),
+                            egui::Sense::click(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .on_hover_text("Start screen")
+                        .clicked()
+                    {
+                        self.selected = None;
+                        self.settings_open = false;
+                        self.backups_tab = false;
+                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let settings = PixelButton::new("Settings")
-                            .icon_only()
-                            .sprite(Sprite::Gear)
-                            .selected(self.settings_open);
-                        if ui.add(settings).hint("Settings").clicked() {
-                            self.toggle_settings();
-                            if self.settings_open {
-                                crate::app::scenery::catgirl::trigger(
-                                    ui.ctx(),
-                                    crate::app::scenery::catgirl::Action::Settings,
-                                );
-                            }
-                        }
-                        let dark = self.config.theme == Theme::Dark;
-                        let (label, sprite) = if dark {
-                            ("Light", Sprite::Sun)
-                        } else {
-                            ("Dark", Sprite::Moon)
-                        };
-                        if ui
-                            .add(PixelButton::new(label).sprite(sprite).icon_only())
-                            .hint(format!("Switch to {label} mode"))
-                            .clicked()
-                        {
-                            self.config.theme = if dark { Theme::Light } else { Theme::Dark };
-                            ctx.set_theme(theme_preference(self.config.theme));
-                            crate::app::scenery::catgirl::trigger(
-                                &ctx,
-                                if dark {
-                                    crate::app::scenery::catgirl::Action::LightMode
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(110.0, 52.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                let dark = self.config.theme == Theme::Dark;
+                                let (label, sprite) = if dark {
+                                    ("Light", Sprite::Sun)
                                 } else {
-                                    crate::app::scenery::catgirl::Action::DarkMode
-                                },
-                            );
-                        }
+                                    ("Dark", Sprite::Moon)
+                                };
+                                if ui
+                                    .add(PixelButton::new(label).sprite(sprite).icon_only())
+                                    .hint(format!("Switch to {label} mode"))
+                                    .clicked()
+                                {
+                                    self.config.theme =
+                                        if dark { Theme::Light } else { Theme::Dark };
+                                    ctx.set_theme(theme_preference(self.config.theme));
+                                    crate::app::scenery::catgirl::trigger(
+                                        &ctx,
+                                        if dark {
+                                            crate::app::scenery::catgirl::Action::LightMode
+                                        } else {
+                                            crate::app::scenery::catgirl::Action::DarkMode
+                                        },
+                                    );
+                                }
+                                let settings = PixelButton::new("Settings")
+                                    .icon_only()
+                                    .sprite(Sprite::Gear)
+                                    .selected(self.settings_open);
+                                if ui.add(settings).hint("Settings").clicked() {
+                                    self.toggle_settings();
+                                    if self.settings_open {
+                                        crate::app::scenery::catgirl::trigger(
+                                            ui.ctx(),
+                                            crate::app::scenery::catgirl::Action::Settings,
+                                        );
+                                    }
+                                }
+                            },
+                        );
                     });
                 });
                 ui.add_space(12.0);
@@ -212,7 +243,7 @@ impl App {
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let (rect, response) =
-                            ui.allocate_exact_size(egui::vec2(112.0, 24.0), egui::Sense::hover());
+                            ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
                         let recent = self
                             .activity_until
                             .is_some_and(|until| until > std::time::Instant::now());
@@ -236,7 +267,6 @@ impl App {
                                     if active { palette.gold } else { palette.dim },
                                     active,
                                 );
-                                pixel::activity_track(ui, 80.0, palette.gold, active);
                             },
                         );
                         if active {
@@ -273,8 +303,8 @@ impl App {
         });
         let panel = egui::Panel::left("jobs")
             .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
-            .default_size(clamp_sidebar_width(self.config.sidebar_width))
-            .size_range(SIDEBAR_WIDTH)
+            .resizable(false)
+            .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
             .show_inside(ui, |ui| {
                 pixel::panel_decoration(ui, 1.0);
@@ -339,18 +369,25 @@ impl App {
                     ui.vertical_centered(crate::app::scenery::catgirl::show);
                 }
             });
-        if ctx
-            .read_response(egui::Id::new("jobs").with("__resize"))
-            .is_some_and(|response| response.dragged())
-        {
-            self.config.sidebar_width = clamp_sidebar_width(panel.response.rect.width());
+        let edge = panel.response.rect;
+        let grab =
+            egui::Rect::from_center_size(edge.right_center(), egui::vec2(10.0, edge.height()));
+        let resize = ui
+            .interact(grab, egui::Id::new("jobs_resize"), egui::Sense::drag())
+            .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+        if resize.dragged() {
+            self.config.sidebar_width =
+                clamp_sidebar_width(self.config.sidebar_width + resize.drag_delta().x);
         }
     }
 
     /// Draws the job as a cartridge-like card; returns whether it was clicked.
     fn job_card(&self, ui: &mut egui::Ui, job: &Job) -> bool {
-        ui.push_id(job.id, |ui| self.job_card_contents(ui, job))
-            .inner
+        ui.scope_builder(
+            egui::UiBuilder::new().id(egui::Id::new(("job_card", job.id))),
+            |ui| self.job_card_contents(ui, job),
+        )
+        .inner
     }
 
     fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
@@ -471,7 +508,13 @@ impl App {
         );
         ui.painter().set(
             background,
-            card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
+            card_shapes(
+                ui.ctx(),
+                rect,
+                selected || response.has_focus(),
+                response.hovered(),
+                glass_hover,
+            ),
         );
         ui.add_space(CARD_SHADOW);
         response.clicked()
@@ -860,6 +903,7 @@ mod tests {
             for with_job in [false, true] {
                 let mut config = Config {
                     skin: skin.id.into(),
+                    sidebar_width: 350.0,
                     ..Config::default()
                 };
                 if with_job {

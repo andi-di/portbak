@@ -360,7 +360,7 @@ pub fn lamp(painter: &egui::Painter, rect: Rect, color: Color32) {
 pub fn activity(painter: &egui::Painter, rect: Rect, active: bool) {
     let palette = Palette::of_ctx(painter.ctx());
     let time = painter.ctx().input(|input| input.time) as f32;
-    let center = egui::pos2(rect.left() + 13.0, rect.center().y);
+    let center = rect.center();
     let silver = if active {
         palette.metal
     } else {
@@ -388,21 +388,16 @@ pub fn activity(painter: &egui::Painter, rect: Rect, active: bool) {
         [center - egui::vec2(2.0, 2.0), center - egui::vec2(0.0, 3.5)],
         Stroke::new(1.0_f32, palette.paper),
     );
-    let start = egui::pos2(rect.left() + 28.0, rect.center().y);
-    let end = egui::pos2(rect.right() - 3.0, rect.center().y);
-    painter.line_segment([start, end], Stroke::new(0.8_f32, palette.outline));
-    for index in 0..5 {
-        diamond(painter, start.lerp(end, index as f32 / 4.0), 1.8, silver);
+    for radius in [7.0, 10.0, 13.0] {
+        painter.circle_stroke(
+            center,
+            radius,
+            Stroke::new(1.0_f32, palette.accent.gamma_multiply(pulse * 0.4)),
+        );
     }
     if active {
         let orbit = center + Vec2::angled(time * 2.3) * 9.0;
         diamond(painter, orbit, 2.2, palette.paper);
-        diamond(
-            painter,
-            start.lerp(end, (time * 0.45).fract()),
-            3.0,
-            palette.hot,
-        );
         painter
             .ctx()
             .request_repaint_after(std::time::Duration::from_millis(50));

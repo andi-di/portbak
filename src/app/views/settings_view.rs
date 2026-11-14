@@ -88,14 +88,15 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
         switch_row(ui, &mut defaults.zip, "Compress as ZIP");
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        let mut job = defaults.new_job();
+        super::editor::schedule_controls(ui, &mut job);
+        defaults.update_schedule(&job);
+        ui.add_space(16.0);
         switch_row(
             ui,
             &mut defaults.check_on_enable,
             "Check immediately when enabled",
         );
-        let mut job = defaults.new_job();
-        super::editor::schedule_controls(ui, &mut job);
-        defaults.update_schedule(&job);
     });
     pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         switch_row(ui, &mut defaults.rolling, "Enable rolling retention");
