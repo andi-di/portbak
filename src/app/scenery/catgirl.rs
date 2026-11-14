@@ -151,8 +151,13 @@ impl Companion {
     }
 }
 
-fn texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> Option<egui::TextureHandle> {
-    let id = egui::Id::new(("saya_artwork", name));
+fn texture(
+    ctx: &egui::Context,
+    name: &str,
+    bytes: &[u8],
+    trim: bool,
+) -> Option<egui::TextureHandle> {
+    let id = egui::Id::new(("saya_artwork", name, trim));
 
     let cached: Option<Result<egui::TextureHandle, String>> =
         ctx.data_mut(|data| data.get_temp(id));
@@ -161,7 +166,11 @@ fn texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> Option<egui::Textur
         let result = image::load_from_memory(bytes)
             .map(|image| {
                 let rgba = image.to_rgba8();
-
+                let rgba = if trim {
+                    trim_transparent_border(&rgba)
+                } else {
+                    rgba
+                };
                 ctx.load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
@@ -185,8 +194,65 @@ fn texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> Option<egui::Textur
     result.ok()
 }
 
+fn trim_transparent_border(image: &image::RgbaImage) -> image::RgbaImage {
+    let mut bounds = (image.width(), image.height(), 0, 0);
+    for (x, y, pixel) in image.enumerate_pixels() {
+        if pixel[3] > 8 {
+            bounds = (
+                bounds.0.min(x),
+                bounds.1.min(y),
+                bounds.2.max(x + 1),
+                bounds.3.max(y + 1),
+            );
+        }
+    }
+    if bounds.2 <= bounds.0 || bounds.3 <= bounds.1 {
+        return image.clone();
+    }
+    image::imageops::crop_imm(
+        image,
+        bounds.0,
+        bounds.1,
+        bounds.2 - bounds.0,
+        bounds.3 - bounds.1,
+    )
+    .to_image()
+}
+
+fn ornament_mesh(texture: egui::TextureId, rect: Rect) -> egui::Mesh {
+    let mut mesh = egui::Mesh::with_texture(texture);
+    for row in 0..2 {
+        for column in 0..2 {
+            let min = rect.min + rect.size() * egui::vec2(column as f32, row as f32) * 0.5;
+            let target = Rect::from_min_size(min, rect.size() * 0.5);
+            // Reflect one quadrant so the displayed border is exactly symmetrical on both axes.
+            let uv = Rect::from_min_max(
+                egui::pos2(column as f32 * 0.5, row as f32 * 0.5),
+                egui::pos2((1 - column) as f32 * 0.5, (1 - row) as f32 * 0.5),
+            );
+            mesh.add_rect_with_uv(target, uv, Color32::WHITE);
+        }
+    }
+    mesh
+}
+
+fn paint_inner_ornament(ui: &egui::Ui, portrait: Rect) {
+    let Some(texture) = texture(
+        ui.ctx(),
+        "portrait-ornament",
+        include_bytes!("../../../assets/themes/midnight-neko/portrait-ornament.png"),
+        true,
+    ) else {
+        return;
+    };
+    let lining = portrait.shrink(1.0);
+    ui.painter()
+        .with_clip_rect(ui.clip_rect().intersect(lining))
+        .add(ornament_mesh(texture.id(), lining));
+}
+
 fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
-    if let Some(texture) = texture(ui.ctx(), name, bytes) {
+    if let Some(texture) = texture(ui.ctx(), name, bytes, false) {
         let size = texture.size_vec2();
 
         let fitted = size * (rect.width() / size.x).min(rect.height() / size.y);
@@ -498,12 +564,7 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
     let font = egui::TextStyle::Small.resolve(ui.style());
     let galley = letter_text(ui, letter.width(), state.line(time), &font);
     paint(ui, rect, &format!("{expression:?}"), expression.bytes());
-    paint(
-        ui,
-        rect.shrink(4.0),
-        "portrait-ornament",
-        include_bytes!("../../../assets/themes/midnight-neko/portrait-ornament.png"),
-    );
+    paint_inner_ornament(ui, rect);
     if let Some(elapsed) = state.love_elapsed(time) {
         paint_love_hearts(ui, rect, elapsed);
         ui.ctx().request_repaint();
@@ -638,6 +699,30 @@ mod tests {
                 },
             );
         }
+    }
+
+    #[test]
+    fn ornament_is_mirrored_and_stays_inside_the_portrait_border() {
+        let portrait = Rect::from_min_size(Pos2::ZERO, egui::vec2(288.0, 288.0));
+        let lining = portrait.shrink(1.0);
+        let mesh = ornament_mesh(egui::TextureId::default(), lining);
+        assert_eq!(mesh.calc_bounds(), lining);
+        for vertex in &mesh.vertices {
+            assert!(lining.contains(vertex.pos));
+            let mirrored = mesh
+                .vertices
+                .iter()
+                .find(|other| {
+                    (other.pos.x - (portrait.width() - vertex.pos.x)).abs() < 0.01
+                        && other.pos.y == vertex.pos.y
+                })
+                .unwrap();
+            assert_eq!(vertex.uv, mirrored.uv);
+        }
+        let mut source = image::RgbaImage::new(8, 8);
+        source.put_pixel(2, 3, image::Rgba([255, 255, 255, 255]));
+        source.put_pixel(5, 6, image::Rgba([255, 255, 255, 255]));
+        assert_eq!(trim_transparent_border(&source).dimensions(), (4, 4));
     }
 
     #[test]
