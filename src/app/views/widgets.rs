@@ -12,7 +12,7 @@ pub const DATE_TIME: &str = "%d.%m.%Y %H:%M:%S";
 pub const DATE: &str = "%a %d.%m.%Y";
 pub const TIME: &str = "%H:%M:%S";
 
-pub const PAGE_PADDING: i8 = 22;
+pub const PAGE_PADDING: i8 = 16;
 
 pub fn page_frame(ui: &egui::Ui) -> egui::Frame {
     egui::Frame::central_panel(ui.style()).inner_margin(egui::Margin::symmetric(0, PAGE_PADDING))
@@ -78,19 +78,23 @@ pub fn switch_row_with(
     label: &str,
     extras: impl FnOnce(&mut egui::Ui),
 ) -> egui::Response {
-    centered_row(ui, |ui| {
-        if style::Skin::of(ui.ctx()).finish != style::Finish::Liquid {
-            let response = ui.add(PixelCheckbox::new(checked, label));
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), ui.spacing().interact_size.y.max(28.0)),
+        egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
+        |ui| {
+            if style::Skin::of(ui.ctx()).finish != style::Finish::Liquid {
+                let response = ui.add(PixelCheckbox::new(checked, label));
+                extras(ui);
+                return response;
+            }
+            ui.label(label);
             extras(ui);
-            return response;
-        }
-        ui.label(label);
-        extras(ui);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add(PixelCheckbox::new(checked, label).unlabeled())
-        })
-        .inner
-    })
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add(PixelCheckbox::new(checked, label).unlabeled())
+            })
+            .inner
+        },
+    )
     .inner
 }
 

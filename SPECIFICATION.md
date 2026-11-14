@@ -362,3 +362,5 @@ When rebuilding from this document, implement the complete behavior and acceptan
 - The footer shows a single activity light with progress in its tooltip.
 - Scheduling modes use consistent spacing; Check immediately when enabled follows the schedule fields with a separate gap.
 - Job errors align to the right of the check status and wrap when space is insufficient.
+
+- Keep job and application settings compact, with consistent section spacing and tightly padded next-execution readouts.

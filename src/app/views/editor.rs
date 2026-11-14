@@ -62,31 +62,33 @@ impl App {
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                page_scroll_area(ui, |ui| {
-                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                    let (Some(job), Some(permissions)) = (job, permissions) else {
-                        add = welcome(ui, can_add);
-                        return;
-                    };
-                    job_tabs(ui, &mut self.backups_tab);
-                    let was_enabled = job.enabled;
-                    let previous = job.clone();
-                    let summary = summaries
-                        .get(&job.id)
-                        .filter(|summary| summary.target == job.target);
-                    action = ui
-                        .push_id(job.id, |ui| job_editor(ui, job, &permissions, summary))
-                        .inner
-                        .map(|action| (job.id, action));
-                    if !permissions.busy {
-                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
-                            self.error =
-                                format!("Could not update automatic destination: {error:#}");
+                ui.push_id(("job_page", selected), |ui| {
+                    page_scroll_area(ui, |ui| {
+                        let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                        let (Some(job), Some(permissions)) = (job, permissions) else {
+                            add = welcome(ui, can_add);
+                            return;
+                        };
+                        job_tabs(ui, &mut self.backups_tab);
+                        let was_enabled = job.enabled;
+                        let previous = job.clone();
+                        let summary = summaries
+                            .get(&job.id)
+                            .filter(|summary| summary.target == job.target);
+                        action = ui
+                            .push_id(job.id, |ui| job_editor(ui, job, &permissions, summary))
+                            .inner
+                            .map(|action| (job.id, action));
+                        if !permissions.busy {
+                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                                self.error =
+                                    format!("Could not update automatic destination: {error:#}");
+                            }
                         }
-                    }
-                    if was_enabled != job.enabled {
-                        activation = Some((job.id, was_enabled));
-                    }
+                        if was_enabled != job.enabled {
+                            activation = Some((job.id, was_enabled));
+                        }
+                    });
                 });
             });
         if add {
@@ -148,7 +150,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         let wording = &Skin::of(ui.ctx()).wording;
         let title = if liquid { palette.ink } else { palette.gold };
         pixel::display_label(ui, wording.welcome_title, 24.0, title);
-        ui.add_space(14.0);
+        ui.add_space(8.0);
         let tagline = "Your folders. Safely backed up.";
         if liquid {
             // iOS empty states describe themselves in plain secondary text below the bold title.
@@ -169,7 +171,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         if liquid {
             return clicked;
         }
-        ui.add_space(14.0);
+        ui.add_space(8.0);
         let prompt = if pixel::blink(ui, 0.5) {
             wording.welcome_prompt
         } else {
@@ -190,7 +192,7 @@ fn job_editor(
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
     job_status(ui, job, permissions.activity);
-    ui.add_space(14.0);
+    ui.add_space(8.0);
     // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
     let unchanged = permissions.busy.then(|| job.clone());
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
@@ -410,7 +412,7 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
     scheduling_fields(ui, job, true);
-    ui.add_space(16.0);
+    ui.add_space(10.0);
     switch_row(
         ui,
         &mut job.check_on_enable,
@@ -477,6 +479,10 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
     .changed()
 }
 
+fn next_check_frame(ctx: &egui::Context) -> egui::Frame {
+    style::well(ctx).inner_margin(egui::Margin::symmetric(6, 3))
+}
+
 fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     let readout_height = ui
         .painter()
@@ -487,7 +493,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         )
         .size()
         .y
-        + style::well(ui.ctx()).total_margin().sum().y;
+        + next_check_frame(ui.ctx()).total_margin().sum().y;
     let row_height = pixel::button_height(ui)
         .max(ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0)
         .max(if show_next_check { readout_height } else { 0.0 });
@@ -515,16 +521,20 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
                 } else {
                     "Select at least one weekday".into()
                 };
-                style::well(ui.ctx())
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(next.to_uppercase())
-                                .font(style::label_font(ui.ctx()))
-                                .color(Palette::of(ui).good),
-                        );
-                    })
-                    .response
-                    .hint("Next check according to the current schedule");
+                let frame = next_check_frame(ui.ctx());
+                let color = Palette::of(ui).good;
+                let text = ui.painter().layout_no_wrap(
+                    next.to_uppercase(),
+                    style::label_font(ui.ctx()),
+                    color,
+                );
+                let margin = frame.total_margin();
+                let (rect, response) =
+                    ui.allocate_exact_size(text.size() + margin.sum(), egui::Sense::hover());
+                let content = egui::Rect::from_min_size(rect.min + margin.left_top(), text.size());
+                ui.painter().add(frame.paint(content));
+                ui.painter().galley(content.min, text, color);
+                response.hint("Next check according to the current schedule");
             }
         },
     );
@@ -683,7 +693,7 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
             ],
         );
     });
-    ui.add_space(14.0);
+    ui.add_space(8.0);
 }
 
 #[cfg(test)]

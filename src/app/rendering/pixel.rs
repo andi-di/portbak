@@ -114,12 +114,24 @@ impl PixelButton {
     }
 }
 
-impl Widget for PixelButton {
-    fn ui(self, ui: &mut egui::Ui) -> Response {
-        let m = style::metrics(ui.ctx());
-        let palette = Palette::of(ui);
-        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
-        let icon_scale = if gothic {
+struct ButtonGeometry {
+    galley: std::sync::Arc<egui::Galley>,
+    icon: Vec2,
+    gap: f32,
+    content: Vec2,
+    face_size: Vec2,
+    margin: Vec2,
+}
+
+impl PixelButton {
+    pub fn size(&self, ui: &egui::Ui) -> Vec2 {
+        let scale = self.icon_scale(ui);
+        let geometry = self.geometry(ui, scale);
+        geometry.face_size + geometry.margin
+    }
+
+    fn icon_scale(&self, ui: &egui::Ui) -> f32 {
+        if Skin::of(ui.ctx()).finish == Finish::Gothic {
             if self.sprite == Some(Sprite::Plus) {
                 40.0 / 12.0
             } else {
@@ -127,15 +139,12 @@ impl Widget for PixelButton {
             }
         } else {
             ICON_SCALE
-        };
-        let utility = gothic
-            && self.icon_only
-            && self.tone == Tone::Plain
-            && matches!(
-                self.sprite,
-                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
-            );
-        let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
+        }
+    }
+
+    fn geometry(&self, ui: &egui::Ui, icon_scale: f32) -> ButtonGeometry {
+        let m = style::metrics(ui.ctx());
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
         let text = if self.icon_only {
             String::new()
         } else {
@@ -176,6 +185,40 @@ impl Widget for PixelButton {
         };
         // `min_size` bounds the whole footprint, so a full-width button cannot widen its panel.
         let face_size = (content + padding * 2.0).max(self.min_size - margin);
+        ButtonGeometry {
+            galley,
+            icon,
+            gap,
+            content,
+            face_size,
+            margin,
+        }
+    }
+}
+
+impl Widget for PixelButton {
+    fn ui(self, ui: &mut egui::Ui) -> Response {
+        let m = style::metrics(ui.ctx());
+        let palette = Palette::of(ui);
+        let finish = Skin::of(ui.ctx()).finish;
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
+        let icon_scale = self.icon_scale(ui);
+        let utility = gothic
+            && self.icon_only
+            && self.tone == Tone::Plain
+            && matches!(
+                self.sprite,
+                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
+            );
+        let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
+        let ButtonGeometry {
+            galley,
+            icon,
+            gap,
+            content,
+            face_size,
+            margin,
+        } = self.geometry(ui, icon_scale);
         let (rect, response) = ui.allocate_exact_size(face_size + margin, Sense::click());
         let enabled = ui.is_enabled();
         response.widget_info(|| {
@@ -563,7 +606,7 @@ pub fn segmented<T: PartialEq + Copy>(
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
     let content = match Skin::of(ui.ctx()).finish {
-        Finish::Gothic => ui.text_style_height(&TextStyle::Button).max(40.0),
+        Finish::Gothic => ui.text_style_height(&TextStyle::Button).max(32.0),
         Finish::Liquid => ui.text_style_height(&TextStyle::Button) + LIQUID_PADDING * 2.0,
         _ => ui.text_style_height(&TextStyle::Button),
     };
@@ -586,7 +629,7 @@ pub fn section<R>(
         left: 0,
         top: 0,
         right: m.shadow,
-        bottom: m.shadow + 6,
+        bottom: m.shadow + 4,
     };
     let backing = ui.painter().add(egui::Shape::Noop);
     let mut frame = egui::Frame::new()
@@ -603,9 +646,9 @@ pub fn section<R>(
         ui.spacing_mut().item_spacing.y = 0.0;
         title_bar(ui, title, sprite, band);
         egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(16, 12))
+            .inner_margin(egui::Margin::symmetric(12, 8))
             .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 7.0;
+                ui.spacing_mut().item_spacing.y = 5.0;
                 ui.set_min_width(ui.available_width());
                 contents(ui)
             })

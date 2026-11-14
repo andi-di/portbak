@@ -134,17 +134,26 @@ impl App {
                         self.settings_open = false;
                         self.backups_tab = false;
                     }
+                    let dark = self.config.theme == Theme::Dark;
+                    let (label, sprite) = if dark {
+                        ("Light", Sprite::Sun)
+                    } else {
+                        ("Dark", Sprite::Moon)
+                    };
+                    let mode_size = PixelButton::new(label).sprite(sprite).icon_only().size(ui);
+                    let settings_size = PixelButton::new("Settings")
+                        .sprite(Sprite::Gear)
+                        .icon_only()
+                        .size(ui);
+                    let toolbar_size = egui::vec2(
+                        mode_size.x + ui.spacing().item_spacing.x + settings_size.x,
+                        mode_size.y.max(settings_size.y),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.allocate_ui_with_layout(
-                            egui::vec2(110.0, 52.0),
+                            toolbar_size,
                             egui::Layout::left_to_right(egui::Align::Center),
                             |ui| {
-                                let dark = self.config.theme == Theme::Dark;
-                                let (label, sprite) = if dark {
-                                    ("Light", Sprite::Sun)
-                                } else {
-                                    ("Dark", Sprite::Moon)
-                                };
                                 if ui
                                     .add(PixelButton::new(label).sprite(sprite).icon_only())
                                     .hint(format!("Switch to {label} mode"))
@@ -847,6 +856,52 @@ mod tests {
                     }
                     if frame >= 6 {
                         assert_eq!(Some(name), enabled_name, "{} {theme:?}", skin.id);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn opening_and_switching_jobs_does_not_emit_id_warnings() {
+        for skin in skins::ALL {
+            let ctx = egui::Context::default();
+            style::install(&ctx, skin);
+            let mut app = App::new(
+                Config {
+                    skin: skin.id.into(),
+                    jobs: vec![Job::default(), Job::default()],
+                    ..Config::default()
+                },
+                std::path::PathBuf::new(),
+                tempfile::tempfile().unwrap(),
+            );
+            for selection in [None, Some(0), Some(0), Some(1), None, Some(1)] {
+                app.selected = selection.map(|index| app.config.jobs[index].id);
+                let output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            crate::MIN_WINDOW_SIZE,
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        app.show_header(ui);
+                        app.show_footer(ui);
+                        app.show_job_list(ui);
+                        app.show_job_editor(ui);
+                    },
+                );
+                for shape in output.shapes {
+                    if let egui::Shape::Text(text) = shape.shape {
+                        assert!(
+                            !text.galley.text().contains("ID ")
+                                && !text.galley.text().contains("Double use"),
+                            "{}: {}",
+                            skin.id,
+                            text.galley.text()
+                        );
                     }
                 }
             }
