@@ -10,3 +10,9 @@ is its hotspot. Native text, resize and other specialized cursors remain intact.
 
 The narrow arrowhead has a 17 × 28 logical-pixel silhouette with silver bevels
 and a small crimson inset. Both cursors keep a thin plum-black contrast rim.
+
+The estate uses three cloud silhouettes, including `cloud-bank.png`, generated with
+built-in imagegen from the neighboring `cloud-variant.png` style reference.
+The full prompt is in `cloud-bank.prompt.txt`. Large scenery textures are fitted
+to a 1024-pixel maximum side when loaded. Four cool blue-violet mist layers drift,
+ripple independently and fade at their edges. Sixteen bats roam and roost.

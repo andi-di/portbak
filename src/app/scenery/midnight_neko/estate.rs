@@ -1,6 +1,6 @@
 //! Asymmetric estate layers leave the central workspace open.
 
-use super::{draw, draw_moving, noise, Sprite, SpritePose};
+use super::{draw, draw_moving, noise, texture, Sprite, SpritePose};
 use eframe::egui::{self, Color32, Rect, Vec2};
 
 pub(super) fn castle_rect(screen: Rect) -> Rect {
@@ -52,10 +52,10 @@ pub(super) fn paint(painter: &egui::Painter) {
         draw_moving(
             painter,
             Rect::from_center_size(center, egui::vec2(width, width * 0.34)),
-            if index.is_multiple_of(2) {
-                Sprite::Cloud
-            } else {
-                Sprite::CloudVariant
+            match index % 3 {
+                0 => Sprite::Cloud,
+                1 => Sprite::CloudVariant,
+                _ => Sprite::CloudBank,
             },
             color,
             SpritePose {
@@ -71,29 +71,57 @@ pub(super) fn paint(painter: &egui::Painter) {
         Sprite::Castle,
         Color32::WHITE.gamma_multiply(if dark { 0.62 } else { 0.32 }),
     );
-    for layer in 0..3 {
+    for layer in 0..4 {
+        let phase = layer as f32 * 1.9;
         let center = egui::pos2(
-            screen.center().x + (time * 0.035 + layer as f32 * 2.0).sin() * screen.width() * 0.18,
-            screen.bottom() - 22.0 - layer as f32 * 25.0,
+            screen.center().x + (time * 0.025 + phase).sin() * screen.width() * 0.12,
+            screen.bottom() - 18.0 - layer as f32 * 24.0 + (time * 0.13 + phase).sin() * 5.0,
         );
-        let width = screen.width() * (0.85 + layer as f32 * 0.08);
+        let width = screen.width() * (1.0 + layer as f32 * 0.06);
+        let breathe = 0.85 + 0.15 * (time * 0.17 + phase).sin();
         let color = if dark {
-            Color32::WHITE.gamma_multiply(0.10)
+            Color32::from_rgb(166, 187, 230).gamma_multiply(0.15 * breathe)
         } else {
-            Color32::from_rgb(125, 110, 135).gamma_multiply(0.12)
+            Color32::from_rgb(100, 117, 155).gamma_multiply(0.12 * breathe)
         };
-        draw_moving(
+        paint_mist(
             painter,
-            Rect::from_center_size(center, egui::vec2(width, width * 0.15)),
-            Sprite::Mist,
+            Rect::from_center_size(center, egui::vec2(width, width * 0.12)),
             color,
-            SpritePose {
-                mirrored: layer % 2 == 0,
-                angle: (time * 0.015 + layer as f32).sin() * 0.018,
-                ..Default::default()
-            },
+            time,
+            layer,
         );
     }
+}
+
+fn paint_mist(painter: &egui::Painter, rect: Rect, color: Color32, time: f32, layer: u32) {
+    let Some(texture) = texture(painter, Sprite::Mist) else {
+        return;
+    };
+    const COLUMNS: u32 = 24;
+    let mut mesh = egui::Mesh::with_texture(texture.id());
+    let phase = layer as f32 * 1.9;
+    for v in [0.0, 1.0] {
+        for column in 0..=COLUMNS {
+            let u = column as f32 / COLUMNS as f32;
+            let wave = (u * 10.0 + time * 0.22 + phase).sin() * 5.0
+                + (u * 17.0 - time * 0.14 + phase).sin() * 2.5;
+            let edge = (u * 8.0).min((1.0 - u) * 8.0).min(1.0);
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: egui::pos2(
+                    rect.left() + u * rect.width(),
+                    rect.top() + v * rect.height() + wave,
+                ),
+                uv: egui::pos2(if layer.is_multiple_of(2) { u } else { 1.0 - u }, v),
+                color: color.gamma_multiply(edge),
+            });
+        }
+    }
+    for column in 0..COLUMNS {
+        mesh.add_triangle(column, column + 1, column + COLUMNS + 1);
+        mesh.add_triangle(column + 1, column + COLUMNS + 2, column + COLUMNS + 1);
+    }
+    painter.add(mesh);
 }
 
 #[cfg(test)]

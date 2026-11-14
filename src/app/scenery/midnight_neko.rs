@@ -8,7 +8,7 @@ use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 use std::time::Duration;
 
-const BAT_COUNT: usize = 12;
+const BAT_COUNT: usize = 16;
 const PETAL_COUNT: u32 = 60;
 const REACTION_RADIUS: f32 = 180.0;
 const CLICK_REACTION_RADIUS: f32 = 320.0;
@@ -23,6 +23,7 @@ enum Sprite {
     Moon,
     Cloud,
     CloudVariant,
+    CloudBank,
     Mountains,
     Mist,
     BatDown,
@@ -52,6 +53,10 @@ impl Sprite {
             Self::CloudVariant => (
                 "cloud-variant",
                 include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud-variant.png"),
+            ),
+            Self::CloudBank => (
+                "cloud-bank",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud-bank.png"),
             ),
             Self::Mountains => (
                 "mountains",
@@ -143,6 +148,12 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
+                // Generated scenery can exceed the conservative texture limit of older GPUs.
+                let image = if image.width() > 1024 || image.height() > 1024 {
+                    image.thumbnail(1024, 1024)
+                } else {
+                    image
+                };
                 let mut rgba = image.to_rgba8();
                 if matches!(sprite, Sprite::BatDown | Sprite::Perched) {
                     for pixel in rgba.pixels_mut() {
