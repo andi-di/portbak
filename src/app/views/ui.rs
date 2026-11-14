@@ -120,16 +120,21 @@ impl App {
                 }
                 ui.horizontal(|ui| {
                     let brand = ui.horizontal(logo);
-                    if ui
+                    let home = ui
                         .interact(
                             brand.response.rect,
                             ui.id().with("home"),
                             egui::Sense::click(),
                         )
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
-                        .on_hover_text("Start screen")
-                        .clicked()
-                    {
+                        .on_hover_text("Start screen");
+                    pixel::subtle_highlight(
+                        ui,
+                        &home,
+                        brand.response.rect.expand(3.0),
+                        palette.ink,
+                    );
+                    if home.clicked() {
                         self.selected = None;
                         self.settings_open = false;
                         self.backups_tab = false;

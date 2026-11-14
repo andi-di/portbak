@@ -152,6 +152,18 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     let rect = frame.response.rect;
     let response =
         pixel::pointing_hand(ui.interact(rect, ui.id().with(candidate.id), egui::Sense::click()));
+    if response.has_focus() {
+        pixel::subtle_highlight(
+            ui,
+            &response,
+            rect.shrink(3.0),
+            if selected {
+                palette.accent_ink
+            } else {
+                palette.ink
+            },
+        );
+    }
     if response.clicked() && !selected {
         *selected_id = candidate.id.to_owned();
     }

@@ -364,3 +364,5 @@ When rebuilding from this document, implement the complete behavior and acceptan
 - Job errors align to the right of the check status and wrap when space is insufficient.
 
 - Keep job and application settings compact, with consistent section spacing and tightly padded next-execution readouts.
+
+- Interactive app branding and Saya's portrait have subtle hover feedback and a distinct keyboard-focus outline. Theme cards also show keyboard focus.

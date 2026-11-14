@@ -34,6 +34,45 @@ pub(crate) fn pointing_hand(response: Response) -> Response {
     response
 }
 
+/// Gentle feedback for interactive artwork that has no button face.
+pub fn subtle_highlight(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    let strength = ui.ctx().animate_bool_with_time(
+        response.id.with("subtle_highlight"),
+        response.hovered() || response.has_focus(),
+        0.15,
+    );
+    if strength <= 0.0 {
+        return;
+    }
+    ui.painter().rect_filled(
+        rect,
+        style::control_radius(ui.ctx()),
+        color.gamma_multiply(0.04 * strength),
+    );
+    ui.painter().rect_stroke(
+        rect,
+        style::control_radius(ui.ctx()),
+        Stroke::new(1.0_f32, color.gamma_multiply(0.35 * strength)),
+        StrokeKind::Inside,
+    );
+    if response.has_focus() {
+        let focus = rect.shrink(3.0);
+        let points = [
+            focus.left_top(),
+            focus.right_top(),
+            focus.right_bottom(),
+            focus.left_bottom(),
+            focus.left_top(),
+        ];
+        ui.painter().extend(egui::Shape::dashed_line(
+            &points,
+            Stroke::new(1.0_f32, color.gamma_multiply(0.85)),
+            3.0,
+            3.0,
+        ));
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Tone {
     Plain,
