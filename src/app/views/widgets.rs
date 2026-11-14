@@ -156,57 +156,55 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
     }
     caption(ui, label);
     centered_row(ui, |ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let open = PixelButton::new("Open folder in file manager")
-                .sprite(Sprite::Monitor)
-                .icon_only();
-            if ui
-                .add_enabled(!path.as_os_str().is_empty() && path.is_dir(), open)
-                .hint("Open folder in file manager")
-                .disabled_hint("Choose an existing folder first")
-                .clicked()
-            {
-                open_error = crate::app::platform::open_in_file_manager(path)
-                    .err()
-                    .map_or_else(String::new, |error| {
-                        format!("Could not open folder: {error:#}")
-                    });
-            }
-            let choose = PixelButton::new("Choose folder …")
-                .sprite(Sprite::Folder)
-                .icon_only();
-            if ui
-                .add_enabled(
-                    !folder_dialog_open(ui.ctx()) && pending.is_none() && !read_only,
-                    choose,
-                )
-                .hint("Choose folder")
-                .clicked()
-            {
-                let result: Picker = Default::default();
-                ui.ctx()
-                    .data_mut(|data| data.insert_temp(picker_id, result.clone()));
-                let ctx = ui.ctx().clone();
-                ctx.data_mut(|data| data.insert_temp(egui::Id::new("folder_dialog_open"), true));
-                std::thread::spawn(move || {
-                    let folder = rfd::FileDialog::new().pick_folder();
-                    *result.lock().unwrap_or_else(|error| error.into_inner()) = Some(folder);
-                    ctx.data_mut(|data| {
-                        data.insert_temp(egui::Id::new("folder_dialog_open"), false)
-                    });
-                    ctx.request_repaint();
+        let choose = PixelButton::new("Choose folder …")
+            .sprite(Sprite::Folder)
+            .icon_only();
+        let open = PixelButton::new("Open folder in file manager")
+            .sprite(Sprite::Monitor)
+            .icon_only();
+        let controls_width =
+            choose.size(ui).x + open.size(ui).x + ui.spacing().item_spacing.x * 2.0;
+        let mut text = display_path(path);
+        let editor = egui::TextEdit::singleline(&mut text)
+            .desired_width((ui.available_width() - controls_width).max(40.0))
+            .margin(egui::vec2(8.0, 4.0))
+            .hint_text("Type a path or choose a folder");
+        if ui.add(editor).changed() {
+            *path = PathBuf::from(text);
+            changed = true;
+        }
+        if ui
+            .add_enabled(
+                !folder_dialog_open(ui.ctx()) && pending.is_none() && !read_only,
+                choose,
+            )
+            .hint("Choose folder")
+            .clicked()
+        {
+            let result: Picker = Default::default();
+            ui.ctx()
+                .data_mut(|data| data.insert_temp(picker_id, result.clone()));
+            let ctx = ui.ctx().clone();
+            ctx.data_mut(|data| data.insert_temp(egui::Id::new("folder_dialog_open"), true));
+            std::thread::spawn(move || {
+                let folder = rfd::FileDialog::new().pick_folder();
+                *result.lock().unwrap_or_else(|error| error.into_inner()) = Some(folder);
+                ctx.data_mut(|data| data.insert_temp(egui::Id::new("folder_dialog_open"), false));
+                ctx.request_repaint();
+            });
+        }
+        if ui
+            .add_enabled(!path.as_os_str().is_empty() && path.is_dir(), open)
+            .hint("Open folder in file manager")
+            .disabled_hint("Choose an existing folder first")
+            .clicked()
+        {
+            open_error = crate::app::platform::open_in_file_manager(path)
+                .err()
+                .map_or_else(String::new, |error| {
+                    format!("Could not open folder: {error:#}")
                 });
-            }
-            let mut text = display_path(path);
-            let editor = egui::TextEdit::singleline(&mut text)
-                .desired_width(ui.available_width())
-                .margin(egui::vec2(8.0, 4.0))
-                .hint_text("Type a path or choose a folder");
-            if ui.add(editor).changed() {
-                *path = PathBuf::from(text);
-                changed = true;
-            }
-        });
+        }
     });
     if changed {
         open_error.clear();
