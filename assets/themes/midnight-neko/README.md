@@ -44,10 +44,13 @@ Minimizing and maximizing use a 240 ms eased slide and fade. The caret strip
 stays fixed at the bottom, while the job list smoothly gains or gives up space.
 The animation can reverse without jumping. Saya starts expanded on every launch.
 
-`portrait-ornament.png` was generated with built-in imagegen. Transparent outer
-padding is trimmed at texture upload, then the top-left quadrant is reflected
-across both axes for exact symmetry. The ornament is enlarged beyond the portrait and cropped at its edges. Fine
-mirrored vine stems start directly at the border and arch inward to connect the
-leaf and rose detailing. The visible artwork remains clipped inside the
-portrait, clear of the dialogue and caret strip.
-See `portrait-ornament.prompt.txt` for the prompt.
+`portrait-ornament.png` is a purpose-built transparent frame with straight edge
+rails and inward-growing silver vines and burgundy roses. It is drawn edge-to-edge
+inside the portrait, without enlargement or floating margins. One quadrant is
+reflected across both axes for exact symmetry.
+
+`caret-ornament.png` adds richer silver scrolls, roses and ruby pendants inside the
+min/max pane. Its left flourish is reflected on the right, leaving the central
+caret unobstructed. Both assets are clipped to their own panes and were made with
+built-in imagegen; their adjacent `.prompt.txt` files record the prompts. Textures
+larger than 1024 pixels are reduced when loaded for GPU compatibility.

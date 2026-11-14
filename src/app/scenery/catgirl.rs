@@ -165,6 +165,11 @@ fn texture(
     let result = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
+                let image = if image.width() > 1024 || image.height() > 1024 {
+                    image.thumbnail(1024, 1024)
+                } else {
+                    image
+                };
                 let rgba = image.to_rgba8();
                 let rgba = if trim {
                     trim_transparent_border(&rgba)
@@ -245,12 +250,42 @@ fn paint_inner_ornament(ui: &egui::Ui, portrait: Rect) {
     ) else {
         return;
     };
-    // Crop the outer stems at the portrait edge so the branches grow inward from the border.
-    let growth = (portrait.width() * 0.02).clamp(6.0, 9.0);
     ui.painter()
         .with_clip_rect(ui.clip_rect().intersect(portrait))
-        .add(ornament_mesh(texture.id(), portrait.expand(growth)));
-    crate::app::rendering::gothic::portrait_vines(ui.painter(), portrait);
+        .add(ornament_mesh(texture.id(), portrait));
+}
+
+fn paint_caret_ornament(ui: &egui::Ui, rect: Rect) {
+    let Some(texture) = texture(
+        ui.ctx(),
+        "caret-ornament",
+        include_bytes!("../../../assets/themes/midnight-neko/caret-ornament.png"),
+        true,
+    ) else {
+        return;
+    };
+    let height = rect.height() - 4.0;
+    let width = rect.width() * 0.4;
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    for right in [false, true] {
+        let target = Rect::from_min_size(
+            egui::pos2(
+                if right {
+                    rect.right() - width
+                } else {
+                    rect.left()
+                },
+                rect.center().y - height / 2.0,
+            ),
+            egui::vec2(width, height),
+        );
+        let uv = if right {
+            Rect::from_min_max(egui::pos2(0.5, 0.0), egui::pos2(0.0, 1.0))
+        } else {
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(0.5, 1.0))
+        };
+        painter.image(texture.id(), target, uv, Color32::WHITE);
+    }
 }
 
 fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
@@ -514,7 +549,7 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
         rect.top(),
         egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.35)),
     );
-    crate::app::rendering::gothic::caret_scrollwork(painter, rect);
+    paint_caret_ornament(ui, rect);
     let direction = if collapsed { -1.0 } else { 1.0 };
     painter.add(egui::Shape::line(
         vec![
@@ -707,12 +742,10 @@ mod tests {
     #[test]
     fn ornament_is_mirrored_and_stays_inside_the_portrait_border() {
         let portrait = Rect::from_min_size(Pos2::ZERO, egui::vec2(288.0, 288.0));
-        let growth = portrait.expand(6.0);
-        let mesh = ornament_mesh(egui::TextureId::default(), growth);
-        assert_eq!(mesh.calc_bounds(), growth);
-        assert!(growth.contains_rect(portrait));
+        let mesh = ornament_mesh(egui::TextureId::default(), portrait);
+        assert_eq!(mesh.calc_bounds(), portrait);
         for vertex in &mesh.vertices {
-            assert!(growth.contains(vertex.pos));
+            assert!(portrait.contains(vertex.pos));
             let mirrored = mesh
                 .vertices
                 .iter()
