@@ -1,5 +1,28 @@
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) enum Expression {
+macro_rules! expression_catalog {
+    ($($(#[$attribute:meta])* $name:ident),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+        pub(super) enum Expression { $($(#[$attribute])* $name),+ }
+
+        impl Expression {
+            pub(super) const ALL: &'static [Self] = &[$(Self::$name),+];
+            pub(super) const REACTIONS: [Self; Self::ALL.len() - 1] = {
+                let mut result = [Self::Neutral; Self::ALL.len() - 1];
+                let mut source = 0;
+                let mut target = 0;
+                while source < Self::ALL.len() {
+                    if !matches!(Self::ALL[source], Self::Neutral) {
+                        result[target] = Self::ALL[source];
+                        target += 1;
+                    }
+                    source += 1;
+                }
+                result
+            };
+        }
+    };
+}
+
+expression_catalog! {
     Angry,
     Bored,
     BoredExpectant,
@@ -31,34 +54,17 @@ pub(super) enum Expression {
 }
 
 impl Expression {
-    pub(super) const REACTIONS: [Self; 26] = [
-        Self::Angry,
-        Self::Bored,
-        Self::BoredExpectant,
-        Self::Celebrating,
-        Self::Curious,
-        Self::Cute,
-        Self::Dominant,
-        Self::Embarrassed,
-        Self::Energetic,
-        Self::Excited,
-        Self::Flirty,
-        Self::Flustered,
-        Self::Happy,
-        Self::InLove,
-        Self::Killer,
-        Self::Meek,
-        Self::Pleading,
-        Self::Pouting,
-        Self::Praying,
-        Self::Question,
-        Self::Sad,
-        Self::Seductive,
-        Self::Shy,
-        Self::Sleepy,
-        Self::Smug,
-        Self::Waiting,
-    ];
+    pub(super) fn label(self) -> String {
+        let name = format!("{self:?}");
+        let mut label = String::new();
+        for (index, character) in name.chars().enumerate() {
+            if index > 0 && character.is_uppercase() {
+                label.push(' ');
+            }
+            label.push(character);
+        }
+        label
+    }
 
     pub(super) fn choose(pool: &[Self], current: Self, random: u128) -> Self {
         let count = pool.iter().filter(|value| **value != current).count();

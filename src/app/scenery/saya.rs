@@ -2,6 +2,7 @@
 
 mod dialogue;
 mod expressions;
+mod gallery;
 mod overlays;
 mod reactions;
 
@@ -26,6 +27,7 @@ fn state_id() -> egui::Id {
     egui::Id::new("saya_sidebar_companion")
 }
 
+pub use gallery::{is_open as gallery_open, show as show_gallery, suppress_home_click};
 pub use reactions::{Action, Page};
 
 pub fn trigger(ctx: &egui::Context, action: Action) {
@@ -77,7 +79,8 @@ struct SayaCompanion {
     page: Option<Page>,
     action_time: Option<f64>,
     displayed: Expression,
-    line_indices: [Option<usize>; 27],
+    line_indices: std::collections::HashMap<Expression, usize>,
+    preview: bool,
 }
 
 impl SayaCompanion {
@@ -98,6 +101,7 @@ impl SayaCompanion {
         if expression != self.visible(time) {
             self.overlay_started_at = (expression != Expression::Neutral).then_some(time);
         }
+        self.preview = false;
         self.expression = expression;
         self.until = time + REACTION_SECONDS;
         self.select_line(expression, random.rotate_left(64));
@@ -123,26 +127,26 @@ impl SayaCompanion {
     }
 
     fn select_line(&mut self, expression: Expression, random: u128) {
-        let index = expression as usize;
         let count = expression.lines().len();
-        let previous = self.line_indices[index];
+        let previous = self.line_indices.get(&expression).copied();
         let mut choice = (random % (count - usize::from(previous.is_some())) as u128) as usize;
         if previous.is_some_and(|old| choice >= old) {
             choice += 1;
         }
-        self.line_indices[index] = Some(choice);
+        self.line_indices.insert(expression, choice);
         self.displayed = expression;
     }
 
     fn line(&self, time: f64) -> &'static str {
         let expression = self.visible(time);
-        expression.lines()[self.line_indices[expression as usize].unwrap_or(0)]
+        expression.lines()[self.line_indices.get(&expression).copied().unwrap_or(0)]
     }
 
     fn visible(&self, time: f64) -> Expression {
-        if self
-            .paused_remaining
-            .is_some_and(|remaining| remaining > 0.0)
+        if self.preview
+            || self
+                .paused_remaining
+                .is_some_and(|remaining| remaining > 0.0)
             || time < self.until
         {
             self.expression
@@ -186,8 +190,7 @@ pub fn preload(ctx: &egui::Context) {
         .unwrap_or_else(|| {
             let (sender, receiver) = std::sync::mpsc::sync_channel(1);
             std::thread::spawn(move || {
-                for expression in std::iter::once(Expression::Neutral).chain(Expression::REACTIONS)
-                {
+                for expression in Expression::ALL.iter().copied() {
                     let image = decode_artwork(expression.bytes());
                     if sender.send((format!("{expression:?}"), image)).is_err() {
                         break;
@@ -260,6 +263,7 @@ pub fn show_header(ui: &mut egui::Ui) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(56.0), egui::Sense::hover());
 
     paint_emblem(ui, rect);
+    gallery::emblem_hold(ui, rect);
     response.on_hover_text("Kurobane family emblem")
 }
 
@@ -544,14 +548,16 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
     let hover_rect = rect.intersect(ui.clip_rect().shrink2(egui::vec2(5.0, 0.0)));
     let response = pointing_hand(ui.interact(hover_rect, portrait_id, egui::Sense::click()));
 
-    state.hold_while_hovered(response.hovered(), time);
-    if response.clicked() {
+    if !state.preview {
+        state.hold_while_hovered(response.hovered(), time);
+    }
+    if response.clicked() && !state.preview {
         let random = uuid::Uuid::new_v4().as_u128();
         state.react_to_click(time, random);
     }
 
     let expression = state.visible(time);
-    if state.displayed != expression || state.line_indices[expression as usize].is_none() {
+    if state.displayed != expression || !state.line_indices.contains_key(&expression) {
         state.select_line(expression, uuid::Uuid::new_v4().as_u128());
     }
 
@@ -891,9 +897,9 @@ mod tests {
             for previous in 0..lines.len() {
                 let mut reached = std::collections::HashSet::new();
                 for seed in 0..lines.len() - 1 {
-                    state.line_indices[expression as usize] = Some(previous);
+                    state.line_indices.insert(expression, previous);
                     state.select_line(expression, seed as u128);
-                    let selected = state.line_indices[expression as usize].unwrap();
+                    let selected = state.line_indices[&expression];
                     assert_ne!(selected, previous);
                     reached.insert(selected);
                 }
@@ -911,7 +917,9 @@ mod tests {
             .into_iter()
             .chain([Expression::Neutral])
         {
-            let next: Vec<_> = (0..26).map(|seed| current.next(seed)).collect();
+            let next: Vec<_> = (0..Expression::REACTIONS.len() as u128)
+                .map(|seed| current.next(seed))
+                .collect();
 
             assert!(!next.contains(&current));
 

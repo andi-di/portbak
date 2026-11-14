@@ -4,8 +4,8 @@ Theme assets:
 
 - `saya-full-body.png`: static pixel-art welcome figure.
 - `saya-emblem.png`: Kurobane family crest beside the application and job names.
-- `expressions/`: all 27 refined pixel busts for the sidebar; click to show one
-  of the 26 non-neutral expressions without immediate repeats. Hovering holds the
+- `expressions/`: registered pixel busts for the sidebar; click to show a
+  non-neutral expression without immediate repeats. Hovering holds the
   expression; it resets after the pointer has been away for three seconds.
 - `scenery/`: moonlit rose garden, bat flight/perching sprites, petal and crescent.
 - `icons/`: individually generated Saya-inspired interface icons and prompts.
@@ -47,3 +47,9 @@ Scenery textures are prepared at a maximum edge of 1024 pixels. Castle flicker u
 `castle.png` plus the transparent `castle-windows.png` mask and 16-pixel cell list
 in `castle-windows.json`. Regenerate derived scenery with
 `python tools/prepare_moonveil_assets.py` (requires Pillow).
+
+The expression catalog in `src/app/scenery/saya/expressions.rs` is the source of
+truth for the enum, gallery, preloader and non-neutral click pool. Add variants
+alphabetically, their artwork, dialogue and overlay, then refine page/action pools.
+The gallery derives its count and grid from that catalog; it has no fixed capacity.
+Hold the header emblem for two seconds to open it.

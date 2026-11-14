@@ -50,6 +50,7 @@ impl eframe::App for App {
             .backup_history
             .as_ref()
             .is_some_and(|history| history.confirming_restore)
+            && !crate::app::scenery::saya::gallery_open(&ctx)
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
         {
             self.selected = None;
@@ -70,6 +71,7 @@ impl eframe::App for App {
             self.dirty = true;
         }
         crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
+        crate::app::scenery::saya::show_gallery(&ctx);
         pixel::paint_overlays(&ctx);
     }
 }
@@ -162,7 +164,7 @@ impl App {
                         brand.response.rect.expand(3.0),
                         palette.ink,
                     );
-                    if home.clicked() {
+                    if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
                         self.selected = None;
                         self.settings_open = false;
                         self.backups_tab = false;
