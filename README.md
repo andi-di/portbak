@@ -24,7 +24,7 @@ Use **Settings > Job settings** to change these defaults for future jobs. Existi
 
 Choose **Modern** (the default), **Retro**, **Liquid Glass**, **Frutiger Aero**, or **Midnight Neko** in Settings. Frutiger Aero and Liquid Glass use OpenGL 3 shaders for their glass and fall back to simpler translucent panes without it. Use the Light/Dark toggle beside Settings in the top toolbar to switch brightness. On first launch, the app uses the system appearance and saves it in `portbak.json`; later launches use the saved choice. The app remembers the selected look too.
 
-The minimum window size is 1024 × 940 logical pixels. The job sidebar is at least 300 logical pixels wide. In Midnight Neko, Saya's square portrait and attached dialogue box use the full sidebar width, and the job list scrolls above them.
+The minimum window size is 1024 × 940 logical pixels. The job sidebar is at least 300 logical pixels wide. In Midnight Neko, Saya's square portrait and attached dialogue box sit at the bottom of the sidebar, with the job list scrolling above. The decorated caret strip minimizes or restores her portrait; she starts expanded on every launch. Her expressions react to pages and actions, then return to neutral after three seconds. Hovering pauses the remaining countdown.
 
 On Windows, the app icon is embedded in the executable for Explorer and shortcuts, as well as set on the app window. No separate icon file is needed.
 

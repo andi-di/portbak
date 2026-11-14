@@ -3,12 +3,6 @@ use super::Expression;
 impl Expression {
     pub(super) fn lines(self) -> &'static [&'static str] {
         match self {
-            Self::Neutral => &[
-                "Hmph. I suppose you can stay.",
-                "Make yourself useful, Human. Or make tea.",
-                "My domain is quieter with you in it. How curious.",
-                "You may keep me company while you work.",
-            ],
             Self::Angry => &[
                 "I wasn't waiting for you!",
                 "Do not mistake my patience for permission to tease me.",
@@ -104,6 +98,12 @@ impl Expression {
                 "Would you mind sitting here? Only for a moment.",
                 "I thought we might share some tea... if you are free.",
                 "Your company would be welcome. There, I said it.",
+            ],
+            Self::Neutral => &[
+                "Hmph. I suppose you can stay.",
+                "Make yourself useful, Human. Or make tea.",
+                "My domain is quieter with you in it. How curious.",
+                "You may keep me company while you work.",
             ],
             Self::Pleading => &[
                 "You will return, will you not?",

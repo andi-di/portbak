@@ -1,6 +1,10 @@
 //! Saya's static welcome figure and individually refined sidebar expressions.
 
 mod dialogue;
+mod expressions;
+mod reactions;
+
+use expressions::Expression;
 
 use crate::app::rendering::pixel::pointing_hand;
 use crate::app::theme::style::Palette;
@@ -21,49 +25,7 @@ fn state_id() -> egui::Id {
     egui::Id::new("saya_sidebar_companion")
 }
 
-#[derive(Clone, Copy)]
-pub enum Action {
-    NewJob,
-    CheckNow,
-    RemoveJob,
-    Settings,
-    SelectJob,
-    Failed,
-    AutomaticEnabled,
-    AutomaticDisabled,
-    RestoreConfirmation,
-    RestoreCompleted,
-    ProtectionEnabled,
-    DarkMode,
-    LightMode,
-}
-
-impl Action {
-    fn priority(self) -> u8 {
-        match self {
-            Self::Failed | Self::RestoreCompleted | Self::ProtectionEnabled => 2,
-            _ => 1,
-        }
-    }
-
-    fn expression(self) -> Expression {
-        match self {
-            Self::NewJob => Expression::Happy,
-            Self::CheckNow => Expression::Energetic,
-            Self::RemoveJob => Expression::Pouting,
-            Self::Settings => Expression::Curious,
-            Self::SelectJob => Expression::Waiting,
-            Self::Failed => Expression::Sad,
-            Self::AutomaticEnabled => Expression::Energetic,
-            Self::AutomaticDisabled => Expression::Pouting,
-            Self::RestoreConfirmation => Expression::Question,
-            Self::RestoreCompleted => Expression::Happy,
-            Self::ProtectionEnabled => Expression::Dominant,
-            Self::DarkMode => Expression::Happy,
-            Self::LightMode => Expression::Sleepy,
-        }
-    }
-}
+pub use reactions::{Action, Page};
 
 pub fn trigger(ctx: &egui::Context, action: Action) {
     if !crate::app::theme::style::Skin::of(ctx).effects.hearts {
@@ -73,216 +35,32 @@ pub fn trigger(ctx: &egui::Context, action: Action) {
     let random = uuid::Uuid::new_v4().as_u128();
     ctx.data_mut(|data| {
         let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
-        state.request_priority(action.expression(), action.priority(), time, random);
+        state.react(action.pool(), time, random);
+        state.action_time = Some(time);
         data.insert_temp(state_id(), state);
     });
     ctx.request_repaint();
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-
-enum Expression {
-    #[default]
-    Neutral,
-
-    Angry,
-
-    Bored,
-
-    BoredExpectant,
-
-    Celebrating,
-
-    Curious,
-
-    Cute,
-
-    Dominant,
-
-    Embarrassed,
-
-    Energetic,
-
-    Excited,
-
-    Flirty,
-
-    Flustered,
-
-    Happy,
-
-    InLove,
-
-    Killer,
-
-    Meek,
-
-    Pleading,
-
-    Pouting,
-
-    Praying,
-
-    Question,
-
-    Sad,
-
-    Seductive,
-
-    Shy,
-
-    Sleepy,
-
-    Smug,
-
-    Waiting,
-}
-
-impl Expression {
-    const REACTIONS: [Self; 26] = [
-        Self::Angry,
-        Self::Bored,
-        Self::BoredExpectant,
-        Self::Celebrating,
-        Self::Curious,
-        Self::Cute,
-        Self::Dominant,
-        Self::Embarrassed,
-        Self::Energetic,
-        Self::Excited,
-        Self::Flirty,
-        Self::Flustered,
-        Self::Happy,
-        Self::InLove,
-        Self::Killer,
-        Self::Meek,
-        Self::Pleading,
-        Self::Pouting,
-        Self::Praying,
-        Self::Question,
-        Self::Sad,
-        Self::Seductive,
-        Self::Shy,
-        Self::Sleepy,
-        Self::Smug,
-        Self::Waiting,
-    ];
-
-    fn next(self, random: u128) -> Self {
-        let choices: Vec<_> = Self::REACTIONS
-            .into_iter()
-            .filter(|choice| *choice != self)
-            .collect();
-
-        choices[(random % choices.len() as u128) as usize]
+pub fn enter_page(ctx: &egui::Context, page: Page) {
+    if !crate::app::theme::style::Skin::of(ctx).effects.hearts {
+        return;
     }
-
-    fn bytes(self) -> &'static [u8] {
-        match self {
-            Self::Neutral => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/neutral.png")
-            }
-
-            Self::Angry => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/angry.png")
-            }
-
-            Self::Bored => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/bored.png")
-            }
-
-            Self::BoredExpectant => include_bytes!(
-                "../../../assets/themes/midnight-neko/expressions/bored-expectant.png"
-            ),
-
-            Self::Celebrating => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/celebrating.png")
-            }
-
-            Self::Curious => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/curious.png")
-            }
-
-            Self::Cute => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/cute.png")
-            }
-
-            Self::Dominant => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/dominant.png")
-            }
-
-            Self::Embarrassed => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/embarrassed.png")
-            }
-
-            Self::Energetic => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/energetic.png")
-            }
-
-            Self::Excited => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/excited.png")
-            }
-
-            Self::Flirty => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/flirty.png")
-            }
-
-            Self::Flustered => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/flustered.png")
-            }
-
-            Self::Happy => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/happy.png")
-            }
-
-            Self::InLove => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/in-love.png")
-            }
-
-            Self::Killer => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/killer.png")
-            }
-
-            Self::Meek => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/meek.png")
-            }
-
-            Self::Pleading => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/pleading.png")
-            }
-
-            Self::Pouting => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/pouting.png")
-            }
-
-            Self::Praying => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/praying.png")
-            }
-
-            Self::Question => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/question.png")
-            }
-
-            Self::Sad => include_bytes!("../../../assets/themes/midnight-neko/expressions/sad.png"),
-
-            Self::Seductive => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/seductive.png")
-            }
-
-            Self::Shy => include_bytes!("../../../assets/themes/midnight-neko/expressions/shy.png"),
-
-            Self::Sleepy => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/sleepy.png")
-            }
-
-            Self::Smug => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/smug.png")
-            }
-
-            Self::Waiting => {
-                include_bytes!("../../../assets/themes/midnight-neko/expressions/waiting.png")
-            }
+    let time = ctx.input(|input| input.time);
+    let changed = ctx.data_mut(|data| {
+        let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
+        if state.page == Some(page) {
+            return false;
         }
+        state.page = Some(page);
+        if state.action_time != Some(time) {
+            state.react(page.pool(), time, uuid::Uuid::new_v4().as_u128());
+        }
+        data.insert_temp(state_id(), state);
+        true
+    });
+    if changed {
+        ctx.request_repaint();
     }
 }
 
@@ -292,71 +70,37 @@ struct Companion {
     expression: Expression,
     love_started_at: Option<f64>,
     until: f64,
-    next_random: Option<f64>,
+    paused_remaining: Option<f64>,
     hovered: bool,
-    pending: Option<Expression>,
-    pending_priority: u8,
-    reaction_priority: u8,
-    cooldown_until: f64,
+    collapsed: bool,
+    page: Option<Page>,
+    action_time: Option<f64>,
     displayed: Expression,
     line_indices: [Option<usize>; 27],
 }
 
 impl Companion {
-    fn schedule(&mut self, time: f64, random: u128) {
-        self.next_random = Some(time + 18.0 + (random as u64 % 37_001) as f64 / 1000.0);
-    }
-
-    fn tick(&mut self, time: f64, hovered: bool, random: u128) {
-        if !hovered && time >= self.cooldown_until {
-            if let Some(expression) = self.pending.take() {
-                self.request_priority(expression, self.pending_priority, time, random);
-                return;
-            }
-        }
-        match self.next_random {
-            None => self.schedule(time, random),
-            Some(deadline)
-                if time >= deadline && !hovered && self.visible(time) == Expression::Neutral =>
-            {
-                self.react(time, random)
-            }
-            _ => {}
-        }
-    }
-
     fn react_to_click(&mut self, time: f64, random: u128) {
-        self.pending = None;
-        self.pending_priority = 0;
         self.set_expression(self.expression.next(random), time, random);
-        self.cooldown_until = time + 2.0;
+        self.action_time = Some(time);
     }
 
-    fn request_priority(&mut self, expression: Expression, priority: u8, time: f64, random: u128) {
-        if priority < self.reaction_priority && time < self.until {
-            return;
-        }
-        if self.hovered || time < self.cooldown_until {
-            if self.pending.is_none() || priority >= self.pending_priority {
-                self.pending = Some(expression);
-                self.pending_priority = priority;
-            }
-        } else {
-            self.set_expression(expression, time, random);
-            self.reaction_priority = priority;
-            self.cooldown_until = time + 2.0;
-        }
+    fn react(&mut self, pool: &[Expression], time: f64, random: u128) {
+        self.set_expression(
+            Expression::choose(pool, self.expression, random),
+            time,
+            random,
+        );
     }
 
     fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
         if expression != self.visible(time) {
             self.love_started_at = (expression == Expression::InLove).then_some(time);
         }
-        self.reaction_priority = 0;
         self.expression = expression;
         self.until = time + REACTION_SECONDS;
         self.select_line(expression, random.rotate_left(64));
-        self.schedule(time, random);
+        self.paused_remaining = self.hovered.then_some(REACTION_SECONDS);
     }
 
     fn love_elapsed(&self, time: f64) -> Option<f64> {
@@ -367,11 +111,16 @@ impl Companion {
     }
 
     fn hold_while_hovered(&mut self, hovered: bool, time: f64) {
-        self.hovered = hovered;
-        if hovered && self.visible(time) != Expression::Neutral {
-            self.until = time + REACTION_SECONDS;
+        if hovered != self.hovered {
+            if hovered {
+                self.paused_remaining = Some((self.until - time).max(0.0));
+            } else if let Some(remaining) = self.paused_remaining.take() {
+                self.until = time + remaining;
+            }
+            self.hovered = hovered;
         }
     }
+
     fn select_line(&mut self, expression: Expression, random: u128) {
         let index = expression as usize;
         let count = expression.lines().len();
@@ -390,15 +139,15 @@ impl Companion {
     }
 
     fn visible(&self, time: f64) -> Expression {
-        if time < self.until {
+        if self
+            .paused_remaining
+            .is_some_and(|remaining| remaining > 0.0)
+            || time < self.until
+        {
             self.expression
         } else {
             Expression::Neutral
         }
-    }
-
-    fn react(&mut self, time: f64, random: u128) {
-        self.set_expression(self.expression.next(random), time, random);
     }
 }
 
@@ -469,6 +218,7 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 
 // Leave room for the longest wrapped line when Saya changes expressions.
 const DIALOGUE_HEIGHT: f32 = 100.0;
+const TOGGLE_HEIGHT: f32 = 28.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
 const LETTER_TRIM_HEIGHT: f32 = 20.0;
 const LETTER_TOP_PADDING: f32 = 4.0;
@@ -637,7 +387,114 @@ fn frame_width(ui: &egui::Ui) -> f32 {
 }
 
 pub fn reserved_height(ui: &egui::Ui) -> f32 {
-    frame_width(ui) + DIALOGUE_HEIGHT
+    let collapsed = ui
+        .ctx()
+        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+        .is_some_and(|state| state.collapsed);
+    if collapsed {
+        TOGGLE_HEIGHT
+    } else {
+        frame_width(ui) + DIALOGUE_HEIGHT + TOGGLE_HEIGHT + ui.spacing().item_spacing.y
+    }
+}
+
+pub fn show_sidebar(ui: &mut egui::Ui) {
+    let area = ui.available_rect_before_wrap();
+    let toggle_rect = Rect::from_min_size(
+        egui::pos2(area.left(), area.bottom() - TOGGLE_HEIGHT),
+        egui::vec2(area.width(), TOGGLE_HEIGHT),
+    );
+    let state = ui
+        .ctx()
+        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+        .unwrap_or_default();
+    let expanded_height = if state.collapsed {
+        0.0
+    } else {
+        let width = frame_width(ui);
+        let font = egui::TextStyle::Small.resolve(ui.style());
+        let time = ui.input(|input| input.time);
+        let galley = letter_text(ui, width * FRAME_RAIL_SPAN, state.line(time), &font);
+        width + letter_height(&galley) + ui.spacing().item_spacing.y
+    };
+    ui.add_space((ui.available_height() - expanded_height - TOGGLE_HEIGHT).max(0.0));
+    if !state.collapsed {
+        show(ui);
+    }
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .id(egui::Id::new("saya_strip"))
+            .max_rect(toggle_rect)
+            .layout(egui::Layout::top_down(egui::Align::Center)),
+        |ui| show_toggle(ui, state.collapsed),
+    );
+}
+
+fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
+    let palette = Palette::of(ui);
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), TOGGLE_HEIGHT),
+        egui::Sense::hover(),
+    );
+    let response = pointing_hand(ui.interact(
+        rect,
+        ui.make_persistent_id("saya_toggle"),
+        egui::Sense::click(),
+    ));
+    let label = if collapsed {
+        "Show Saya"
+    } else {
+        "Minimize Saya"
+    };
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), collapsed, label)
+    });
+    let center = rect.center();
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3, palette.sunken);
+    for side in [-1.0, 1.0] {
+        let start = center + egui::vec2(side * 18.0, 0.0);
+        let end = egui::pos2(
+            if side < 0.0 {
+                rect.left() + 16.0
+            } else {
+                rect.right() - 16.0
+            },
+            center.y,
+        );
+        painter.line_segment(
+            [start, end],
+            egui::Stroke::new(0.8_f32, palette.metal.gamma_multiply(0.5)),
+        );
+        crate::app::rendering::gothic::lamp(
+            painter,
+            Rect::from_center_size(end, egui::Vec2::splat(6.0)),
+            palette.metal,
+        );
+    }
+    let direction = if collapsed { -1.0 } else { 1.0 };
+    painter.add(egui::Shape::line(
+        vec![
+            center + egui::vec2(-5.0, -direction * 2.5),
+            center + egui::vec2(0.0, direction * 2.5),
+            center + egui::vec2(5.0, -direction * 2.5),
+        ],
+        egui::Stroke::new(1.6_f32, palette.metal),
+    ));
+    crate::app::rendering::pixel::subtle_highlight(ui, &response, rect, palette.metal);
+    if response.clone().on_hover_text(label).clicked() {
+        let time = ui.input(|input| input.time);
+        ui.ctx().data_mut(|data| {
+            let mut state = data.get_temp::<Companion>(state_id()).unwrap_or_default();
+            state.hold_while_hovered(false, time);
+            state.collapsed = !collapsed;
+            data.insert_temp(state_id(), state);
+        });
+        if collapsed {
+            trigger(ui.ctx(), Action::Maximized);
+        }
+        ui.ctx().request_repaint();
+    }
 }
 
 pub fn show(ui: &mut egui::Ui) {
@@ -665,7 +522,6 @@ pub fn show(ui: &mut egui::Ui) {
         let random = uuid::Uuid::new_v4().as_u128();
         state.react_to_click(time, random);
     }
-    state.tick(time, response.hovered(), uuid::Uuid::new_v4().as_u128());
 
     let expression = state.visible(time);
     if state.displayed != expression || state.line_indices[expression as usize].is_none() {
@@ -691,15 +547,11 @@ pub fn show(ui: &mut egui::Ui) {
     paint(ui, rect, "portrait-frame", FRAME_ART);
     crate::app::rendering::pixel::subtle_outline(ui, &response, opening, Palette::of(ui).metal);
 
-    if time < state.until {
+    if !state.hovered && time < state.until {
         ui.ctx()
             .request_repaint_after(Duration::from_secs_f64(state.until - time));
     }
 
-    if let Some(deadline) = state.next_random {
-        ui.ctx()
-            .request_repaint_after(Duration::from_secs_f64((deadline - time).max(0.25)));
-    }
     ui.ctx().data_mut(|data| data.insert_temp(id, state));
 }
 
@@ -757,72 +609,99 @@ mod tests {
     }
 
     #[test]
-    fn direct_click_reacts_immediately_even_during_hover_and_cooldown() {
-        use super::{Companion, Expression};
+    fn actions_replace_hovered_reactions_immediately() {
         let mut state = Companion::default();
-        state.request_priority(Expression::Happy, 2, 0.0, 1);
-        state.hold_while_hovered(true, 0.1);
-        state.request_priority(Expression::Sad, 2, 0.1, 2);
-        state.react_to_click(0.2, 3);
-        let reaction = state.visible(0.2);
-        assert_ne!(reaction, Expression::Happy);
-        assert!(state.pending.is_none());
-        state.react_to_click(0.3, 4);
-        assert_ne!(state.visible(0.3), reaction);
-        let reaction = state.visible(0.3);
+        state.react(Action::NewJob.pool(), 0.0, 1);
         state.hold_while_hovered(true, 1.0);
-        state.tick(1.0, true, 5);
-        assert_eq!(state.visible(1.0), reaction);
+        state.react(Action::Failed.pool(), 1.5, 2);
+        assert_eq!(state.visible(100.0), Expression::Sad);
+        state.react_to_click(101.0, 3);
+        assert_ne!(state.visible(101.0), Expression::Sad);
+        state.react(Action::Failed.pool(), 102.0, 4);
+        assert_eq!(state.visible(102.0), Expression::Sad);
+        state.hold_while_hovered(false, 103.0);
+        assert_eq!(state.visible(105.9), Expression::Sad);
+        assert_eq!(state.visible(106.0), Expression::Neutral);
     }
 
     #[test]
-    fn outcomes_win_cooldowns_and_hover_defers_changes() {
-        use super::{Companion, Expression};
+    fn timer_pauses_and_resumes_its_remaining_duration() {
         let mut state = Companion::default();
-        state.request_priority(Expression::Waiting, 1, 0.0, 1);
-        state.request_priority(Expression::Sad, 2, 0.5, 2);
-        state.request_priority(Expression::Cute, 1, 1.0, 3);
-        assert_eq!(state.visible(1.0), Expression::Waiting);
-        state.tick(2.0, false, 4);
-        assert_eq!(state.visible(2.0), Expression::Sad);
-        state.request_priority(Expression::Curious, 1, 2.5, 5);
-        state.next_random = Some(2.5);
-        state.tick(3.0, false, 6);
-        assert_eq!(state.visible(3.0), Expression::Sad);
-        state.hold_while_hovered(true, 4.0);
-        let line = state.line(4.0);
-        state.request_priority(Expression::Happy, 2, 4.0, 7);
-        state.tick(4.0, true, 8);
-        assert_eq!(state.visible(4.0), Expression::Sad);
-        assert_eq!(state.line(4.0), line);
-        state.hold_while_hovered(false, 4.1);
-        state.tick(4.1, false, 9);
-        assert_eq!(state.visible(4.1), Expression::Happy);
+        state.react(Action::Failed.pool(), 10.0, 0);
+        state.hold_while_hovered(true, 12.5);
+        let line = state.line(12.5);
+        assert_eq!(state.visible(100.0), Expression::Sad);
+        assert_eq!(state.line(100.0), line);
+        state.hold_while_hovered(false, 100.0);
+        assert_eq!(state.visible(100.49), Expression::Sad);
+        assert_eq!(state.visible(100.5), Expression::Neutral);
+        assert_eq!(state.visible(10000.0), Expression::Neutral);
     }
 
     #[test]
-    fn random_deadlines_vary_and_do_not_interrupt_hovered_reactions() {
-        let mut state = super::Companion::default();
-        state.tick(0.0, false, 1000);
-        assert_eq!(state.next_random, Some(19.0));
-        state.tick(18.9, false, 2000);
-        assert_eq!(state.visible(18.9), super::Expression::Neutral);
-        state.tick(19.0, false, 2000);
-        let expression = state.visible(19.0);
-        assert_ne!(expression, super::Expression::Neutral);
-        assert_eq!(state.next_random, Some(39.0));
-        state.set_expression(expression, 40.0, 2000);
-        state.hold_while_hovered(true, 41.0);
-        state.next_random = Some(41.0);
-        state.request_priority(super::Expression::Curious, 1, 41.0, 3000);
-        let line = state.line(41.0);
-        state.tick(41.0, true, 4000);
-        assert_eq!(state.visible(41.0), expression);
-        assert_eq!(state.line(41.0), line);
-        state.hold_while_hovered(false, 41.1);
-        state.tick(41.1, false, 5000);
-        assert_eq!(state.visible(41.1), super::Expression::Curious);
-        assert!(state.next_random.unwrap() > 41.1 + 18.0);
+    fn event_pools_do_not_repeat_and_single_expression_pools_still_work() {
+        for pool in [
+            Action::NewJob.pool(),
+            Action::Maximized.pool(),
+            Page::StartScreen.pool(),
+            Page::JobSettings(uuid::Uuid::nil()).pool(),
+            Page::Backups(uuid::Uuid::nil()).pool(),
+            Page::SettingsJobs.pool(),
+            Page::SettingsTheme.pool(),
+        ] {
+            for current in pool {
+                for random in 0..20 {
+                    let next = Expression::choose(pool, *current, random);
+                    assert!(pool.contains(&next));
+                    assert_ne!(*current, next);
+                }
+            }
+        }
+        assert_eq!(
+            Expression::choose(Action::Failed.pool(), Expression::Sad, 0),
+            Expression::Sad
+        );
+    }
+
+    #[test]
+    fn page_changes_do_not_overwrite_actions_or_repeat_on_redraw() {
+        let ctx = egui::Context::default();
+        crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("midnight-neko"));
+        let mut until = 0.0;
+        for (time, page) in [
+            (0.0, Page::StartScreen),
+            (0.5, Page::SettingsJobs),
+            (1.0, Page::SettingsJobs),
+            (1.5, Page::SettingsTheme),
+        ] {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(time),
+                    ..Default::default()
+                },
+                |_| {
+                    if time == 0.5 {
+                        trigger(&ctx, Action::Failed);
+                    }
+                    enter_page(&ctx, page);
+                    let state = ctx
+                        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+                        .unwrap();
+                    if time == 0.5 || time == 1.0 {
+                        assert_eq!(state.visible(time), Expression::Sad);
+                    }
+                    if time == 0.5 {
+                        until = state.until;
+                    }
+                    if time == 1.0 {
+                        assert_eq!(state.until, until);
+                    }
+                    if time == 1.5 {
+                        assert!(Page::SettingsTheme.pool().contains(&state.visible(time)));
+                    }
+                },
+            );
+        }
     }
 
     #[test]
@@ -892,30 +771,12 @@ mod tests {
     }
 
     #[test]
-
-    fn sidebar_returns_to_neutral_after_reaction() {
+    fn sidebar_starts_expanded_and_returns_to_neutral_without_idle_reactions() {
         let mut state = Companion::default();
-
-        state.react(10.0, 4);
-
+        assert!(!state.collapsed);
+        state.react_to_click(10.0, 4);
         assert_ne!(state.visible(10.1), Expression::Neutral);
-
         assert_eq!(state.visible(14.0), Expression::Neutral);
-    }
-
-    #[test]
-    fn hovering_holds_expression_and_line_until_three_seconds_after_leaving() {
-        let mut state = Companion::default();
-        state.react(10.0, 4);
-        let expression = state.visible(10.0);
-        let line = state.line(10.0);
-        state.hold_while_hovered(true, 12.5);
-        state.hold_while_hovered(true, 15.0);
-        assert_eq!(state.visible(17.9), expression);
-        assert_eq!(state.line(17.9), line);
-        state.hold_while_hovered(false, 17.9);
-        assert_eq!(state.visible(18.0), Expression::Neutral);
-        state.hold_while_hovered(true, 19.0);
-        assert_eq!(state.visible(19.0), Expression::Neutral);
+        assert_eq!(state.visible(1000.0), Expression::Neutral);
     }
 }

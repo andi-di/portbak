@@ -54,15 +54,25 @@ Provide:
   - Accent, green and red fills use the iOS system colors. The empty state shows a still grey symbol; backup lists use plain grey date headers and blue folder symbols; job symbols are blue (grey when disabled) and the job count is plain grey text; Settings opens with a large title. Empty-state descriptions and explanatory notes are secondary grey.
   - Pages blur content progressively where it scrolls out of view at the top or bottom edge, fading it into the backdrop.
 - Midnight Neko uses 32-pixel utility and job action icons and a 40-pixel New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.
-- Midnight Neko Saya reacts after randomized 18–55 second delays. Timers wait for neutral. Outcome reactions take priority over navigation, with a two-second cooldown.
+- Midnight Neko Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
+  - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.
   - New job: Happy; Check now: Energetic; Remove job: Pouting; Settings: Curious; select job: Waiting; Dark mode: Happy; Light mode: Sleepy.
 - When Saya enters her in-love expression, three ruby hearts briefly rise and fade inside the sidebar frame. Holding the expression does not replay the effect.
-- Saya's dialogue is centered in a letterbox attached to her portrait, with matching silver and burgundy rails, filigree corners, and a ruby seal. Keep the portrait square and at full sidebar width, with the letterbox aligned to the frame rails. Reserve space for wrapped dialogue and scroll the job list above it.
+- Saya's dialogue is centered in a letterbox attached to her portrait, with matching silver and burgundy rails, filigree corners, and a ruby seal. Keep the portrait square and at full sidebar width, with the letterbox aligned to the frame rails. Anchor the portrait and letterbox at the sidebar bottom, including on an empty start screen, and scroll the job list above them. A decorated strip below the letterbox minimizes or restores Saya at the same bottom position, with downward/upward carets and no visible text. Start expanded on every launch.
 - Midnight Neko uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
 - Midnight Neko job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge). Align the head with the lower card border and keep the badge inside it.
-- Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered or during a cooldown. Keep expression and dialogue unchanged while hovered otherwise, deferring automatic and action reactions until the pointer leaves; return to neutral after three seconds away. The welcome figure stays static and does not react to clicks.
+- Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered. The welcome figure stays static and does not react to clicks.
+- Saya's page pools:
+  - Start screen: BoredExpectant, Pleading, Waiting. Job settings: BoredExpectant, Curious, Dominant, Smug.
+  - Backups: Dominant, Praying, Smug. Application Job settings: Curious, Question, Waiting. Theme settings: Cute, Flirty, Seductive.
+- Saya's action pools:
+  - Create job: Energetic, Excited, Happy. Check now: Dominant, Energetic. Remove job: Meek, Pouting, Sad.
+  - Enable automatic backups: Dominant, Energetic, Happy. Disable: BoredExpectant, Pouting. Protect backup: Dominant, Killer.
+  - Restore confirmation: Praying, Question. Restore success: Celebrating, Happy, Smug. Operation failure: Sad only.
+  - Dark mode: Happy, Smug. Light mode: Angry, Flustered, Sleepy. Restore portrait: Angry, Excited, Flustered, Happy, Pouting.
+
   - Each expression, including neutral, has at least four matching dialogue lines. Pick a line on expression changes, keep it stable while visible, and avoid repeating that expression's previous line during the session.
 - Midnight Neko has an asymmetric moonlit vampire estate with a castle and winding stairs at lower right, a silver crescent below the topbar, detailed layered rocky mountains, thorn roses, three sculpted pixel-art cloud variants drifting at individual speeds and two cool blue-violet fog variations with layered ripples and gentle drifting, and subtly flickering burgundy windows, sixteen bats that fly, perch, avoid the pointer and scatter on clicks, varied falling petals, and short-lived petal/crescent/silver-spark cursor trails. Decorations never intercept controls. Preserve native text, resize and other specialized cursors.
   - The pointing hand appears over clickable controls and Saya's portrait. Its pressed variant stays active through a held primary click, with specialized cursors taking precedence.

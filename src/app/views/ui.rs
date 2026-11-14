@@ -63,11 +63,30 @@ impl eframe::App for App {
         if self.config != before {
             self.dirty = true;
         }
+        crate::app::scenery::catgirl::enter_page(&ctx, self.saya_page());
         pixel::paint_overlays(&ctx);
     }
 }
 
 impl App {
+    fn saya_page(&self) -> crate::app::scenery::catgirl::Page {
+        use crate::app::scenery::catgirl::Page;
+        if self.settings_open {
+            match self.settings_tab {
+                super::settings_view::SettingsTab::Jobs => Page::SettingsJobs,
+                super::settings_view::SettingsTab::Theme => Page::SettingsTheme,
+            }
+        } else if let Some(id) = self.selected {
+            if self.backups_tab {
+                Page::Backups(id)
+            } else {
+                Page::JobSettings(id)
+            }
+        } else {
+            Page::StartScreen
+        }
+    }
+
     fn initialize_theme(&mut self, ctx: &egui::Context) {
         if self.config.theme == Theme::System {
             self.config.theme =
@@ -185,12 +204,6 @@ impl App {
                                     .selected(self.settings_open);
                                 if ui.add(settings).hint("Settings").clicked() {
                                     self.toggle_settings();
-                                    if self.settings_open {
-                                        crate::app::scenery::catgirl::trigger(
-                                            ui.ctx(),
-                                            crate::app::scenery::catgirl::Action::Settings,
-                                        );
-                                    }
                                 }
                             },
                         );
@@ -359,8 +372,7 @@ impl App {
                     );
                 }
                 ui.add_space(12.0);
-                let show_mascot = Skin::of(ui.ctx()).effects.hearts
-                    && (!self.config.jobs.is_empty() || self.settings_open);
+                let show_mascot = Skin::of(ui.ctx()).effects.hearts;
                 let list_height = if show_mascot {
                     (ui.available_height()
                         - ui.spacing().item_spacing.y
@@ -371,6 +383,7 @@ impl App {
                 };
                 let mut clicked = None;
                 egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
                     .max_height(list_height)
                     .show(ui, |ui| {
                         for job in &self.config.jobs {
@@ -381,13 +394,9 @@ impl App {
                     });
                 if let Some(id) = clicked {
                     self.toggle_job(id);
-                    crate::app::scenery::catgirl::trigger(
-                        ui.ctx(),
-                        crate::app::scenery::catgirl::Action::SelectJob,
-                    );
                 }
                 if show_mascot {
-                    ui.vertical_centered(crate::app::scenery::catgirl::show);
+                    ui.vertical_centered(crate::app::scenery::catgirl::show_sidebar);
                 }
             });
         let edge = panel.response.rect;
@@ -911,6 +920,86 @@ mod tests {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn saya_strip_stays_at_the_bottom_when_collapsed_and_expanded() {
+        for sidebar_width in [300.0, 460.0] {
+            let ctx = egui::Context::default();
+            let mut app = App::new(
+                Config {
+                    skin: "midnight-neko".into(),
+                    sidebar_width,
+                    ..Config::default()
+                },
+                std::path::PathBuf::new(),
+                tempfile::tempfile().unwrap(),
+            );
+            app.ensure_skin(&ctx);
+            let mut position = None;
+            let mut events = Vec::new();
+            let strip_id = egui::Id::new("saya_strip").with("saya_toggle");
+            for frame in 0..10 {
+                let output = ctx.run_ui(
+                    egui::RawInput {
+                        events: std::mem::take(&mut events),
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            crate::MIN_WINDOW_SIZE,
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        app.show_header(ui);
+                        app.show_footer(ui);
+                        app.show_job_list(ui);
+                    },
+                );
+                let strip = ctx
+                    .read_response(strip_id)
+                    .expect("Saya's strip is always available")
+                    .rect;
+                if frame >= 2 {
+                    if let Some(previous) = position {
+                        assert_eq!(strip, previous, "frame={frame}");
+                    } else {
+                        position = Some(strip);
+                    }
+                }
+                let has_portrait = output.shapes.iter().any(|shape| match &shape.shape {
+                    egui::Shape::Mesh(mesh) => {
+                        let rect = mesh.calc_bounds();
+                        rect.width() > 250.0 && (rect.width() - rect.height()).abs() < 0.1
+                    }
+                    _ => false,
+                });
+                if frame == 2 || frame == 9 {
+                    assert!(has_portrait);
+                }
+                if frame == 5 {
+                    assert!(!has_portrait);
+                }
+                let center = strip.center();
+                events = match frame {
+                    2 | 5 => vec![
+                        egui::Event::PointerMoved(center),
+                        egui::Event::PointerButton {
+                            pos: center,
+                            button: egui::PointerButton::Primary,
+                            pressed: true,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    3 | 6 => vec![egui::Event::PointerButton {
+                        pos: center,
+                        button: egui::PointerButton::Primary,
+                        pressed: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    _ => vec![],
+                };
             }
         }
     }
