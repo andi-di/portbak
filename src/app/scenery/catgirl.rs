@@ -653,6 +653,8 @@ pub fn show(ui: &mut egui::Ui) {
         egui::pos2(ui.clip_rect().center().x - width / 2.0, ui.cursor().top()),
         size,
     );
+    // The artwork reaches the panel edge, but the divider owns its resize gutter.
+    let hover_rect = hover_rect.intersect(ui.clip_rect().shrink2(egui::vec2(10.0, 0.0)));
     let response = pointing_hand(ui.interact(hover_rect, portrait_id, egui::Sense::click()));
 
     state.hold_while_hovered(response.hovered(), time);
