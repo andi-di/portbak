@@ -255,6 +255,13 @@ fn paint_inner_ornament(ui: &egui::Ui, portrait: Rect) {
         .add(ornament_mesh(texture.id(), portrait));
 }
 
+fn caret_ornament_size(asset: egui::Vec2, pane: egui::Vec2) -> egui::Vec2 {
+    let scale = ((pane.y - 4.0) / asset.y)
+        .min((pane.x * 0.5 - 20.0) / asset.x)
+        .max(0.0);
+    asset * scale
+}
+
 fn paint_caret_ornament(ui: &egui::Ui, rect: Rect) {
     let Some(texture) = texture(
         ui.ctx(),
@@ -264,8 +271,8 @@ fn paint_caret_ornament(ui: &egui::Ui, rect: Rect) {
     ) else {
         return;
     };
-    let height = rect.height() - 4.0;
-    let width = rect.width() * 0.4;
+    let size = caret_ornament_size(texture.size_vec2() * egui::vec2(0.5, 1.0), rect.size());
+    let (width, height) = (size.x, size.y);
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     for right in [false, true] {
         let target = Rect::from_min_size(
@@ -760,6 +767,17 @@ mod tests {
         source.put_pixel(2, 3, image::Rgba([255, 255, 255, 255]));
         source.put_pixel(5, 6, image::Rgba([255, 255, 255, 255]));
         assert_eq!(trim_transparent_border(&source).dimensions(), (4, 4));
+    }
+
+    #[test]
+    fn caret_artwork_keeps_its_aspect_ratio_at_both_sidebar_widths() {
+        let asset = egui::vec2(1024.0, 128.0);
+        for width in [288.0, 448.0] {
+            let size = caret_ornament_size(asset, egui::vec2(width, TOGGLE_HEIGHT));
+            assert!((size.x / size.y - asset.x / asset.y).abs() < 0.001);
+            assert!(size.x <= width * 0.5 - 20.0);
+            assert!(size.y <= TOGGLE_HEIGHT - 4.0);
+        }
     }
 
     #[test]

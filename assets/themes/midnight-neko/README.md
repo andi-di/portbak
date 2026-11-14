@@ -49,8 +49,8 @@ rails and inward-growing silver vines and burgundy roses. It is drawn edge-to-ed
 inside the portrait, without enlargement or floating margins. One quadrant is
 reflected across both axes for exact symmetry.
 
-`caret-ornament.png` adds richer silver scrolls, roses and ruby pendants inside the
-min/max pane. Its left flourish is reflected on the right, leaving the central
-caret unobstructed. Both assets are clipped to their own panes and were made with
+`caret-ornament.png` is one long, shallow silver flourish with roses and ruby
+pendants. It is cropped to its alpha bounds; its left half supplies the flourish and is mirrored on the right. Both sides
+scale uniformly at their natural aspect ratio, leaving the central caret clear. Both assets are clipped to their own panes and were made with
 built-in imagegen; their adjacent `.prompt.txt` files record the prompts. Textures
 larger than 1024 pixels are reduced when loaded for GPU compatibility.
