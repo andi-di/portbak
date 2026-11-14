@@ -53,7 +53,7 @@ pub static MIDNIGHT_NEKO: Skin = Skin {
         mascot: Sprite::Floppy,
         tagline: "",
         welcome_title: "Your files, forever cherished",
-        welcome_prompt: "Create your first backup job",
+        welcome_prompt: "Create a backup job",
         ready: "Keeping watch",
     },
 };
