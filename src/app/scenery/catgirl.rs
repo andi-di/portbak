@@ -471,7 +471,8 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 const DIALOGUE_HEIGHT: f32 = 100.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
 const LETTER_TRIM_HEIGHT: f32 = 20.0;
-const LETTER_PADDING: f32 = 8.0;
+const LETTER_TOP_PADDING: f32 = 4.0;
+const LETTER_BOTTOM_PADDING: f32 = 8.0;
 const LETTER_TEXT_INSET: f32 = 16.0;
 // The straight rails' outer edges sit 4.8% in from either texture edge.
 const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
@@ -494,7 +495,7 @@ fn letter_text(
 }
 
 fn letter_height(galley: &egui::Galley) -> f32 {
-    galley.size().y.max(24.0) + 2.0 * LETTER_PADDING + LETTER_TRIM_HEIGHT
+    galley.size().y.max(24.0) + LETTER_TOP_PADDING + LETTER_BOTTOM_PADDING + LETTER_TRIM_HEIGHT
 }
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::Galley>) {
@@ -512,8 +513,10 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::G
     ui.painter().rect_filled(rect, 0.0, Palette::of(ui).surface);
 
     // Center the glyphs themselves between the rails, independent of the font's line metrics.
-    let text_center =
-        (portrait.bottom() + rect.bottom() + LETTER_TRIM_OVERHANG - LETTER_TRIM_HEIGHT) / 2.0;
+    let text_top_edge = portrait.bottom() + LETTER_TOP_PADDING;
+    let text_bottom_edge =
+        rect.bottom() + LETTER_TRIM_OVERHANG - LETTER_TRIM_HEIGHT - LETTER_BOTTOM_PADDING;
+    let text_center = (text_top_edge + text_bottom_edge) / 2.0;
     let text_top = text_center - galley.mesh_bounds.center().y;
     let text_rect = Rect::from_min_size(
         egui::pos2(rect.center().x - galley.size().x / 2.0, text_top),
