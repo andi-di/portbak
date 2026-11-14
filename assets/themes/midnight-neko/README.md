@@ -25,7 +25,8 @@ crescents and silver sparks form a bounded trail. All effects stay enabled.
 Keep each dialogue line to **120 Unicode characters maximum**, including spaces
 and punctuation. The unified companion panel has one outer frame around a square
 portrait, plain letterbox and caret strip. A single divider separates the portrait
-from the letterbox; only the outer frame carries ornaments. The strip contains
+from the letterbox; the outer frame stays plain. A separate transparent silver-vine and burgundy-rose
+overlay decorates the inside of the portrait, inset from the border. The strip contains
 only the centered caret.
 
 The letterbox stays 60 logical pixels tall, with 46 pixels available for text and
@@ -42,3 +43,7 @@ budget and rendered bounds must pass; never resize the box for individual lines.
 Minimizing and maximizing use a 240 ms eased slide and fade. The caret strip
 stays fixed at the bottom, while the job list smoothly gains or gives up space.
 The animation can reverse without jumping. Saya starts expanded on every launch.
+
+`portrait-ornament.png` was generated with built-in imagegen. Its outer transparent
+margin and a further four-pixel drawing inset keep it clear of the shared border
+and the dialogue/caret panels. See `portrait-ornament.prompt.txt` for the prompt.

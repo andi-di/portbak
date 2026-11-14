@@ -410,7 +410,12 @@ pub fn show_sidebar(ui: &mut egui::Ui) {
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
     show_toggle(&mut strip_ui, collapsed);
-    crate::app::rendering::gothic::corners(ui.painter(), layout.outer, palette.metal);
+    ui.painter().rect_stroke(
+        layout.outer,
+        3,
+        egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.55)),
+        egui::StrokeKind::Inside,
+    );
 }
 
 fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
@@ -493,6 +498,12 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
     let font = egui::TextStyle::Small.resolve(ui.style());
     let galley = letter_text(ui, letter.width(), state.line(time), &font);
     paint(ui, rect, &format!("{expression:?}"), expression.bytes());
+    paint(
+        ui,
+        rect.shrink(4.0),
+        "portrait-ornament",
+        include_bytes!("../../../assets/themes/midnight-neko/portrait-ornament.png"),
+    );
     if let Some(elapsed) = state.love_elapsed(time) {
         paint_love_hearts(ui, rect, elapsed);
         ui.ctx().request_repaint();
