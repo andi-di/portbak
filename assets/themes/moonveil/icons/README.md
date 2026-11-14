@@ -57,7 +57,10 @@ Keep character colors in the Saya heads and surrounding controls. Functional
 icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.
 
-The restore icon uses a clean counterclockwise circular arrow. The warning icon
-uses a filled triangle with a broad exclamation cutout. The gallery close button
-uses the generated `close.png` diagonal cross. Keep light/dark masks identical;
-preserve the standard canvas, padding and visible extent for all three.
+The restore arrow and close cross use smooth vector geometry in `sources/` to
+keep their curves and diagonals clean at small sizes. Restore has a uniform
+16-pixel source stroke; the X uses rounded 14-pixel strokes. Regenerate their
+128-pixel PNG pairs on Windows with
+`powershell.exe -NoProfile -File tools/render_moonveil_vectors.ps1`.
+The warning icon retains its filled triangle and exclamation cutout. Preserve
+the standard canvas, padding and visible extent for every icon.
