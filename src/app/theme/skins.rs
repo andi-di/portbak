@@ -9,11 +9,11 @@ mod retro;
 use crate::app::theme::style::Skin;
 
 pub static ALL: &[&Skin] = &[
-    &retro::RETRO,
     &modern::MODERN,
+    &retro::RETRO,
+    &liquid_glass::LIQUID_GLASS,
     &frutiger_aero::FRUTIGER_AERO,
     &midnight_neko::MIDNIGHT_NEKO,
-    &liquid_glass::LIQUID_GLASS,
 ];
 
 pub fn default() -> &'static Skin {

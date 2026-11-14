@@ -389,7 +389,7 @@ impl Default for Config {
         Self {
             version: 1,
             theme: Theme::System,
-            skin: "retro".into(),
+            skin: "modern".into(),
             job_defaults: JobDefaults::default(),
             sidebar_width: 300.0,
             jobs: vec![],
@@ -897,7 +897,7 @@ mod tests {
     fn configs_without_a_skin_load_the_default_skin() {
         let saved: Config =
             serde_json::from_str(r#"{"version":1,"theme":"Light","jobs":[]}"#).unwrap();
-        assert_eq!(saved.skin, "retro");
+        assert_eq!(saved.skin, "modern");
         assert_eq!(saved.sidebar_width, 300.0);
         assert_eq!(saved.theme, Theme::Light);
     }
