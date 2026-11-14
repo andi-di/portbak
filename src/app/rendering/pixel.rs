@@ -334,7 +334,14 @@ impl Widget for PixelButton {
             let face = Rect::from_min_size(rect.min, face_size);
             if finish == Finish::Gothic {
                 if !utility || hovered || sunk || response.has_focus() {
-                    gothic::control(painter, face, fill, response.has_focus(), enabled);
+                    gothic::control(
+                        painter,
+                        face,
+                        fill,
+                        response.has_focus(),
+                        enabled,
+                        self.sprite != Some(Sprite::Plus),
+                    );
                 }
             } else {
                 crate::app::rendering::modern::control(
@@ -572,7 +579,7 @@ impl Widget for PixelCheckbox<'_> {
                     palette.sunken
                 };
                 if Skin::of(ui.ctx()).finish == Finish::Gothic {
-                    gothic::control(painter, square, fill, response.has_focus(), enabled);
+                    gothic::control(painter, square, fill, response.has_focus(), enabled, true);
                 } else {
                     crate::app::rendering::modern::control(
                         painter,

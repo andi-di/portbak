@@ -492,7 +492,14 @@ fn activity_setting(painter: &egui::Painter, center: Pos2, silver: Color32, outl
     diamond(painter, center - Vec2::Y * 12.0, 1.4, silver);
 }
 
-pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool, enabled: bool) {
+pub fn control(
+    painter: &egui::Painter,
+    rect: Rect,
+    fill: Color32,
+    focused: bool,
+    enabled: bool,
+    accent_details: bool,
+) {
     let palette = Palette::of_ctx(painter.ctx());
     painter.rect_filled(rect, 3, fill);
     painter.rect_stroke(
@@ -501,7 +508,7 @@ pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool
         Stroke::new(1.0_f32, palette.outline),
         StrokeKind::Inside,
     );
-    if enabled && fill == palette.accent && rect.width() > 50.0 {
+    if accent_details && enabled && fill == palette.accent && rect.width() > 50.0 {
         diamond(
             painter,
             egui::pos2(rect.left() + 5.0, rect.center().y),
