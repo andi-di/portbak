@@ -251,8 +251,12 @@ impl App {
                             .color(palette.dim),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let (rect, response) =
-                            ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
+                        let size = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                            egui::vec2(48.0, 32.0)
+                        } else {
+                            egui::vec2(28.0, 28.0)
+                        };
+                        let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
                         let recent = self
                             .activity_until
                             .is_some_and(|until| until > std::time::Instant::now());

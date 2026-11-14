@@ -361,47 +361,118 @@ pub fn activity(painter: &egui::Painter, rect: Rect, active: bool) {
     let palette = Palette::of_ctx(painter.ctx());
     let time = painter.ctx().input(|input| input.time) as f32;
     let center = rect.center();
-    let silver = if active {
-        palette.metal
-    } else {
-        mix(palette.metal, palette.sunken, 0.4)
-    };
-    let arc: Vec<_> = (0..25)
-        .map(|step| {
-            let angle = 0.65 + step as f32 / 24.0 * 5.0;
-            center + Vec2::angled(angle) * 9.0
-        })
-        .collect();
-    painter.add(egui::Shape::line(arc, Stroke::new(1.6_f32, silver)));
     let pulse = if active {
-        0.35 + 0.2 * (time * 4.0).sin()
+        0.65 + 0.35 * (time * 3.6).sin()
     } else {
-        0.05
+        0.0
     };
-    diamond(
-        painter,
-        center,
-        5.0,
-        mix(palette.accent, palette.hot, pulse),
-    );
-    painter.line_segment(
-        [center - egui::vec2(2.0, 2.0), center - egui::vec2(0.0, 3.5)],
-        Stroke::new(1.0_f32, palette.paper),
-    );
-    for radius in [7.0, 10.0, 13.0] {
-        painter.circle_stroke(
+    let silver = mix(palette.metal, palette.paper, 0.25);
+    let ruby = if active {
+        mix(palette.accent, palette.hot, 0.55 + pulse * 0.35)
+    } else {
+        mix(palette.accent, palette.sunken, 0.4)
+    };
+    for radius in (7..=14).rev() {
+        painter.circle_filled(
             center,
-            radius,
-            Stroke::new(1.0_f32, palette.accent.gamma_multiply(pulse * 0.4)),
+            radius as f32,
+            ruby.gamma_multiply(if active { 0.025 + pulse * 0.025 } else { 0.012 }),
         );
     }
+    activity_setting(painter, center, silver, palette.outline);
+    // A silver crescent cradles the stone without painting over the scenery.
+    let moon: Vec<_> = (0..=28)
+        .map(|step| {
+            let angle = 0.8 + step as f32 / 28.0 * 4.7;
+            center + Vec2::angled(angle) * 11.0
+        })
+        .collect();
+    painter.add(egui::Shape::line(moon, Stroke::new(1.4_f32, silver)));
+    diamond(painter, center, 8.0, palette.outline);
+    diamond(painter, center, 6.5, ruby);
+    for (points, tint) in [
+        (
+            [
+                egui::vec2(0.0, -6.5),
+                egui::vec2(0.0, 0.0),
+                egui::vec2(-6.5, 0.0),
+            ],
+            mix(ruby, palette.paper, 0.38),
+        ),
+        (
+            [
+                egui::vec2(0.0, -6.5),
+                egui::vec2(6.5, 0.0),
+                egui::vec2(0.0, 0.0),
+            ],
+            mix(ruby, palette.hot, 0.35),
+        ),
+        (
+            [
+                egui::vec2(0.0, 0.0),
+                egui::vec2(6.5, 0.0),
+                egui::vec2(0.0, 6.5),
+            ],
+            mix(ruby, palette.outline, 0.35),
+        ),
+    ] {
+        painter.add(egui::Shape::convex_polygon(
+            points.into_iter().map(|offset| center + offset).collect(),
+            tint,
+            Stroke::NONE,
+        ));
+    }
+    painter.line_segment(
+        [
+            center + egui::vec2(-3.5, -0.5),
+            center + egui::vec2(-0.5, -4.5),
+        ],
+        Stroke::new(1.0_f32, palette.paper),
+    );
+    diamond(painter, center + egui::vec2(0.0, 13.0), 1.8, silver);
     if active {
-        let orbit = center + Vec2::angled(time * 2.3) * 9.0;
-        diamond(painter, orbit, 2.2, palette.paper);
+        for index in 0..3 {
+            let angle = time * 1.8 + index as f32 * std::f32::consts::TAU / 3.0;
+            let spark = center + egui::vec2(angle.cos() * 17.0, angle.sin() * 11.5);
+            diamond(
+                painter,
+                spark,
+                1.3 + pulse * 0.5,
+                palette.paper.gamma_multiply(0.85),
+            );
+        }
         painter
             .ctx()
-            .request_repaint_after(std::time::Duration::from_millis(50));
+            .request_repaint_after(std::time::Duration::from_millis(33));
     }
+}
+
+fn activity_setting(painter: &egui::Painter, center: Pos2, silver: Color32, outline: Color32) {
+    for side in [-1.0, 1.0] {
+        let at = |x: f32, y: f32| center + egui::vec2(x * side, y);
+        let wing = vec![
+            at(6.0, -3.0),
+            at(13.0, -8.0),
+            at(21.0, -9.0),
+            at(18.0, -3.0),
+            at(20.0, 1.0),
+            at(14.0, -1.0),
+            at(11.0, 4.0),
+            at(8.0, 1.0),
+        ];
+        painter.add(egui::Shape::closed_line(wing, Stroke::new(1.1_f32, silver)));
+        painter.line_segment(
+            [at(8.0, -2.0), at(18.0, -6.0)],
+            Stroke::new(0.7_f32, silver.gamma_multiply(0.6)),
+        );
+        diamond(painter, at(12.0, -7.0), 1.5, silver);
+    }
+    painter.line_segment(
+        [center - Vec2::Y * 13.0, center - Vec2::Y * 8.0],
+        Stroke::new(1.0_f32, silver),
+    );
+    diamond(painter, center - Vec2::Y * 12.0, 2.5, outline);
+    diamond(painter, center - Vec2::Y * 12.0, 1.4, silver);
 }
 
 pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool, enabled: bool) {
