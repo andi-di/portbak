@@ -100,7 +100,7 @@ impl SayaCompanion {
 
     fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
         if expression != self.visible(time) {
-            self.overlay_started_at = (expression == Expression::InLove).then_some(time);
+            self.overlay_started_at = (expression == Expression::Love).then_some(time);
         }
         self.preview = false;
         self.expression = expression;
@@ -111,7 +111,7 @@ impl SayaCompanion {
 
     fn overlay_elapsed(&self, time: f64) -> Option<f64> {
         self.overlay_started_at
-            .filter(|_| self.visible(time) == Expression::InLove)
+            .filter(|_| self.visible(time) == Expression::Love)
             .map(|start| time - start)
             .filter(|elapsed| (0.0..LOVE_HEART_SECONDS + LOVE_HEARTS[2].3).contains(elapsed))
     }
@@ -851,16 +851,16 @@ mod tests {
     #[test]
     fn love_hearts_play_once_per_entry_and_stop_when_interrupted() {
         let mut state = SayaCompanion::default();
-        state.set_expression(Expression::InLove, 1.0, 0);
+        state.set_expression(Expression::Love, 1.0, 0);
         assert_eq!(state.overlay_elapsed(1.25), Some(0.25));
 
-        state.set_expression(Expression::InLove, 1.5, 1);
+        state.set_expression(Expression::Love, 1.5, 1);
         state.hold_while_hovered(true, 2.0);
-        assert_eq!(state.visible(2.0), Expression::InLove);
+        assert_eq!(state.visible(2.0), Expression::Love);
         assert_eq!(state.overlay_elapsed(2.0), None);
 
         state.set_expression(Expression::Happy, 2.25, 2);
-        state.set_expression(Expression::InLove, 2.5, 3);
+        state.set_expression(Expression::Love, 2.5, 3);
         assert_eq!(state.overlay_elapsed(2.75), Some(0.25));
         state.set_expression(Expression::Sad, 2.75, 4);
         assert_eq!(state.overlay_elapsed(2.75), None);
@@ -874,7 +874,7 @@ mod tests {
             state.hold_while_hovered(true, 10.1);
             assert_eq!(
                 state.overlay_elapsed(10.2),
-                (expression == Expression::InLove).then_some(10.2 - 10.0)
+                (expression == Expression::Love).then_some(10.2 - 10.0)
             );
             assert_eq!(state.overlay_elapsed(12.0), None);
             assert_eq!(state.visible(12.0), expression);

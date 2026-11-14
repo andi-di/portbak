@@ -21,7 +21,7 @@ impl Action {
     pub(super) fn pool(self) -> &'static [Expression] {
         use Expression::*;
         match self {
-            Self::AutomaticDisabled => &[BoredExpectant, Pouting],
+            Self::AutomaticDisabled => &[Expectant, Pouting],
             Self::AutomaticEnabled => &[Dominant, Energetic, Happy],
             Self::CheckNow => &[Dominant, Energetic],
             Self::DarkMode => &[Happy, Smug],
@@ -51,10 +51,10 @@ impl Page {
         use Expression::*;
         match self {
             Self::Backups(_) => &[Dominant, Praying, Smug],
-            Self::JobSettings(_) => &[BoredExpectant, Curious, Dominant, Smug],
+            Self::JobSettings(_) => &[Expectant, Curious, Dominant, Smug],
             Self::SettingsJobs => &[Curious, Question, Waiting],
             Self::SettingsTheme => &[Cute, Flirty, Seductive],
-            Self::StartScreen => &[BoredExpectant, Pleading, Waiting],
+            Self::StartScreen => &[Expectant, Pleading, Waiting],
         }
     }
 }

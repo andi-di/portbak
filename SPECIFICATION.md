@@ -56,13 +56,13 @@ Provide:
 - Moonveil uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.
   - Center header contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
 - Moonveil Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
-  - Only InLove has a portrait overlay: briefly rising hearts. All other expressions have no overlay.
-  - Hearts play once on InLove entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.
+  - Only Love has a portrait overlay: briefly rising hearts. All other expressions have no overlay.
+  - Hearts play once on Love entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.
   - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.
   - New job: Happy; Check now: Energetic; Remove job: Pouting; Settings: Curious; select job: Waiting; Dark mode: Happy; Light mode: Sleepy.
-- When Saya enters her in-love expression, three ruby hearts briefly rise and fade inside the sidebar frame. Holding the expression does not replay the effect.
+- When Saya enters her Love expression, three ruby hearts briefly rise and fade inside the sidebar frame. Holding the expression does not replay the effect.
 - Saya's bottom-anchored companion panel uses one continuous outer silver frame around a square portrait, plain letterbox and attached caret strip. Keep the portrait and outer border plain, without ornaments. Keep one divider beneath the portrait and no gaps between sections. Show it on an empty start screen; scroll jobs above it.
   - The strip contains only a centered downward/upward caret. It stays at the same bottom position in both states. Minimize/maximize with a reversible 240 ms eased slide and fade, reclaiming job-list space smoothly. Start expanded on every launch.
 - Moonveil uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
@@ -74,11 +74,11 @@ Provide:
 - Saya's letterbox stays 60 logical pixels tall, fitting three normal-sized lines with 7-pixel top/bottom margins. Its width follows the portrait; font size scales from 12 to 13.5 logical pixels with sidebar width, shrinking long dialogue down to 9 pixels. Limit dialogue to 120 characters including spaces and punctuation and test rendered bounds at minimum width.
 - The Saya caret strip meets the sidebar borders, replacing its lower corner ornaments. Keep only the silver frame; omit the redundant dark outer stroke and separator.
 - Saya's page pools:
-  - Start screen: BoredExpectant, Pleading, Waiting. Job settings: BoredExpectant, Curious, Dominant, Smug.
+  - Start screen: Expectant, Pleading, Waiting. Job settings: Expectant, Curious, Dominant, Smug.
   - Backups: Dominant, Praying, Smug. Application Job settings: Curious, Question, Waiting. Theme settings: Cute, Flirty, Seductive.
 - Saya's action pools:
   - Create job: Energetic, Excited, Happy. Check now: Dominant, Energetic. Remove job: Meek, Pouting, Sad.
-  - Enable automatic backups: Dominant, Energetic, Happy. Disable: BoredExpectant, Pouting. Protect backup: Dominant, Killer.
+  - Enable automatic backups: Dominant, Energetic, Happy. Disable: Expectant, Pouting. Protect backup: Dominant, Killer.
   - Restore confirmation: Praying, Question. Restore success: Celebrating, Happy, Smug. Operation failure: Sad only.
   - Dark mode: Happy, Smug. Light mode: Angry, Flustered, Sleepy. Restore portrait: Angry, Excited, Flustered, Happy, Pouting.
 

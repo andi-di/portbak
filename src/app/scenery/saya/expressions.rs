@@ -25,7 +25,6 @@ macro_rules! expression_catalog {
 expression_catalog! {
     Angry,
     Bored,
-    BoredExpectant,
     Celebrating,
     Curious,
     Cute,
@@ -33,11 +32,12 @@ expression_catalog! {
     Embarrassed,
     Energetic,
     Excited,
+    Expectant,
     Flirty,
     Flustered,
     Happy,
-    InLove,
     Killer,
+    Love,
     Meek,
     #[default]
     Neutral,
@@ -90,9 +90,6 @@ impl Expression {
             Self::Bored => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/bored.png")
             }
-            Self::BoredExpectant => {
-                include_bytes!("../../../../assets/themes/moonveil/expressions/bored-expectant.png")
-            }
             Self::Celebrating => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/celebrating.png")
             }
@@ -114,6 +111,9 @@ impl Expression {
             Self::Excited => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/excited.png")
             }
+            Self::Expectant => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/expectant.png")
+            }
             Self::Flirty => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/flirty.png")
             }
@@ -123,11 +123,11 @@ impl Expression {
             Self::Happy => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/happy.png")
             }
-            Self::InLove => {
-                include_bytes!("../../../../assets/themes/moonveil/expressions/in-love.png")
-            }
             Self::Killer => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/killer.png")
+            }
+            Self::Love => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/love.png")
             }
             Self::Meek => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/meek.png")

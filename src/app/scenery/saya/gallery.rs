@@ -109,7 +109,7 @@ fn select(ctx: &egui::Context, expression: Expression, time: f64) {
             .get_temp::<SayaCompanion>(state_id())
             .unwrap_or_default();
         companion.set_expression(expression, time, uuid::Uuid::new_v4().as_u128());
-        companion.overlay_started_at = (expression == Expression::InLove).then_some(time);
+        companion.overlay_started_at = (expression == Expression::Love).then_some(time);
         companion.preview = true;
         companion.collapsed = false;
         data.insert_temp(state_id(), companion);
@@ -406,14 +406,14 @@ mod tests {
                 },
             )
         });
-        select(&ctx, Expression::InLove, 1.0);
+        select(&ctx, Expression::Love, 1.0);
         let companion = ctx
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
             .unwrap();
-        assert_eq!(companion.visible(100.0), Expression::InLove);
+        assert_eq!(companion.visible(100.0), Expression::Love);
         assert_eq!(companion.overlay_elapsed(1.2), Some(1.2 - 1.0));
         assert_eq!(companion.overlay_elapsed(100.0), None);
-        select(&ctx, Expression::InLove, 100.0);
+        select(&ctx, Expression::Love, 100.0);
         let companion = ctx
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
             .unwrap();
@@ -467,8 +467,8 @@ mod tests {
         assert!(Expression::REACTIONS
             .iter()
             .all(|expression| Expression::ALL.contains(expression)));
-        assert_eq!(Expression::BoredExpectant.label(), "Bored Expectant");
-        assert_eq!(Expression::InLove.label(), "In Love");
+        assert_eq!(Expression::Expectant.label(), "Expectant");
+        assert_eq!(Expression::Love.label(), "Love");
         assert!(columns(900.0, 10.0) > columns(260.0, 10.0));
     }
 

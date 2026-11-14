@@ -15,12 +15,6 @@ impl Expression {
                 "A book, some strong tea... surely you can arrange that.",
                 "Have you finished? I have counted every rose outside.",
             ],
-            Self::BoredExpectant => &[
-                "Go on. I'm listening.",
-                "Well, Human? You have my attention.",
-                "I trust there was a reason for that lingering glance.",
-                "You may speak. I shall try to look less impressed.",
-            ],
             Self::Celebrating => &[
                 "Naturally, everything went according to my plan.",
                 "An excellent result. My influence is unmistakable.",
@@ -63,6 +57,12 @@ impl Expression {
                 "At last, something worthy of our attention!",
                 "I knew you would return. I simply did not expect to smile.",
             ],
+            Self::Expectant => &[
+                "Go on. I'm listening.",
+                "Well, Human? You have my attention.",
+                "I trust there was a reason for that lingering glance.",
+                "You may speak. I shall try to look less impressed.",
+            ],
             Self::Flirty => &[
                 "You do enjoy my company, Human.",
                 "Another glance? I shall allow it.",
@@ -81,17 +81,17 @@ impl Expression {
                 "I saved you a place. It seemed practical.",
                 "You may stay for another cup of tea.",
             ],
-            Self::InLove => &[
-                "Maybe I missed you. Just a little.",
-                "I find myself looking forward to your visits.",
-                "The garden seems quieter when you are away.",
-                "Stay beside me a little longer. If you wish.",
-            ],
             Self::Killer => &[
                 "Nothing gets past me. Nothing.",
                 "Should trouble find you, it will answer to me.",
                 "My patience is reserved for you, Human.",
                 "Behind me, Mortal. Let me look first.",
+            ],
+            Self::Love => &[
+                "Maybe I missed you. Just a little.",
+                "I find myself looking forward to your visits.",
+                "The garden seems quieter when you are away.",
+                "Stay beside me a little longer. If you wish.",
             ],
             Self::Meek => &[
                 "Perhaps you could stay a little longer.",
