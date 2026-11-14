@@ -109,7 +109,7 @@ fn select(ctx: &egui::Context, expression: Expression, time: f64) {
             .get_temp::<SayaCompanion>(state_id())
             .unwrap_or_default();
         companion.set_expression(expression, time, uuid::Uuid::new_v4().as_u128());
-        companion.overlay_started_at = (expression != Expression::Neutral).then_some(time);
+        companion.overlay_started_at = (expression == Expression::InLove).then_some(time);
         companion.preview = true;
         companion.collapsed = false;
         data.insert_temp(state_id(), companion);
@@ -213,11 +213,7 @@ fn preview(ui: &mut egui::Ui, gallery: &Gallery, size: f32, dialogue_height: f32
     let time = ui.input(|input| input.time);
     if companion.expression == expression {
         if let Some(elapsed) = companion.overlay_elapsed(time) {
-            if expression == Expression::InLove {
-                super::paint_love_hearts(ui, rect, elapsed);
-            } else {
-                super::overlays::paint(ui.painter(), rect, expression, elapsed);
-            }
+            super::paint_love_hearts(ui, rect, elapsed);
             ui.ctx().request_repaint_after(Duration::from_millis(50));
         }
     }
@@ -410,14 +406,14 @@ mod tests {
                 },
             )
         });
-        select(&ctx, Expression::Sad, 1.0);
+        select(&ctx, Expression::InLove, 1.0);
         let companion = ctx
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
             .unwrap();
-        assert_eq!(companion.visible(100.0), Expression::Sad);
+        assert_eq!(companion.visible(100.0), Expression::InLove);
         assert_eq!(companion.overlay_elapsed(1.2), Some(1.2 - 1.0));
         assert_eq!(companion.overlay_elapsed(100.0), None);
-        select(&ctx, Expression::Sad, 100.0);
+        select(&ctx, Expression::InLove, 100.0);
         let companion = ctx
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
             .unwrap();
