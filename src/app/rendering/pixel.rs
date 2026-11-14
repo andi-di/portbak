@@ -4,7 +4,7 @@ use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::gothic;
 use crate::app::rendering::liquid::{self, Frost, Lens};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::{aurora, liquid_wallpaper, midnight_neko};
+use crate::app::scenery::{aurora, liquid_wallpaper, moonveil};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -961,7 +961,7 @@ pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
 
 pub fn sidebar_decoration(ui: &egui::Ui) {
     if Skin::of(ui.ctx()).finish == Finish::Gothic {
-        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
+        crate::app::scenery::moonveil::paint_bats(ui.painter());
         gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
         gothic::top_corners(
             ui.painter(),
@@ -979,7 +979,7 @@ pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     const INSET: f32 = 6.0;
     let ctx = ui.ctx();
     if Skin::of(ctx).finish == Finish::Gothic {
-        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
+        crate::app::scenery::moonveil::paint_bats(ui.painter());
         gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
         gothic::corners(
             ui.painter(),
@@ -1018,7 +1018,7 @@ pub fn paint_underlay(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
-        midnight_neko::paint_background(ctx, palette);
+        moonveil::paint_background(ctx, palette);
     } else if Skin::of(ctx).finish == Finish::Liquid {
         liquid_wallpaper::paint(ctx);
     } else if effects.wallpaper {
@@ -1034,7 +1034,7 @@ pub fn paint_scenery(ui: &egui::Ui) {
     let effects = &Skin::of(ui.ctx()).effects;
     let palette = Palette::of(ui);
     if Skin::of(ui.ctx()).finish == Finish::Gothic {
-        midnight_neko::paint_scene(ui.painter(), Palette::of(ui));
+        moonveil::paint_scene(ui.painter(), Palette::of(ui));
         gothic::pattern(ui.painter(), ui.clip_rect());
     }
     if effects.grid {
@@ -1047,7 +1047,7 @@ pub fn paint_overlays(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
-        midnight_neko::paint_overlays(ctx, palette);
+        moonveil::paint_overlays(ctx, palette);
     }
     if effects.scanlines {
         paint_scanlines(ctx, palette);

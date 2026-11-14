@@ -45,67 +45,67 @@ impl Sprite {
         match self {
             Self::Castle => (
                 "castle",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/castle.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/castle.png"),
             ),
             Self::CastleWindows => (
                 "castle-windows",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/castle-windows.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/castle-windows.png"),
             ),
             Self::Moon => (
                 "moon",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/moon.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/moon.png"),
             ),
             Self::Cloud => (
                 "cloud",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/cloud.png"),
             ),
             Self::CloudVariant => (
                 "cloud-variant",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud-variant.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/cloud-variant.png"),
             ),
             Self::CloudBank => (
                 "cloud-bank",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/cloud-bank.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/cloud-bank.png"),
             ),
             Self::Mountains => (
                 "mountains",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/mountains.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/mountains.png"),
             ),
             Self::Mist => (
                 "mist",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/mist.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/mist.png"),
             ),
             Self::MistVeil => (
                 "mist-veil",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/mist-veil.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/mist-veil.png"),
             ),
             Self::BatDown => (
                 "bat_down",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/bat-down.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/bat-down.png"),
             ),
             Self::Perched => (
                 "perched",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/bat-perched.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/bat-perched.png"),
             ),
             Self::Petal => (
                 "petal",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/petal.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/petal.png"),
             ),
             Self::Crescent => (
                 "crescent",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/crescent.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/crescent.png"),
             ),
             Self::PetalRound => (
                 "petal_round",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/petal-round.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/petal-round.png"),
             ),
             Self::PetalFolded => (
                 "petal_folded",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/petal-folded.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/petal-folded.png"),
             ),
             Self::SilverSpark => (
                 "silver_spark",
-                include_bytes!("../../../assets/themes/midnight-neko/scenery/silver-spark.png"),
+                include_bytes!("../../../assets/themes/moonveil/scenery/silver-spark.png"),
             ),
         }
     }
@@ -127,7 +127,7 @@ struct Bat {
 }
 
 #[derive(Clone, Default)]
-struct Garden {
+struct Estate {
     bats: Vec<Bat>,
     particles: Vec<Particle>,
     last_time: Option<f32>,
@@ -144,7 +144,7 @@ struct Particle {
 }
 
 fn state_id() -> egui::Id {
-    egui::Id::new("saya_garden")
+    egui::Id::new("moonveil_estate")
 }
 
 fn texture(ctx: &egui::Context, sprite: Sprite) -> Option<egui::TextureHandle> {
@@ -310,7 +310,7 @@ fn steer(bat: &mut Bat, target: Pos2, pointer: Option<Pos2>, pressed: bool, dt: 
     bat.position.y = bat.position.y.clamp(bounds.top(), bounds.bottom());
 }
 
-fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pressed: bool) {
+fn update(state: &mut Estate, screen: Rect, time: f32, pointer: Option<Pos2>, pressed: bool) {
     let dt = state
         .last_time
         .map_or(0.0, |previous| (time - previous).clamp(0.0, 0.05));
@@ -419,7 +419,7 @@ pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
             input.pointer.any_pressed(),
         )
     });
-    let mut state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
+    let mut state: Estate = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
     update(&mut state, screen, time, pointer, pressed);
     let pass = ctx.cumulative_pass_nr();
     ctx.data_mut(|data| {
@@ -532,7 +532,7 @@ pub fn paint_bats(painter: &egui::Painter) {
     rendering::paint_items(painter, items);
 }
 
-fn release(state: &mut Garden, origin: Pos2, time: f32, count: u32) {
+fn release(state: &mut Estate, origin: Pos2, time: f32, count: u32) {
     for _ in 0..count {
         let seed = state.released;
         state.released = state.released.wrapping_add(1);
@@ -548,7 +548,7 @@ fn release(state: &mut Garden, origin: Pos2, time: f32, count: u32) {
     state.particles.drain(..excess);
 }
 
-fn record_pointer(state: &mut Garden, pointer: Option<Pos2>, pressed: bool, time: f32) {
+fn record_pointer(state: &mut Estate, pointer: Option<Pos2>, pressed: bool, time: f32) {
     state
         .particles
         .retain(|particle| time - particle.born < LIFETIME);
@@ -735,7 +735,7 @@ mod tests {
     #[test]
     fn direct_click_gives_a_faster_longer_escape_then_resumes_roaming() {
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1400.0, 900.0));
-        let mut clicked = Garden::default();
+        let mut clicked = Estate::default();
         update(&mut clicked, screen, 0.0, None, false);
         clicked.bats[0].position = screen.center();
         let mut hovered = clicked.clone();
@@ -757,7 +757,7 @@ mod tests {
     #[test]
     fn bats_roost_scatter_spread_and_return_individually() {
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 700.0));
-        let mut state = Garden::default();
+        let mut state = Estate::default();
         update(&mut state, screen, 0.0, None, false);
         assert!(state
             .bats
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn pointer_trail_is_bounded_expires_and_does_not_bridge_pointer_leaves() {
-        let mut state = Garden::default();
+        let mut state = Estate::default();
         for step in 0..1000 {
             record_pointer(
                 &mut state,

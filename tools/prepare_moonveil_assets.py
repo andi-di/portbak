@@ -1,9 +1,9 @@
-"""Prepare embedded Neko scenery at its runtime resolution (requires Pillow)."""
+"""Prepare embedded Moonveil scenery at its runtime resolution (requires Pillow)."""
 from pathlib import Path
 import json
 from PIL import Image
 
-root = Path(__file__).resolve().parents[1] / "assets/themes/midnight-neko/scenery"
+root = Path(__file__).resolve().parents[1] / "assets/themes/moonveil/scenery"
 for name in ("cloud-bank.png", "mist-veil.png"):
     with Image.open(root / name) as source:
         source.thumbnail((1024, 1024))

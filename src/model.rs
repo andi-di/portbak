@@ -378,10 +378,21 @@ pub struct Config {
     pub version: u32,
     pub theme: Theme,
     /// Id of the chosen skin; unknown ids fall back to the default skin.
+    #[serde(deserialize_with = "deserialize_skin")]
     pub skin: String,
     pub job_defaults: JobDefaults,
     pub sidebar_width: f32,
     pub jobs: Vec<Job>,
+}
+
+// Preserve the selected look when loading configurations from before the rename.
+fn deserialize_skin<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let id = String::deserialize(deserializer)?;
+    Ok(if id == "midnight-neko" {
+        "moonveil".into()
+    } else {
+        id
+    })
 }
 
 impl Default for Config {
@@ -891,6 +902,19 @@ mod tests {
             assert_eq!(saved.skin, "modern");
             assert_eq!(saved.theme, theme);
         }
+    }
+
+    #[test]
+    fn legacy_theme_selection_migrates_to_moonveil_and_saves_the_new_id() {
+        for id in ["midnight-neko", "moonveil"] {
+            let config: Config = serde_json::from_value(serde_json::json!({"skin": id})).unwrap();
+            assert_eq!(config.skin, "moonveil");
+            let saved = serde_json::to_value(config.for_storage()).unwrap();
+            assert_eq!(saved["skin"], "moonveil");
+        }
+        let config: Config =
+            serde_json::from_value(serde_json::json!({"skin": "unknown-look"})).unwrap();
+        assert_eq!(config.skin, "unknown-look");
     }
 
     #[test]

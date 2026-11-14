@@ -1,4 +1,4 @@
-# Midnight Neko artwork
+# Moonveil artwork
 
 Theme assets:
 
@@ -46,4 +46,4 @@ The animation can reverse without jumping. Saya starts expanded on every launch.
 Scenery textures are prepared at a maximum edge of 1024 pixels. Castle flicker uses
 `castle.png` plus the transparent `castle-windows.png` mask and 16-pixel cell list
 in `castle-windows.json`. Regenerate derived scenery with
-`python tools/prepare_neko_assets.py` (requires Pillow).
+`python tools/prepare_moonveil_assets.py` (requires Pillow).

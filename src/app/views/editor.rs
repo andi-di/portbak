@@ -93,28 +93,25 @@ impl App {
             });
         if add {
             self.add_job();
-            crate::app::scenery::catgirl::trigger(
-                &ctx,
-                crate::app::scenery::catgirl::Action::NewJob,
-            );
+            crate::app::scenery::saya::trigger(&ctx, crate::app::scenery::saya::Action::NewJob);
         }
         if let Some((id, was_enabled)) = activation {
             self.job_activation_changed(id, was_enabled);
             if let Some(job) = self.job(id) {
                 let action = if job.enabled {
-                    crate::app::scenery::catgirl::Action::AutomaticEnabled
+                    crate::app::scenery::saya::Action::AutomaticEnabled
                 } else {
-                    crate::app::scenery::catgirl::Action::AutomaticDisabled
+                    crate::app::scenery::saya::Action::AutomaticDisabled
                 };
-                crate::app::scenery::catgirl::trigger(&ctx, action);
+                crate::app::scenery::saya::trigger(&ctx, action);
             }
         }
         if let Some((id, action)) = action {
             let reaction = match action {
-                JobAction::Check => crate::app::scenery::catgirl::Action::CheckNow,
-                JobAction::Remove => crate::app::scenery::catgirl::Action::RemoveJob,
+                JobAction::Check => crate::app::scenery::saya::Action::CheckNow,
+                JobAction::Remove => crate::app::scenery::saya::Action::RemoveJob,
             };
-            crate::app::scenery::catgirl::trigger(&ctx, reaction);
+            crate::app::scenery::saya::trigger(&ctx, reaction);
             self.apply(id, action);
         }
     }
@@ -141,7 +138,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         };
         ui.add_space(bob);
         if Skin::of(ui.ctx()).effects.hearts {
-            crate::app::scenery::catgirl::show_welcome(ui);
+            crate::app::scenery::saya::show_welcome(ui);
         } else {
             let symbol = if liquid { palette.dim } else { palette.hot };
             sprites::show(ui, Sprite::Floppy, 10.0, symbol);
@@ -327,7 +324,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
         |ui| {
             if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
                 let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
-                crate::app::scenery::catgirl::paint_emblem(ui, rect);
+                crate::app::scenery::saya::paint_emblem(ui, rect);
             } else {
                 sprites::show(
                     ui,

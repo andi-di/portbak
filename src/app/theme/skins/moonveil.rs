@@ -1,4 +1,4 @@
-//! Midnight Neko: matte gothic panels, burgundy accents and an illustrated catgirl companion.
+//! Moonveil: matte gothic panels, burgundy accents and Saya as an illustrated companion.
 
 use crate::app::rendering::sprites::Sprite;
 use crate::app::theme::style::{
@@ -6,9 +6,9 @@ use crate::app::theme::style::{
 };
 use eframe::egui::Color32;
 
-pub static MIDNIGHT_NEKO: Skin = Skin {
-    id: "midnight-neko",
-    name: "Midnight Neko",
+pub static MOONVEIL: Skin = Skin {
+    id: "moonveil",
+    name: "Moonveil",
     description: "Plum-black panels, burgundy ribbons, silver accents and Saya, a moss-eyed gothic companion.",
     dark: MOONLIGHT,
     light: PALE_STONE,

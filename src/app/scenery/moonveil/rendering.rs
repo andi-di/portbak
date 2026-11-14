@@ -1,4 +1,4 @@
-use super::{noise, sprite_point, texture, Garden, Sprite, SpritePose};
+use super::{noise, sprite_point, texture, Estate, Sprite, SpritePose};
 use eframe::egui::{self, Color32, Rect};
 use std::{
     collections::HashMap,
@@ -12,7 +12,7 @@ pub(super) struct Item {
 
 pub(super) struct Frame {
     pass: u64,
-    pub garden: Garden,
+    pub garden: Estate,
     pub scene: OnceLock<Vec<Item>>,
     pub bats: OnceLock<Vec<Item>>,
     pub petals: OnceLock<Vec<Item>>,
@@ -20,7 +20,7 @@ pub(super) struct Frame {
 }
 
 impl Frame {
-    pub fn new(pass: u64, garden: Garden) -> Self {
+    pub fn new(pass: u64, garden: Estate) -> Self {
         Self {
             pass,
             garden,
@@ -33,7 +33,7 @@ impl Frame {
 }
 
 pub(super) fn frame_id() -> egui::Id {
-    egui::Id::new("neko_prepared_frame")
+    egui::Id::new("moonveil_prepared_frame")
 }
 
 pub(super) fn frame(ctx: &egui::Context) -> Arc<Frame> {
@@ -44,7 +44,7 @@ pub(super) fn frame(ctx: &egui::Context) -> Arc<Frame> {
         }
     }
     let garden = ctx
-        .data_mut(|data| data.get_temp::<Garden>(super::state_id()))
+        .data_mut(|data| data.get_temp::<Estate>(super::state_id()))
         .unwrap_or_default();
     let frame = Arc::new(Frame::new(pass, garden));
     ctx.data_mut(|data| data.insert_temp(frame_id(), frame.clone()));
@@ -145,7 +145,7 @@ impl<'a> SceneBuilder<'a> {
         static CELLS: OnceLock<Vec<[u32; 2]>> = OnceLock::new();
         let cells = CELLS.get_or_init(|| {
             serde_json::from_slice(include_bytes!(
-                "../../../../assets/themes/midnight-neko/scenery/castle-windows.json"
+                "../../../../assets/themes/moonveil/scenery/castle-windows.json"
             ))
             .expect("embedded castle window cells")
         });
@@ -260,7 +260,7 @@ mod tests {
                     .data_mut(|data| data.get_temp::<Arc<Frame>>(frame_id()))
                     .is_none());
                 assert!(ctx
-                    .data_mut(|data| data.get_temp::<Garden>(super::super::state_id()))
+                    .data_mut(|data| data.get_temp::<Estate>(super::super::state_id()))
                     .is_none());
             });
         }

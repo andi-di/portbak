@@ -11,14 +11,14 @@ macro_rules! asset {
             $name,
             if $dark {
                 include_bytes!(concat!(
-                    "../../../assets/themes/midnight-neko/icons/dark/",
+                    "../../../assets/themes/moonveil/icons/dark/",
                     $name,
                     ".png"
                 ))
                 .as_slice()
             } else {
                 include_bytes!(concat!(
-                    "../../../assets/themes/midnight-neko/icons/light/",
+                    "../../../assets/themes/moonveil/icons/light/",
                     $name,
                     ".png"
                 ))
@@ -604,7 +604,7 @@ mod tests {
 
     #[test]
     fn icon_variants_match_geometry_and_contrast_control_surfaces() {
-        let skin = crate::app::theme::skins::find("midnight-neko");
+        let skin = crate::app::theme::skins::find("moonveil");
         for sprite in Sprite::ALL {
             let light = image::load_from_memory(icon_asset(sprite, false).1)
                 .unwrap()

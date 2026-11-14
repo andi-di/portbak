@@ -38,11 +38,11 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        if self.config.skin == "midnight-neko" {
-            if !crate::app::scenery::midnight_neko::decorations_visible(&ctx) {
+        if self.config.skin == "moonveil" {
+            if !crate::app::scenery::moonveil::decorations_visible(&ctx) {
                 return;
             }
-            crate::app::scenery::catgirl::preload(&ctx);
+            crate::app::scenery::saya::preload(&ctx);
         }
         pixel::paint_underlay(&ctx);
         let before = self.config.clone();
@@ -69,14 +69,14 @@ impl eframe::App for App {
         if self.config != before {
             self.dirty = true;
         }
-        crate::app::scenery::catgirl::enter_page(&ctx, self.saya_page());
+        crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
         pixel::paint_overlays(&ctx);
     }
 }
 
 impl App {
-    fn saya_page(&self) -> crate::app::scenery::catgirl::Page {
-        use crate::app::scenery::catgirl::Page;
+    fn saya_page(&self) -> crate::app::scenery::saya::Page {
+        use crate::app::scenery::saya::Page;
         if self.settings_open {
             match self.settings_tab {
                 super::settings_view::SettingsTab::Jobs => Page::SettingsJobs,
@@ -195,12 +195,12 @@ impl App {
                                     self.config.theme =
                                         if dark { Theme::Light } else { Theme::Dark };
                                     ctx.set_theme(theme_preference(self.config.theme));
-                                    crate::app::scenery::catgirl::trigger(
+                                    crate::app::scenery::saya::trigger(
                                         &ctx,
                                         if dark {
-                                            crate::app::scenery::catgirl::Action::LightMode
+                                            crate::app::scenery::saya::Action::LightMode
                                         } else {
-                                            crate::app::scenery::catgirl::Action::DarkMode
+                                            crate::app::scenery::saya::Action::DarkMode
                                         },
                                     );
                                 }
@@ -385,9 +385,9 @@ impl App {
                 };
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
-                    crate::app::scenery::catgirl::trigger(
+                    crate::app::scenery::saya::trigger(
                         ui.ctx(),
-                        crate::app::scenery::catgirl::Action::NewJob,
+                        crate::app::scenery::saya::Action::NewJob,
                     );
                 }
                 ui.add_space(12.0);
@@ -395,7 +395,7 @@ impl App {
                 let list_height = if show_mascot {
                     (ui.available_height()
                         - ui.spacing().item_spacing.y
-                        - crate::app::scenery::catgirl::reserved_height(ui))
+                        - crate::app::scenery::saya::reserved_height(ui))
                     .max(0.0)
                 } else {
                     ui.available_height()
@@ -415,7 +415,7 @@ impl App {
                     self.toggle_job(id);
                 }
                 if show_mascot {
-                    ui.vertical_centered(crate::app::scenery::catgirl::show_sidebar);
+                    ui.vertical_centered(crate::app::scenery::saya::show_sidebar);
                 }
             });
         let edge = panel.response.rect;
@@ -623,7 +623,7 @@ fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
     let mascot = match skin.finish {
-        Finish::Gothic => crate::app::scenery::catgirl::show_header(ui),
+        Finish::Gothic => crate::app::scenery::saya::show_header(ui),
         Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
         _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
@@ -735,11 +735,11 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 mod tests {
     #[test]
     #[ignore = "manual release-mode CPU rendering profile"]
-    fn profile_midnight_neko() {
+    fn profile_moonveil() {
         let ctx = egui::Context::default();
         let mut app = App::new(
             Config {
-                skin: "midnight-neko".into(),
+                skin: "moonveil".into(),
                 jobs: vec![Job::default()],
                 ..Config::default()
             },
@@ -791,7 +791,7 @@ mod tests {
             }
         }
         samples.sort_by(f64::total_cmp);
-        println!("NEKO_PROFILE mean_ms={:.3} p95_ms={:.3} startup_max_ms={startup_max:.3} uploads_mib={:.2} batches={:.1}",
+        println!("MOONVEIL_PROFILE mean_ms={:.3} p95_ms={:.3} startup_max_ms={startup_max:.3} uploads_mib={:.2} batches={:.1}",
             samples.iter().sum::<f64>() / samples.len() as f64, samples[samples.len() * 95 / 100],
             upload_bytes as f64 / (1024.0 * 1024.0), batches as f64 / samples.len() as f64);
     }
@@ -1020,7 +1020,7 @@ mod tests {
             let ctx = egui::Context::default();
             let mut app = App::new(
                 Config {
-                    skin: "midnight-neko".into(),
+                    skin: "moonveil".into(),
                     sidebar_width,
                     ..Config::default()
                 },
@@ -1204,7 +1204,7 @@ mod tests {
 
     #[test]
     fn dragged_sidebar_width_survives_frames_and_restart() {
-        for skin in ["modern", "midnight-neko"] {
+        for skin in ["modern", "moonveil"] {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("config.json");
             let mut app = App::new(
@@ -1230,7 +1230,7 @@ mod tests {
             };
             frame(&mut app, &ctx, vec![]);
             frame(&mut app, &ctx, vec![]);
-            let inset = if skin == "midnight-neko" { 5.0 } else { 0.0 };
+            let inset = if skin == "moonveil" { 5.0 } else { 0.0 };
             let start = egui::pos2(300.0 - inset, 300.0);
             let end = egui::pos2(390.0 - inset, 300.0);
             let handle = ctx.read_response(egui::Id::new("jobs_resize")).unwrap();
@@ -1285,11 +1285,11 @@ mod tests {
     }
 
     #[test]
-    fn midnight_neko_portrait_fits_at_minimum_window_size_with_wide_sidebar() {
+    fn moonveil_portrait_fits_at_minimum_window_size_with_wide_sidebar() {
         let ctx = egui::Context::default();
         let mut app = App::new(
             Config {
-                skin: "midnight-neko".into(),
+                skin: "moonveil".into(),
                 sidebar_width: *SIDEBAR_WIDTH.end(),
                 jobs: (0..8).map(|_| Job::default()).collect(),
                 ..Config::default()

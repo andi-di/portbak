@@ -35,7 +35,7 @@ pub fn trigger(ctx: &egui::Context, action: Action) {
     let time = ctx.input(|input| input.time);
     let random = uuid::Uuid::new_v4().as_u128();
     ctx.data_mut(|data| {
-        let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
+        let mut state: SayaCompanion = data.get_temp(state_id()).unwrap_or_default();
         state.react(action.pool(), time, random);
         state.action_time = Some(time);
         data.insert_temp(state_id(), state);
@@ -49,7 +49,7 @@ pub fn enter_page(ctx: &egui::Context, page: Page) {
     }
     let time = ctx.input(|input| input.time);
     let changed = ctx.data_mut(|data| {
-        let mut state: Companion = data.get_temp(state_id()).unwrap_or_default();
+        let mut state: SayaCompanion = data.get_temp(state_id()).unwrap_or_default();
         if state.page == Some(page) {
             return false;
         }
@@ -67,7 +67,7 @@ pub fn enter_page(ctx: &egui::Context, page: Page) {
 
 #[derive(Clone, Default)]
 
-struct Companion {
+struct SayaCompanion {
     expression: Expression,
     overlay_started_at: Option<f64>,
     until: f64,
@@ -80,7 +80,7 @@ struct Companion {
     line_indices: [Option<usize>; 27],
 }
 
-impl Companion {
+impl SayaCompanion {
     fn react_to_click(&mut self, time: f64, random: u128) {
         self.set_expression(self.expression.next(random), time, random);
         self.action_time = Some(time);
@@ -177,7 +177,7 @@ struct Preloader(std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<Decod
 
 /// Decode off-thread with one pending image; upload at most one image per frame.
 pub fn preload(ctx: &egui::Context) {
-    if !super::midnight_neko::decorations_visible(ctx) {
+    if !super::moonveil::decorations_visible(ctx) {
         return;
     }
     let id = egui::Id::new("saya_artwork_preloader");
@@ -268,7 +268,7 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
         ui,
         rect,
         "family-emblem",
-        include_bytes!("../../../assets/themes/midnight-neko/saya-emblem.png"),
+        include_bytes!("../../../assets/themes/moonveil/saya-emblem.png"),
     );
 }
 
@@ -283,14 +283,14 @@ const PANEL_INSET: f32 = 5.0;
 const PANEL_BORDER: f32 = 1.0;
 const COLLAPSE_SECONDS: f32 = 0.24;
 
-struct CompanionLayout {
+struct SayaLayout {
     outer: Rect,
     portrait: Rect,
     letter: Rect,
     toggle: Rect,
 }
 
-impl CompanionLayout {
+impl SayaLayout {
     fn new(bounds: Rect, expansion: f32) -> Self {
         let width = (bounds.width() - PANEL_BORDER * 2.0).max(0.0);
         let height = TOGGLE_HEIGHT + PANEL_BORDER * 2.0 + (width + DIALOGUE_HEIGHT) * expansion;
@@ -318,7 +318,7 @@ impl CompanionLayout {
 fn expansion(ui: &egui::Ui) -> f32 {
     let collapsed = ui
         .ctx()
-        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+        .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
         .is_some_and(|state| state.collapsed);
     let amount = ui.ctx().animate_bool_with_time(
         egui::Id::new("saya_expansion"),
@@ -429,7 +429,7 @@ fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
 }
 
 pub fn reserved_height(ui: &egui::Ui) -> f32 {
-    CompanionLayout::new(ui.clip_rect().shrink(PANEL_INSET), expansion(ui))
+    SayaLayout::new(ui.clip_rect().shrink(PANEL_INSET), expansion(ui))
         .outer
         .height()
         + 6.0
@@ -437,7 +437,7 @@ pub fn reserved_height(ui: &egui::Ui) -> f32 {
 
 pub fn show_sidebar(ui: &mut egui::Ui) {
     let amount = expansion(ui);
-    let layout = CompanionLayout::new(ui.clip_rect().shrink(PANEL_INSET), amount);
+    let layout = SayaLayout::new(ui.clip_rect().shrink(PANEL_INSET), amount);
     let palette = Palette::of(ui);
     ui.painter().rect_filled(layout.outer, 3, palette.surface);
     if amount > 0.0 {
@@ -459,7 +459,7 @@ pub fn show_sidebar(ui: &mut egui::Ui) {
     }
     let collapsed = ui
         .ctx()
-        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+        .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
         .is_some_and(|state| state.collapsed);
     let mut strip_ui = ui.new_child(
         egui::UiBuilder::new()
@@ -517,7 +517,9 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
     if response.clone().on_hover_text(label).clicked() {
         let time = ui.input(|input| input.time);
         ui.ctx().data_mut(|data| {
-            let mut state = data.get_temp::<Companion>(state_id()).unwrap_or_default();
+            let mut state = data
+                .get_temp::<SayaCompanion>(state_id())
+                .unwrap_or_default();
             state.hold_while_hovered(false, time);
             state.collapsed = !collapsed;
             data.insert_temp(state_id(), state);
@@ -534,7 +536,7 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
 
     let id = state_id();
 
-    let mut state: Companion = ui
+    let mut state: SayaCompanion = ui
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
@@ -586,7 +588,7 @@ pub fn show_welcome(ui: &mut egui::Ui) {
         ui,
         rect,
         "full_body",
-        include_bytes!("../../../assets/themes/midnight-neko/saya-full-body.png"),
+        include_bytes!("../../../assets/themes/moonveil/saya-full-body.png"),
     );
 }
 
@@ -644,7 +646,7 @@ mod tests {
     #[test]
     fn dialogue_budget_fits_the_fixed_box_at_every_sidebar_width() {
         let ctx = egui::Context::default();
-        crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("midnight-neko"));
+        crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("moonveil"));
         for theme in [egui::Theme::Light, egui::Theme::Dark] {
             ctx.set_theme(theme);
             let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
@@ -691,7 +693,7 @@ mod tests {
     fn companion_sections_share_one_frame_and_animation_keeps_the_caret_anchored() {
         for width in [300.0, 460.0] {
             let bounds = Rect::from_min_size(Pos2::ZERO, egui::vec2(width, 800.0));
-            let expanded = CompanionLayout::new(bounds, 1.0);
+            let expanded = SayaLayout::new(bounds, 1.0);
             assert_eq!(expanded.portrait.width(), expanded.portrait.height());
             assert_eq!(expanded.portrait.left_bottom(), expanded.letter.left_top());
             assert_eq!(expanded.letter.left_bottom(), expanded.toggle.left_top());
@@ -699,7 +701,7 @@ mod tests {
             assert_eq!(expanded.letter.width(), expanded.toggle.width());
             let mut previous = 0.0;
             for amount in [0.0, 0.25, 0.5, 0.75, 1.0] {
-                let layout = CompanionLayout::new(bounds, amount);
+                let layout = SayaLayout::new(bounds, amount);
                 assert_eq!(layout.toggle, expanded.toggle);
                 assert!(layout.outer.height() > previous);
                 previous = layout.outer.height();
@@ -726,7 +728,9 @@ mod tests {
                 },
                 |ui| {
                     ctx.data_mut(|data| {
-                        let mut state = data.get_temp::<Companion>(state_id()).unwrap_or_default();
+                        let mut state = data
+                            .get_temp::<SayaCompanion>(state_id())
+                            .unwrap_or_default();
                         state.collapsed = collapsed;
                         data.insert_temp(state_id(), state);
                     });
@@ -747,7 +751,7 @@ mod tests {
 
     #[test]
     fn actions_replace_hovered_reactions_immediately() {
-        let mut state = Companion::default();
+        let mut state = SayaCompanion::default();
         state.react(Action::NewJob.pool(), 0.0, 1);
         state.hold_while_hovered(true, 1.0);
         state.react(Action::Failed.pool(), 1.5, 2);
@@ -763,7 +767,7 @@ mod tests {
 
     #[test]
     fn timer_pauses_and_resumes_its_remaining_duration() {
-        let mut state = Companion::default();
+        let mut state = SayaCompanion::default();
         state.react(Action::Failed.pool(), 10.0, 0);
         state.hold_while_hovered(true, 12.5);
         let line = state.line(12.5);
@@ -803,7 +807,7 @@ mod tests {
     #[test]
     fn page_changes_do_not_overwrite_actions_or_repeat_on_redraw() {
         let ctx = egui::Context::default();
-        crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("midnight-neko"));
+        crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("moonveil"));
         let mut until = 0.0;
         for (time, page) in [
             (0.0, Page::StartScreen),
@@ -822,7 +826,7 @@ mod tests {
                     }
                     enter_page(&ctx, page);
                     let state = ctx
-                        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+                        .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
                         .unwrap();
                     if time == 0.5 || time == 1.0 {
                         assert_eq!(state.visible(time), Expression::Sad);
@@ -843,7 +847,7 @@ mod tests {
 
     #[test]
     fn overlays_play_once_per_entry_and_switch_immediately_with_reactions() {
-        let mut state = Companion::default();
+        let mut state = SayaCompanion::default();
         state.set_expression(Expression::InLove, 1.0, 0);
         assert_eq!(state.overlay_elapsed(1.25), Some(0.25));
 
@@ -862,7 +866,7 @@ mod tests {
     #[test]
     fn overlays_end_while_hover_keeps_the_expression_and_neutral_has_none() {
         for expression in Expression::REACTIONS {
-            let mut state = Companion::default();
+            let mut state = SayaCompanion::default();
             state.set_expression(expression, 10.0, 0);
             state.hold_while_hovered(true, 10.1);
             assert_eq!(state.overlay_elapsed(10.2), Some(10.2 - 10.0));
@@ -875,7 +879,7 @@ mod tests {
 
     #[test]
     fn dialogue_varies_without_repeating_each_expressions_previous_line() {
-        let mut state = super::Companion::default();
+        let mut state = super::SayaCompanion::default();
         for expression in super::Expression::REACTIONS
             .into_iter()
             .chain([super::Expression::Neutral])
@@ -923,7 +927,7 @@ mod tests {
 
     #[test]
     fn sidebar_starts_expanded_and_returns_to_neutral_without_idle_reactions() {
-        let mut state = Companion::default();
+        let mut state = SayaCompanion::default();
         assert!(!state.collapsed);
         state.react_to_click(10.0, 4);
         assert_ne!(state.visible(10.1), Expression::Neutral);

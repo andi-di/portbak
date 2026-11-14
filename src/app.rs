@@ -476,7 +476,7 @@ impl App {
                         .as_ref()
                         .is_some_and(|history| history.request == request)
                 {
-                    scenery::catgirl::trigger(ctx, scenery::catgirl::Action::ProtectionEnabled);
+                    scenery::saya::trigger(ctx, scenery::saya::Action::ProtectionEnabled);
                 }
                 self.protection_saved(request, &name, protected, result);
             }
@@ -490,10 +490,10 @@ impl App {
     }
 
     fn finish_operation(&mut self, id: Uuid, result: Result<Outcome, String>, ctx: &egui::Context) {
-        use scenery::catgirl::{self, Action};
+        use scenery::saya::{self, Action};
         match &result {
-            Err(_) => catgirl::trigger(ctx, Action::Failed),
-            Ok(_) if self.restoring => catgirl::trigger(ctx, Action::RestoreCompleted),
+            Err(_) => saya::trigger(ctx, Action::Failed),
+            Ok(_) if self.restoring => saya::trigger(ctx, Action::RestoreCompleted),
             Ok(_) => {}
         }
         if let Some(job) = self.job_mut(id) {
@@ -932,9 +932,9 @@ mod tests {
     }
 
     #[test]
-    fn minimized_neko_window_still_runs_due_backups() {
+    fn minimized_moonveil_window_still_runs_due_backups() {
         let (_directory, mut app, _) = restore_fixture();
-        app.config.skin = "midnight-neko".into();
+        app.config.skin = "moonveil".into();
         let job = app.config.jobs[0].clone();
         std::fs::write(job.source.join("file"), "changed while minimized").unwrap();
         let context = egui::Context::default();
@@ -945,7 +945,7 @@ mod tests {
             .unwrap()
             .minimized = Some(true);
         let _ = context.run_ui(input, |_| {
-            assert!(!scenery::midnight_neko::decorations_visible(&context));
+            assert!(!scenery::moonveil::decorations_visible(&context));
             app.tick(&context);
             assert_eq!(app.active, Some(job.id));
         });
