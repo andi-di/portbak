@@ -2,6 +2,7 @@
 
 mod dialogue;
 mod expressions;
+mod overlays;
 mod reactions;
 
 use expressions::Expression;
@@ -68,7 +69,7 @@ pub fn enter_page(ctx: &egui::Context, page: Page) {
 
 struct Companion {
     expression: Expression,
-    love_started_at: Option<f64>,
+    overlay_started_at: Option<f64>,
     until: f64,
     paused_remaining: Option<f64>,
     hovered: bool,
@@ -95,7 +96,7 @@ impl Companion {
 
     fn set_expression(&mut self, expression: Expression, time: f64, random: u128) {
         if expression != self.visible(time) {
-            self.love_started_at = (expression == Expression::InLove).then_some(time);
+            self.overlay_started_at = (expression != Expression::Neutral).then_some(time);
         }
         self.expression = expression;
         self.until = time + REACTION_SECONDS;
@@ -103,11 +104,11 @@ impl Companion {
         self.paused_remaining = self.hovered.then_some(REACTION_SECONDS);
     }
 
-    fn love_elapsed(&self, time: f64) -> Option<f64> {
-        self.love_started_at
-            .filter(|_| self.visible(time) == Expression::InLove)
+    fn overlay_elapsed(&self, time: f64) -> Option<f64> {
+        self.overlay_started_at
+            .filter(|_| self.visible(time) == self.expression)
             .map(|start| time - start)
-            .filter(|elapsed| (0.0..LOVE_HEART_SECONDS + LOVE_HEARTS[2].3).contains(elapsed))
+            .filter(|elapsed| (0.0..overlays::duration(self.expression)).contains(elapsed))
     }
 
     fn hold_while_hovered(&mut self, hovered: bool, time: f64) {
@@ -382,7 +383,9 @@ fn show_letter(ui: &mut egui::Ui, rect: Rect, galley: std::sync::Arc<egui::Galle
 }
 
 fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
-    let painter = ui.painter().with_clip_rect(opening);
+    let painter = ui
+        .painter()
+        .with_clip_rect(ui.clip_rect().intersect(opening));
     // The top row has two lobes. The following rows taper to the point.
     let rows = [
         (1, 3, 0),
@@ -553,9 +556,13 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
     let font = egui::TextStyle::Small.resolve(ui.style());
     let galley = letter_text(ui, letter.width(), state.line(time), &font);
     paint(ui, rect, &format!("{expression:?}"), expression.bytes());
-    if let Some(elapsed) = state.love_elapsed(time) {
-        paint_love_hearts(ui, rect, elapsed);
-        ui.ctx().request_repaint();
+    if let Some(elapsed) = state.overlay_elapsed(time) {
+        if expression == Expression::InLove {
+            paint_love_hearts(ui, rect, elapsed);
+        } else {
+            overlays::paint(ui.painter(), rect, expression, elapsed);
+        }
+        ui.ctx().request_repaint_after(Duration::from_millis(50));
     }
     show_letter(ui, letter, galley);
     crate::app::rendering::pixel::subtle_outline(ui, &response, rect, Palette::of(ui).metal);
@@ -835,21 +842,35 @@ mod tests {
     }
 
     #[test]
-    fn love_hearts_play_once_per_entry_and_end_if_interrupted() {
+    fn overlays_play_once_per_entry_and_switch_immediately_with_reactions() {
         let mut state = Companion::default();
         state.set_expression(Expression::InLove, 1.0, 0);
-        assert_eq!(state.love_elapsed(1.25), Some(0.25));
+        assert_eq!(state.overlay_elapsed(1.25), Some(0.25));
 
         state.set_expression(Expression::InLove, 1.5, 1);
         state.hold_while_hovered(true, 2.0);
         assert_eq!(state.visible(2.0), Expression::InLove);
-        assert_eq!(state.love_elapsed(2.0), None);
+        assert_eq!(state.overlay_elapsed(2.0), None);
 
         state.set_expression(Expression::Happy, 2.25, 2);
         state.set_expression(Expression::InLove, 2.5, 3);
-        assert_eq!(state.love_elapsed(2.75), Some(0.25));
+        assert_eq!(state.overlay_elapsed(2.75), Some(0.25));
         state.set_expression(Expression::Sad, 2.75, 4);
-        assert_eq!(state.love_elapsed(2.75), None);
+        assert_eq!(state.overlay_elapsed(2.75), Some(0.0));
+    }
+
+    #[test]
+    fn overlays_end_while_hover_keeps_the_expression_and_neutral_has_none() {
+        for expression in Expression::REACTIONS {
+            let mut state = Companion::default();
+            state.set_expression(expression, 10.0, 0);
+            state.hold_while_hovered(true, 10.1);
+            assert_eq!(state.overlay_elapsed(10.2), Some(10.2 - 10.0));
+            assert_eq!(state.overlay_elapsed(12.0), None);
+            assert_eq!(state.visible(12.0), expression);
+            state.set_expression(Expression::Neutral, 12.0, 0);
+            assert_eq!(state.overlay_elapsed(12.0), None);
+        }
     }
 
     #[test]

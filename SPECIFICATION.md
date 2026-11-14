@@ -55,6 +55,8 @@ Provide:
   - Pages blur content progressively where it scrolls out of view at the top or bottom edge, fading it into the backdrop.
 - Midnight Neko uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.
 - Midnight Neko Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
+  - Each non-neutral expression has one brief portrait overlay; Neutral stays plain. Curious uses an orbiting mote, Question a question mark, and InLove keeps its floating hearts. Other accents match each expression (anger mark, blush, crown, tear, rose, feather, halo, sparkle or pixel symbol).
+  - Overlays play once on expression entry, stop or switch immediately with the expression, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong overlays.
   - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.
