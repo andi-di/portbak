@@ -9,7 +9,7 @@ use eframe::egui::Color32;
 pub static MOONVEIL: Skin = Skin {
     id: "moonveil",
     name: "Moonveil",
-    description: "Plum-black panels, burgundy ribbons, silver accents and Saya, a moss-eyed gothic companion.",
+    description: "A moonlit theme with vampiric elegance, burgundy roses, drifting mist, and Saya keeping watch.",
     dark: MOONLIGHT,
     light: PALE_STONE,
     fonts: Fonts {
