@@ -56,6 +56,12 @@ pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color3
     paint_icon(painter, rect, name, bytes, dark, fill);
 }
 
+pub fn close_icon(painter: &egui::Painter, rect: Rect, fill: Color32) {
+    let dark = foreground(fill) == Color32::WHITE;
+    let (name, bytes) = asset!("close", dark);
+    paint_icon(painter, rect, name, bytes, dark, fill);
+}
+
 pub fn job_icon(painter: &egui::Painter, rect: Rect, active: bool) {
     let dark = painter.ctx().global_style().visuals.dark_mode;
     let (name, bytes) = if active {
@@ -602,16 +608,23 @@ mod tests {
         }
     }
 
+    fn functional_assets(dark: bool) -> Vec<(&'static str, &'static [u8])> {
+        Sprite::ALL
+            .into_iter()
+            .map(|sprite| icon_asset(sprite, dark))
+            .chain(std::iter::once(asset!("close", dark)))
+            .collect()
+    }
+
     #[test]
     fn icon_variants_match_geometry_and_contrast_control_surfaces() {
         let skin = crate::app::theme::skins::find("moonveil");
-        for sprite in Sprite::ALL {
-            let light = image::load_from_memory(icon_asset(sprite, false).1)
-                .unwrap()
-                .to_rgba8();
-            let dark = image::load_from_memory(icon_asset(sprite, true).1)
-                .unwrap()
-                .to_rgba8();
+        for ((name, light_bytes), (_, dark_bytes)) in functional_assets(false)
+            .into_iter()
+            .zip(functional_assets(true))
+        {
+            let light = image::load_from_memory(light_bytes).unwrap().to_rgba8();
+            let dark = image::load_from_memory(dark_bytes).unwrap().to_rgba8();
             assert_eq!(light.dimensions(), dark.dimensions());
             assert!(light.pixels().zip(dark.pixels()).all(|(a, b)| a[3] == b[3]));
             for palette in [&skin.light, &skin.dark] {
@@ -637,7 +650,7 @@ mod tests {
                         silver_finish(&mut image, ink == Color32::WHITE, fill);
                         for pixel in image.pixels().filter(|pixel| pixel[3] != 0) {
                             let color = Color32::from_rgb(pixel[0], pixel[1], pixel[2]);
-                            assert!(contrast(fill, color) >= 4.5, "{sprite:?} / {fill:?}");
+                            assert!(contrast(fill, color) >= 4.5, "{name} / {fill:?}");
                         }
                         assert!(contrast(fill, ink) >= 4.5);
                     }
@@ -649,9 +662,8 @@ mod tests {
     #[test]
     fn icons_share_resolution_padding_and_visible_extent() {
         let mut names = std::collections::HashSet::new();
-        for sprite in Sprite::ALL {
-            let (name, bytes) = icon_asset(sprite, true);
-            assert!(names.insert(name), "duplicate icon for {sprite:?}");
+        for (name, bytes) in functional_assets(true) {
+            assert!(names.insert(name), "duplicate icon: {name}");
             let image = image::load_from_memory(bytes).unwrap().to_rgba8();
             assert_eq!(image.dimensions(), (128, 128), "{name}");
             let mut bounds = (128, 128, 0, 0);

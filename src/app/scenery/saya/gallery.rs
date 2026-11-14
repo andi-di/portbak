@@ -194,13 +194,11 @@ fn close_button(ui: &mut egui::Ui) -> egui::Response {
         .on_hover_text("Close gallery (Esc)");
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close gallery"));
-    let center = response.rect.center();
-    let stroke = egui::Stroke::new(1.8_f32, Palette::of(ui).ink);
-    for direction in [-1.0, 1.0] {
-        let offset = egui::vec2(6.0, 6.0 * direction);
-        ui.painter()
-            .line_segment([center - offset, center + offset], stroke);
-    }
+    crate::app::rendering::gothic::close_icon(
+        ui.painter(),
+        Rect::from_center_size(response.rect.center(), Vec2::splat(24.0)),
+        Palette::of(ui).raised,
+    );
     response
 }
 

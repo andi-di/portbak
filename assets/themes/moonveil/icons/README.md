@@ -57,5 +57,7 @@ Keep character colors in the Saya heads and surrounding controls. Functional
 icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.
 
-The restore arrow has balanced top and bottom strokes and a wide inner opening; keep
-its light/dark masks identical and preserve the standard canvas and visible extent.
+The restore icon uses a clean counterclockwise circular arrow. The warning icon
+uses a filled triangle with a broad exclamation cutout. The gallery close button
+uses the generated `close.png` diagonal cross. Keep light/dark masks identical;
+preserve the standard canvas, padding and visible extent for all three.
