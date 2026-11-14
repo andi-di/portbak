@@ -151,42 +151,93 @@ impl Companion {
     }
 }
 
-fn texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> Option<egui::TextureHandle> {
-    let id = egui::Id::new(("saya_artwork", name));
+fn decode_artwork(bytes: &[u8]) -> Result<egui::ColorImage, String> {
+    let image = image::load_from_memory(bytes).map_err(|error| error.to_string())?;
+    let image = if image.width() > 1024 || image.height() > 1024 {
+        image.thumbnail(1024, 1024)
+    } else {
+        image
+    };
+    let rgba = image.to_rgba8();
+    Ok(egui::ColorImage::from_rgba_unmultiplied(
+        [rgba.width() as usize, rgba.height() as usize],
+        rgba.as_raw(),
+    ))
+}
 
+fn artwork_id(name: &str) -> egui::Id {
+    egui::Id::new(("saya_artwork", name))
+}
+
+type DecodedArtwork = (String, Result<egui::ColorImage, String>);
+
+#[derive(Clone)]
+struct Preloader(std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<DecodedArtwork>>>);
+
+/// Decode off-thread with one pending image; upload at most one image per frame.
+pub fn preload(ctx: &egui::Context) {
+    if !super::midnight_neko::decorations_visible(ctx) {
+        return;
+    }
+    let id = egui::Id::new("saya_artwork_preloader");
+    let preloader = ctx
+        .data_mut(|data| data.get_temp::<Preloader>(id))
+        .unwrap_or_else(|| {
+            let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+            std::thread::spawn(move || {
+                for expression in std::iter::once(Expression::Neutral).chain(Expression::REACTIONS)
+                {
+                    let image = decode_artwork(expression.bytes());
+                    if sender.send((format!("{expression:?}"), image)).is_err() {
+                        break;
+                    }
+                }
+            });
+            let preloader = Preloader(std::sync::Arc::new(std::sync::Mutex::new(receiver)));
+            ctx.data_mut(|data| data.insert_temp(id, preloader.clone()));
+            preloader
+        });
+    let frame_id = id.with("uploaded_frame");
+    let frame = ctx.cumulative_frame_nr();
+    if ctx.data_mut(|data| data.get_temp::<u64>(frame_id)) == Some(frame) {
+        return;
+    }
+    ctx.data_mut(|data| data.insert_temp(frame_id, frame));
+    let Ok(receiver) = preloader.0.lock() else {
+        return;
+    };
+    let Ok((name, decoded)) = receiver.try_recv() else {
+        return;
+    };
+    let id = artwork_id(&name);
+    if ctx
+        .data_mut(|data| data.get_temp::<Result<egui::TextureHandle, String>>(id))
+        .is_some()
+    {
+        return;
+    }
+    let result = decoded.map(|image| ctx.load_texture(&name, image, egui::TextureOptions::NEAREST));
+    if let Err(error) = &result {
+        eprintln!("Could not preload Saya artwork {name}: {error}");
+    }
+    ctx.data_mut(|data| data.insert_temp(id, result));
+}
+
+fn texture(ctx: &egui::Context, name: &str, bytes: &[u8]) -> Option<egui::TextureHandle> {
+    let id = artwork_id(name);
     let cached: Option<Result<egui::TextureHandle, String>> =
         ctx.data_mut(|data| data.get_temp(id));
-
-    let result = cached.unwrap_or_else(|| {
-        let result = image::load_from_memory(bytes)
-            .map(|image| {
-                let image = if image.width() > 1024 || image.height() > 1024 {
-                    image.thumbnail(1024, 1024)
-                } else {
-                    image
-                };
-                let rgba = image.to_rgba8();
-                ctx.load_texture(
-                    name,
-                    egui::ColorImage::from_rgba_unmultiplied(
-                        [rgba.width() as usize, rgba.height() as usize],
-                        rgba.as_raw(),
-                    ),
-                    egui::TextureOptions::NEAREST,
-                )
-            })
-            .map_err(|error| format!("Could not load Saya artwork {name}: {error}"));
-
-        if let Err(error) = &result {
-            eprintln!("{error}");
-        }
-
-        ctx.data_mut(|data| data.insert_temp(id, result.clone()));
-
-        result
-    });
-
-    result.ok()
+    cached
+        .unwrap_or_else(|| {
+            let result = decode_artwork(bytes)
+                .map(|image| ctx.load_texture(name, image, egui::TextureOptions::NEAREST));
+            if let Err(error) = &result {
+                eprintln!("Could not load Saya artwork {name}: {error}");
+            }
+            ctx.data_mut(|data| data.insert_temp(id, result.clone()));
+            result
+        })
+        .ok()
 }
 
 fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
@@ -534,6 +585,55 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn preloader_uploads_only_one_artwork_per_frame() {
+        let ctx = eframe::egui::Context::default();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(2);
+        for name in ["preload-a", "preload-b"] {
+            sender
+                .send((
+                    name.to_owned(),
+                    Ok(eframe::egui::ColorImage::filled(
+                        [2, 2],
+                        eframe::egui::Color32::WHITE,
+                    )),
+                ))
+                .unwrap();
+        }
+        ctx.data_mut(|data| {
+            data.insert_temp(
+                eframe::egui::Id::new("saya_artwork_preloader"),
+                super::Preloader(std::sync::Arc::new(std::sync::Mutex::new(receiver))),
+            )
+        });
+        let _ = ctx.run_ui(eframe::egui::RawInput::default(), |_| {
+            super::preload(&ctx);
+            super::preload(&ctx);
+            assert!(ctx
+                .data_mut(
+                    |data| data.get_temp::<Result<eframe::egui::TextureHandle, String>>(
+                        super::artwork_id("preload-a")
+                    )
+                )
+                .is_some());
+            assert!(ctx
+                .data_mut(
+                    |data| data.get_temp::<Result<eframe::egui::TextureHandle, String>>(
+                        super::artwork_id("preload-b")
+                    )
+                )
+                .is_none());
+        });
+        let _ = ctx.run_ui(eframe::egui::RawInput::default(), |_| super::preload(&ctx));
+        assert!(ctx
+            .data_mut(
+                |data| data.get_temp::<Result<eframe::egui::TextureHandle, String>>(
+                    super::artwork_id("preload-b")
+                )
+            )
+            .is_some());
+    }
+
     #[test]
     fn dialogue_budget_fits_the_fixed_box_at_every_sidebar_width() {
         let ctx = egui::Context::default();

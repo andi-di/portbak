@@ -38,6 +38,12 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        if self.config.skin == "midnight-neko" {
+            if !crate::app::scenery::midnight_neko::decorations_visible(&ctx) {
+                return;
+            }
+            crate::app::scenery::catgirl::preload(&ctx);
+        }
         pixel::paint_underlay(&ctx);
         let before = self.config.clone();
         if !self
@@ -727,6 +733,69 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[ignore = "manual release-mode CPU rendering profile"]
+    fn profile_midnight_neko() {
+        let ctx = egui::Context::default();
+        let mut app = App::new(
+            Config {
+                skin: "midnight-neko".into(),
+                jobs: vec![Job::default()],
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.ensure_skin(&ctx);
+        ctx.set_theme(egui::Theme::Dark);
+        let mut samples = Vec::new();
+        let mut startup_max = 0.0_f64;
+        let mut upload_bytes = 0;
+        let mut batches = 0;
+        for frame in 0..360 {
+            let started = std::time::Instant::now();
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(frame as f64 * 0.05),
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 960.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    pixel::paint_underlay(&ctx);
+                    app.show_header(ui);
+                    app.show_footer(ui);
+                    app.show_job_list(ui);
+                    app.show_job_editor(ui);
+                    pixel::paint_overlays(&ctx);
+                },
+            );
+            upload_bytes += output
+                .textures_delta
+                .set
+                .iter()
+                .map(|(_, delta)| {
+                    let size = delta.image.size();
+                    size[0] * size[1] * 4
+                })
+                .sum::<usize>();
+            let primitives = ctx.tessellate(output.shapes, output.pixels_per_point);
+            let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+            if frame < 240 {
+                startup_max = startup_max.max(elapsed);
+            } else {
+                samples.push(elapsed);
+                batches += primitives.len();
+            }
+        }
+        samples.sort_by(f64::total_cmp);
+        println!("NEKO_PROFILE mean_ms={:.3} p95_ms={:.3} startup_max_ms={startup_max:.3} uploads_mib={:.2} batches={:.1}",
+            samples.iter().sum::<f64>() / samples.len() as f64, samples[samples.len() * 95 / 100],
+            upload_bytes as f64 / (1024.0 * 1024.0), batches as f64 / samples.len() as f64);
+    }
+
     use super::*;
     use crate::model::Config;
 

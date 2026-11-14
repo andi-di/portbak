@@ -932,6 +932,29 @@ mod tests {
     }
 
     #[test]
+    fn minimized_neko_window_still_runs_due_backups() {
+        let (_directory, mut app, _) = restore_fixture();
+        app.config.skin = "midnight-neko".into();
+        let job = app.config.jobs[0].clone();
+        std::fs::write(job.source.join("file"), "changed while minimized").unwrap();
+        let context = egui::Context::default();
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .minimized = Some(true);
+        let _ = context.run_ui(input, |_| {
+            assert!(!scenery::midnight_neko::decorations_visible(&context));
+            app.tick(&context);
+            assert_eq!(app.active, Some(job.id));
+        });
+        tick_until(&mut app, &context, |app| app.active.is_none());
+        assert!(app.active.is_none());
+        assert_eq!(engine::history::list(&job).unwrap().len(), 2);
+    }
+
+    #[test]
     fn history_mutations_pause_due_backups_until_finished() {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);

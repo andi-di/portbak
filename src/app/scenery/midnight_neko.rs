@@ -2,11 +2,14 @@
 
 mod cursors;
 mod estate;
+mod rendering;
+
+use rendering::{Frame, SceneBuilder};
 
 use crate::app::rendering::ornaments::noise;
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 const BAT_COUNT: usize = 16;
 const PETAL_COUNT: u32 = 60;
@@ -17,9 +20,10 @@ const LIFETIME: f32 = 1.0;
 const CLICK_ESCAPE_SECONDS: f32 = 3.5;
 const CLICK_ESCAPE_SPEED: f32 = 400.0;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Sprite {
     Castle,
+    CastleWindows,
     Moon,
     Cloud,
     CloudVariant,
@@ -42,6 +46,10 @@ impl Sprite {
             Self::Castle => (
                 "castle",
                 include_bytes!("../../../assets/themes/midnight-neko/scenery/castle.png"),
+            ),
+            Self::CastleWindows => (
+                "castle-windows",
+                include_bytes!("../../../assets/themes/midnight-neko/scenery/castle-windows.png"),
             ),
             Self::Moon => (
                 "moon",
@@ -139,17 +147,13 @@ fn state_id() -> egui::Id {
     egui::Id::new("saya_garden")
 }
 
-fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandle> {
+fn texture(ctx: &egui::Context, sprite: Sprite) -> Option<egui::TextureHandle> {
     let (name, bytes) = sprite.asset();
-    let dark = painter.ctx().global_style().visuals.dark_mode;
-    let phase = if matches!(sprite, Sprite::Castle) {
-        painter.ctx().input(|input| (input.time * 0.7) as u32 % 8)
-    } else {
-        0
-    };
-    let id = egui::Id::new(("saya_scenery", name, dark, phase));
+    let dark =
+        matches!(sprite, Sprite::BatDown | Sprite::Perched) && ctx.global_style().visuals.dark_mode;
+    let id = egui::Id::new(("saya_scenery", name, dark));
     let cached: Option<Result<egui::TextureHandle, String>> =
-        painter.ctx().data_mut(|data| data.get_temp(id));
+        ctx.data_mut(|data| data.get_temp(id));
     let texture = cached.unwrap_or_else(|| {
         let result = image::load_from_memory(bytes)
             .map(|image| {
@@ -172,19 +176,7 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
                         pixel.0[..3].copy_from_slice(&color);
                     }
                 }
-                if matches!(sprite, Sprite::Castle) {
-                    let height = rgba.height();
-                    for (x, y, pixel) in rgba.enumerate_pixels_mut() {
-                        if y < height * 2 / 3 && pixel[0].saturating_sub(pixel[1]) > 35 {
-                            let flicker = noise(x / 16 + y / 16 * 100, phase) > 0.85;
-                            if flicker {
-                                pixel[0] = pixel[0].saturating_add(35);
-                                pixel[1] = pixel[1].saturating_add(12);
-                            }
-                        }
-                    }
-                }
-                painter.ctx().load_texture(
+                ctx.load_texture(
                     name,
                     egui::ColorImage::from_rgba_unmultiplied(
                         [rgba.width() as usize, rgba.height() as usize],
@@ -197,23 +189,21 @@ fn texture(painter: &egui::Painter, sprite: Sprite) -> Option<egui::TextureHandl
         if let Err(error) = &result {
             eprintln!("{error}");
         }
-        painter
-            .ctx()
-            .data_mut(|data| data.insert_temp(id, result.clone()));
+        ctx.data_mut(|data| data.insert_temp(id, result.clone()));
         result
     });
     texture.ok()
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 struct SpritePose {
     angle: f32,
     mirrored: bool,
     flap: f32,
 }
 
-fn draw(painter: &egui::Painter, rect: Rect, sprite: Sprite, tint: Color32) {
-    draw_moving(painter, rect, sprite, tint, SpritePose::default());
+fn draw(scene: &mut SceneBuilder<'_>, rect: Rect, sprite: Sprite, tint: Color32) {
+    scene.draw(rect, sprite, tint, SpritePose::default());
 }
 
 fn sprite_point(rect: Rect, u: f32, v: f32, pose: &SpritePose) -> Pos2 {
@@ -226,32 +216,13 @@ fn sprite_point(rect: Rect, u: f32, v: f32, pose: &SpritePose) -> Pos2 {
 }
 
 fn draw_moving(
-    painter: &egui::Painter,
+    scene: &mut SceneBuilder<'_>,
     rect: Rect,
     sprite: Sprite,
     tint: Color32,
     pose: SpritePose,
 ) {
-    let Some(texture) = texture(painter, sprite) else {
-        return;
-    };
-    let mut mesh = egui::Mesh::with_texture(texture.id());
-    // Fixed central body columns keep wing motion from stretching the torso.
-    let columns = [0.0, 0.4, 0.6, 1.0];
-    for v in [0.0, 1.0] {
-        for u in columns {
-            mesh.vertices.push(egui::epaint::Vertex {
-                pos: sprite_point(rect, u, v, &pose),
-                uv: egui::pos2(if pose.mirrored { 1.0 - u } else { u }, v),
-                color: tint,
-            });
-        }
-    }
-    for column in 0..3 {
-        mesh.add_triangle(column, column + 1, column + 4);
-        mesh.add_triangle(column + 1, column + 5, column + 4);
-    }
-    painter.add(mesh);
+    scene.draw(rect, sprite, tint, pose);
 }
 
 fn petal(seed: u32) -> Sprite {
@@ -430,101 +401,135 @@ fn update(state: &mut Garden, screen: Rect, time: f32, pointer: Option<Pos2>, pr
     record_pointer(state, pointer, pressed, time);
 }
 
-pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
-    let screen = ctx.content_rect();
-    let painter = ctx.layer_painter(egui::LayerId::background());
-    painter.rect_filled(screen, 0, palette.background);
-    {
-        let (time, pointer, pressed) = ctx.input(|input| {
-            (
-                input.time as f32,
-                input.pointer.hover_pos(),
-                input.pointer.any_pressed(),
-            )
-        });
-        let mut state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
-        update(&mut state, screen, time, pointer, pressed);
-        ctx.data_mut(|data| data.insert_temp(state_id(), state));
-        ctx.request_repaint_after(Duration::from_millis(50));
-    }
-    paint_scene(&painter, palette);
+pub fn decorations_visible(ctx: &egui::Context) -> bool {
+    ctx.input(|input| input.viewport().visible() != Some(false))
 }
 
-/// Repeat the same scene behind opaque panel contents, clipped by each painter.
-pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
-    let ctx = painter.ctx();
-    let screen = ctx.content_rect();
-    estate::paint(painter);
-    let time = ctx.input(|input| input.time) as f32;
-    paint_bats(painter);
-    for index in 0..PETAL_COUNT {
-        let progress = (time * (0.02 + noise(index, 4) * 0.012) + noise(index, 6)).fract();
-        let center = egui::pos2(
-            screen.left()
-                + noise(index, 7) * screen.width()
-                + (time * 0.4 + index as f32).sin() * 12.0,
-            screen.top() + progress * screen.height(),
-        );
-        let size = 9.0 + noise(index, 8) * 9.0;
-        let tumble = 0.4 + (time * 0.7 + index as f32).cos().abs() * 0.6;
-        draw_moving(
-            painter,
-            Rect::from_center_size(center, egui::vec2(size * tumble, size)),
-            petal(index),
-            Color32::WHITE.gamma_multiply(0.35 + noise(index, 9) * 0.2),
-            SpritePose {
-                angle: time * (0.3 + noise(index, 10)) + index as f32,
-                mirrored: index.is_multiple_of(2),
-                ..Default::default()
-            },
-        );
+pub fn paint_background(ctx: &egui::Context, palette: &Palette) {
+    if !decorations_visible(ctx) {
+        return;
     }
+    let screen = ctx.content_rect();
+    ctx.layer_painter(egui::LayerId::background())
+        .rect_filled(screen, 0, palette.background);
+    let (time, pointer, pressed) = ctx.input(|input| {
+        (
+            input.time as f32,
+            input.pointer.hover_pos(),
+            input.pointer.any_pressed(),
+        )
+    });
+    let mut state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
+    update(&mut state, screen, time, pointer, pressed);
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|data| {
+        data.insert_temp(state_id(), state.clone());
+        data.insert_temp(rendering::frame_id(), Arc::new(Frame::new(pass, state)));
+    });
+    ctx.request_repaint_after(Duration::from_millis(50));
+}
+
+pub fn paint_scene(painter: &egui::Painter, _palette: &Palette) {
+    if !decorations_visible(painter.ctx()) {
+        return;
+    }
+    let frame = rendering::frame(painter.ctx());
+    let items = frame.scene.get_or_init(|| {
+        let mut scene = SceneBuilder::new(painter.ctx(), painter.clip_rect());
+        estate::paint(&mut scene);
+        scene.finish()
+    });
+    rendering::paint_items(painter, items);
+    paint_bats(painter);
+    let items = frame.petals.get_or_init(|| {
+        let mut scene = SceneBuilder::new(painter.ctx(), painter.clip_rect());
+        let screen = painter.ctx().content_rect();
+        let time = painter.ctx().input(|input| input.time) as f32;
+        for index in 0..PETAL_COUNT {
+            let progress = (time * (0.02 + noise(index, 4) * 0.012) + noise(index, 6)).fract();
+            let center = egui::pos2(
+                screen.left()
+                    + noise(index, 7) * screen.width()
+                    + (time * 0.4 + index as f32).sin() * 12.0,
+                screen.top() + progress * screen.height(),
+            );
+            let size = 9.0 + noise(index, 8) * 9.0;
+            let tumble = 0.4 + (time * 0.7 + index as f32).cos().abs() * 0.6;
+            draw_moving(
+                &mut scene,
+                Rect::from_center_size(center, egui::vec2(size * tumble, size)),
+                petal(index),
+                Color32::WHITE.gamma_multiply(0.35 + noise(index, 9) * 0.2),
+                SpritePose {
+                    angle: time * (0.3 + noise(index, 10)) + index as f32,
+                    mirrored: index.is_multiple_of(2),
+                    ..Default::default()
+                },
+            );
+        }
+        scene.finish()
+    });
+    rendering::paint_items(painter, items);
 }
 
 pub fn paint_bats(painter: &egui::Painter) {
-    let ctx = painter.ctx();
-    let time = ctx.input(|input| input.time) as f32;
-    let state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
-    for (index, bat) in state.bats.iter().enumerate() {
-        let sprite = if bat.perched {
-            Sprite::Perched
-        } else {
-            Sprite::BatDown
-        };
-        let rect = Rect::from_center_size(bat.position, Vec2::splat(bat.size));
-        let pose = SpritePose {
-            mirrored: bat.facing_left,
-            flap: if bat.perched {
-                0.0
-            } else {
-                (time * 12.0 + index as f32).sin()
-            },
-            angle: if bat.perched {
-                0.0
-            } else {
-                (bat.velocity.y * 0.002).clamp(-0.12, 0.12)
-            },
-        };
-        draw_moving(painter, rect, sprite, Color32::WHITE, SpritePose { ..pose });
-        let (eyes, y) = if bat.perched {
-            ([58.5, 67.5], 92.5)
-        } else {
-            ([65.0, 71.0], 54.5)
-        };
-        for x in eyes {
-            let u = if bat.facing_left {
-                1.0 - x / 128.0
-            } else {
-                x / 128.0
-            };
-            let center = sprite_point(rect, u, y / 128.0, &pose);
-            painter.rect_filled(
-                Rect::from_center_size(center, Vec2::splat(1.5)),
-                0,
-                Color32::from_rgb(137, 24, 43),
-            );
-        }
+    if !decorations_visible(painter.ctx()) {
+        return;
     }
+    let frame = rendering::frame(painter.ctx());
+    let items = frame.bats.get_or_init(|| {
+        let mut scene = SceneBuilder::new(painter.ctx(), painter.ctx().content_rect());
+        let time = painter.ctx().input(|input| input.time) as f32;
+        let state = &frame.garden;
+        for (index, bat) in state.bats.iter().enumerate() {
+            let sprite = if bat.perched {
+                Sprite::Perched
+            } else {
+                Sprite::BatDown
+            };
+            let rect = Rect::from_center_size(bat.position, Vec2::splat(bat.size));
+            let pose = SpritePose {
+                mirrored: bat.facing_left,
+                flap: if bat.perched {
+                    0.0
+                } else {
+                    (time * 12.0 + index as f32).sin()
+                },
+                angle: if bat.perched {
+                    0.0
+                } else {
+                    (bat.velocity.y * 0.002).clamp(-0.12, 0.12)
+                },
+            };
+            draw_moving(
+                &mut scene,
+                rect,
+                sprite,
+                Color32::WHITE,
+                SpritePose { ..pose },
+            );
+            let (eyes, y) = if bat.perched {
+                ([58.5, 67.5], 92.5)
+            } else {
+                ([65.0, 71.0], 54.5)
+            };
+            for x in eyes {
+                let u = if bat.facing_left {
+                    1.0 - x / 128.0
+                } else {
+                    x / 128.0
+                };
+                let center = sprite_point(rect, u, y / 128.0, &pose);
+                scene.rect(
+                    Rect::from_center_size(center, Vec2::splat(1.5)),
+                    0,
+                    Color32::from_rgb(137, 24, 43),
+                );
+            }
+        }
+        scene.finish()
+    });
+    rendering::paint_items(painter, items);
 }
 
 fn release(state: &mut Garden, origin: Pos2, time: f32, count: u32) {
@@ -574,12 +579,17 @@ fn record_pointer(state: &mut Garden, pointer: Option<Pos2>, pressed: bool, time
 }
 
 pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
+    if !decorations_visible(ctx) {
+        return;
+    }
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Tooltip,
         egui::Id::new("saya_cursor"),
     ));
-    {
-        let state: Garden = ctx.data_mut(|data| data.get_temp(state_id()).unwrap_or_default());
+    let frame = rendering::frame(ctx);
+    let items = frame.particles.get_or_init(|| {
+        let mut scene = SceneBuilder::new(ctx, ctx.content_rect());
+        let state = &frame.garden;
         let time = ctx.input(|input| input.time) as f32;
         for particle in &state.particles {
             let age = (time - particle.born).max(0.0);
@@ -593,7 +603,7 @@ pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
             };
             let size = 10.0 + noise(particle.seed, 92) * 8.0;
             draw_moving(
-                &painter,
+                &mut scene,
                 Rect::from_center_size(position, Vec2::splat(size)),
                 sprite,
                 Color32::WHITE.gamma_multiply(fade * 0.65),
@@ -604,7 +614,9 @@ pub fn paint_overlays(ctx: &egui::Context, _palette: &Palette) {
                 },
             );
         }
-    }
+        scene.finish()
+    });
+    rendering::paint_items(&painter, items);
     // Native dialogs and unfocused windows must not retain a painted cursor.
     if crate::app::views::widgets::folder_dialog_open(ctx) || !ctx.input(|input| input.focused) {
         ctx.set_cursor_icon(egui::CursorIcon::Default);

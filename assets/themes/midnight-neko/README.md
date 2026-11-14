@@ -42,3 +42,8 @@ Minimizing and maximizing use a 240 ms eased slide and fade. The caret strip
 stays fixed at the bottom, while the job list smoothly gains or gives up space.
 The animation can reverse without jumping. Saya starts expanded on every launch.
 
+
+Scenery textures are prepared at a maximum edge of 1024 pixels. Castle flicker uses
+`castle.png` plus the transparent `castle-windows.png` mask and 16-pixel cell list
+in `castle-windows.json`. Regenerate derived scenery with
+`python tools/prepare_neko_assets.py` (requires Pillow).

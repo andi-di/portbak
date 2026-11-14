@@ -1,6 +1,7 @@
 //! Asymmetric estate layers leave the central workspace open.
 
-use super::{draw, draw_moving, noise, texture, Sprite, SpritePose};
+use super::rendering::SceneBuilder;
+use super::{draw, draw_moving, noise, Sprite, SpritePose};
 use eframe::egui::{self, Color32, Rect, Vec2};
 
 pub(super) fn castle_rect(screen: Rect) -> Rect {
@@ -14,8 +15,8 @@ pub(super) fn castle_rect(screen: Rect) -> Rect {
     )
 }
 
-pub(super) fn paint(painter: &egui::Painter) {
-    let ctx = painter.ctx();
+pub(super) fn paint(painter: &mut SceneBuilder<'_>) {
+    let ctx = painter.ctx;
     let screen = ctx.content_rect();
     let dark = ctx.global_style().visuals.dark_mode;
     let time = ctx.input(|input| input.time) as f32;
@@ -71,6 +72,7 @@ pub(super) fn paint(painter: &egui::Painter) {
         Sprite::Castle,
         Color32::WHITE.gamma_multiply(if dark { 0.62 } else { 0.32 }),
     );
+    painter.castle_windows(castle_rect(screen), if dark { 0.25 } else { 0.18 });
     for layer in 0..4 {
         let phase = layer as f32 * 1.9;
         let center = egui::pos2(
@@ -94,13 +96,16 @@ pub(super) fn paint(painter: &egui::Painter) {
     }
 }
 
-fn paint_mist(painter: &egui::Painter, rect: Rect, color: Color32, time: f32, layer: u32) {
+fn paint_mist(painter: &mut SceneBuilder<'_>, rect: Rect, color: Color32, time: f32, layer: u32) {
     let sprite = if layer.is_multiple_of(2) {
         Sprite::Mist
     } else {
         Sprite::MistVeil
     };
-    let Some(texture) = texture(painter, sprite) else {
+    if !painter.visible(rect.expand(8.0)) {
+        return;
+    }
+    let Some(texture) = painter.texture(sprite) else {
         return;
     };
     const COLUMNS: u32 = 24;
@@ -126,7 +131,7 @@ fn paint_mist(painter: &egui::Painter, rect: Rect, color: Color32, time: f32, la
         mesh.add_triangle(column, column + 1, column + COLUMNS + 1);
         mesh.add_triangle(column + 1, column + COLUMNS + 2, column + COLUMNS + 1);
     }
-    painter.add(mesh);
+    painter.mesh(rect.expand(8.0), mesh);
 }
 
 #[cfg(test)]
