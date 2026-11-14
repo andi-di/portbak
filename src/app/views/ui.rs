@@ -962,9 +962,10 @@ mod tests {
             let mut position = None;
             let mut events = Vec::new();
             let strip_id = egui::Id::new("saya_strip").with("saya_toggle");
-            for frame in 0..10 {
+            for frame in 0..12 {
                 let output = ctx.run_ui(
                     egui::RawInput {
+                        time: Some(frame as f64 * 0.3),
                         events: std::mem::take(&mut events),
                         screen_rect: Some(egui::Rect::from_min_size(
                             egui::Pos2::ZERO,
@@ -996,15 +997,15 @@ mod tests {
                     }
                     _ => false,
                 });
-                if frame == 2 || frame == 9 {
+                if frame == 2 || frame == 11 {
                     assert!(has_portrait);
                 }
-                if frame == 5 {
+                if frame == 7 {
                     assert!(!has_portrait);
                 }
                 let center = strip.center();
                 events = match frame {
-                    2 | 5 => vec![
+                    2 | 7 => vec![
                         egui::Event::PointerMoved(center),
                         egui::Event::PointerButton {
                             pos: center,
@@ -1013,7 +1014,7 @@ mod tests {
                             modifiers: egui::Modifiers::NONE,
                         },
                     ],
-                    3 | 6 => vec![egui::Event::PointerButton {
+                    3 | 8 => vec![egui::Event::PointerButton {
                         pos: center,
                         button: egui::PointerButton::Primary,
                         pressed: false,
@@ -1248,7 +1249,7 @@ mod tests {
                     return None;
                 };
                 let rect = mesh.calc_bounds();
-                (rect.left() < 10.0 && rect.width() > 450.0 && rect.width() == rect.height())
+                (rect.left() < 10.0 && rect.width() > 440.0 && rect.width() == rect.height())
                     .then_some((rect, clipped.clip_rect))
             });
             let (rect, clip) = portrait.expect("full-width square portrait");
@@ -1258,12 +1259,15 @@ mod tests {
                 .expect("bottom strip")
                 .rect;
             assert!(
-                rect.bottom() + 56.0 - 4.0 <= strip.top() + 0.1,
+                rect.bottom() + 60.0 <= strip.top() + 0.1,
                 "portrait={rect:?}, strip={strip:?}"
             );
+            let panel = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+                .unwrap()
+                .rect;
             assert!(
-                clip.expand(1.0).contains_rect(strip),
-                "clip={clip:?}, strip={strip:?}"
+                panel.contains_rect(strip),
+                "panel={panel:?}, strip={strip:?}"
             );
         }
     }

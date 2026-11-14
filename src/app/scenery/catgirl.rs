@@ -216,21 +216,61 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
     );
 }
 
-// Leave room for the longest wrapped line when Saya changes expressions.
-const DIALOGUE_HEIGHT: f32 = 56.0;
+const DIALOGUE_HEIGHT: f32 = 60.0;
 const MAX_DIALOGUE_CHARACTERS: usize = 120;
-const MIN_DIALOGUE_FONT_SIZE: f32 = 8.0;
-// Tuck the trim's transparent lower edge beneath the strip so they read as one panel.
-const PORTRAIT_TOGGLE_OVERLAP: f32 = 4.0;
-const TOGGLE_HEIGHT: f32 = 28.0;
-const LETTER_TRIM_OVERHANG: f32 = 7.0;
-const LETTER_TRIM_HEIGHT: f32 = 10.0;
-const LETTER_TOP_PADDING: f32 = 2.0;
-const LETTER_BOTTOM_PADDING: f32 = 3.0;
-const LETTER_TEXT_INSET: f32 = 12.0;
-// The straight rails' outer edges sit 4.8% in from either texture edge.
-const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
-const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
+const MIN_DIALOGUE_FONT_SIZE: f32 = 9.0;
+const TOGGLE_HEIGHT: f32 = 26.0;
+const LETTER_TOP_PADDING: f32 = 7.0;
+const LETTER_BOTTOM_PADDING: f32 = 7.0;
+const LETTER_TEXT_INSET: f32 = 14.0;
+const PANEL_INSET: f32 = 5.0;
+const PANEL_BORDER: f32 = 1.0;
+const COLLAPSE_SECONDS: f32 = 0.24;
+
+struct CompanionLayout {
+    outer: Rect,
+    portrait: Rect,
+    letter: Rect,
+    toggle: Rect,
+}
+
+impl CompanionLayout {
+    fn new(bounds: Rect, expansion: f32) -> Self {
+        let width = (bounds.width() - PANEL_BORDER * 2.0).max(0.0);
+        let height = TOGGLE_HEIGHT + PANEL_BORDER * 2.0 + (width + DIALOGUE_HEIGHT) * expansion;
+        let outer = Rect::from_min_max(
+            egui::pos2(bounds.left(), bounds.bottom() - height),
+            bounds.max,
+        );
+        let inner = outer.shrink(PANEL_BORDER);
+        let portrait = Rect::from_min_size(inner.min, egui::Vec2::splat(width));
+        let letter =
+            Rect::from_min_size(portrait.left_bottom(), egui::vec2(width, DIALOGUE_HEIGHT));
+        let toggle = Rect::from_min_max(
+            egui::pos2(inner.left(), inner.bottom() - TOGGLE_HEIGHT),
+            inner.max,
+        );
+        Self {
+            outer,
+            portrait,
+            letter,
+            toggle,
+        }
+    }
+}
+
+fn expansion(ui: &egui::Ui) -> f32 {
+    let collapsed = ui
+        .ctx()
+        .data_mut(|data| data.get_temp::<Companion>(state_id()))
+        .is_some_and(|state| state.collapsed);
+    let amount = ui.ctx().animate_bool_with_time(
+        egui::Id::new("saya_expansion"),
+        !collapsed,
+        COLLAPSE_SECONDS,
+    );
+    amount * amount * (3.0 - 2.0 * amount)
+}
 
 fn letter_text(
     ui: &egui::Ui,
@@ -239,13 +279,12 @@ fn letter_text(
     font: &egui::FontId,
 ) -> std::sync::Arc<egui::Galley> {
     debug_assert!(line.chars().count() <= MAX_DIALOGUE_CHARACTERS);
-    let minimum_width = (300.0 - 4.0) * FRAME_RAIL_SPAN;
+    let minimum_width = 300.0 - (PANEL_INSET + PANEL_BORDER) * 2.0;
     let scale = (width / minimum_width).sqrt().clamp(1.0, 1.25);
     let mut font = font.clone();
-    font.size = (11.0 * scale).min(13.0);
+    font.size = (12.0 * scale).min(13.5);
     let text_width = (width - 2.0 * LETTER_TEXT_INSET).max(1.0);
-    let text_height =
-        DIALOGUE_HEIGHT - LETTER_TOP_PADDING - LETTER_BOTTOM_PADDING - LETTER_TRIM_HEIGHT;
+    let text_height = DIALOGUE_HEIGHT - LETTER_TOP_PADDING - LETTER_BOTTOM_PADDING;
     loop {
         let mut job = egui::text::LayoutJob::simple(
             line.to_owned(),
@@ -266,94 +305,25 @@ fn letter_text(
     }
 }
 
-fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::Galley>) {
-    let width = portrait.width() * FRAME_RAIL_SPAN;
-    let rect = Rect::from_min_max(
-        egui::pos2(
-            portrait.center().x - width / 2.0,
-            portrait.bottom() - portrait.height() * 0.04,
-        ),
-        egui::pos2(
-            portrait.center().x + width / 2.0,
-            portrait.bottom() + DIALOGUE_HEIGHT - LETTER_TRIM_OVERHANG,
-        ),
+fn show_letter(ui: &mut egui::Ui, rect: Rect, galley: std::sync::Arc<egui::Galley>) {
+    let palette = Palette::of(ui);
+    ui.painter().rect_filled(rect, 0, palette.surface);
+    ui.painter().hline(
+        rect.x_range(),
+        rect.top(),
+        egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.35)),
     );
-    ui.painter().rect_filled(rect, 0.0, Palette::of(ui).surface);
-
-    // Center the glyphs themselves between the rails, independent of the font's line metrics.
-    let text_top_edge = portrait.bottom() + LETTER_TOP_PADDING;
-    let text_bottom_edge =
-        rect.bottom() + LETTER_TRIM_OVERHANG - LETTER_TRIM_HEIGHT - LETTER_BOTTOM_PADDING;
-    let text_center = (text_top_edge + text_bottom_edge) / 2.0;
-    let text_top = text_center - galley.mesh_bounds.center().y;
-    let text_rect = Rect::from_min_size(
-        egui::pos2(rect.center().x - galley.size().x / 2.0, text_top),
-        galley.size(),
+    let position = egui::pos2(
+        rect.center().x - galley.size().x / 2.0,
+        rect.center().y - galley.mesh_bounds.center().y,
     );
     let mut text_ui = ui.new_child(
         egui::UiBuilder::new()
             .id_salt("saya_letter")
-            .max_rect(text_rect)
+            .max_rect(Rect::from_min_size(position, galley.size()))
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
     text_ui.label(galley);
-    // The letter can use the panel margins, just like the portrait.
-    ui.add_space((rect.bottom() + LETTER_TRIM_OVERHANG - ui.cursor().top()).max(0.0));
-    paint_letter_trim(ui, rect);
-}
-
-fn paint_letter_trim(ui: &egui::Ui, rect: Rect) {
-    let painter = ui.painter();
-    let bottom = rect.bottom() + LETTER_TRIM_OVERHANG;
-    // Keep the full five-point stroke inside the measured outer edges.
-    for x in [rect.left() + 2.5, rect.right() - 2.5] {
-        for (width, color) in [
-            (5.0_f32, Color32::from_rgb(57, 34, 44)),
-            (3.0, Color32::from_rgb(182, 163, 156)),
-            (1.0, Color32::from_rgb(104, 47, 66)),
-        ] {
-            painter.vline(
-                x,
-                rect.top()..=rect.bottom(),
-                egui::Stroke::new(width, color),
-            );
-        }
-    }
-
-    let Some(frame) = texture(ui.ctx(), "portrait-frame", FRAME_ART) else {
-        return;
-    };
-    // Reuse the frame's corners and ruby at fixed proportions. Stretch only the plain rails.
-    let cap = 22.0_f32.min(rect.width() / 5.0);
-    let left = rect.left() - 4.0;
-    let right = rect.right() + 4.0;
-    let center = rect.center().x;
-    let edges = [
-        left,
-        left + cap,
-        center - cap,
-        center + cap,
-        right - cap,
-        right,
-    ];
-    let strips = [
-        (0.0, 0.13),
-        (0.13, 0.16),
-        (0.37, 0.63),
-        (0.84, 0.87),
-        (0.87, 1.0),
-    ];
-    for (edge, (u0, u1)) in edges.windows(2).zip(strips) {
-        painter.image(
-            frame.id(),
-            Rect::from_min_max(
-                egui::pos2(edge[0], bottom - LETTER_TRIM_HEIGHT),
-                egui::pos2(edge[1], bottom),
-            ),
-            Rect::from_min_max(egui::pos2(u0, 0.88), egui::pos2(u1, 1.0)),
-            Color32::WHITE,
-        );
-    }
 }
 
 fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
@@ -400,47 +370,47 @@ fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
     }
 }
 
-fn frame_width(ui: &egui::Ui) -> f32 {
-    (ui.clip_rect().width() - 4.0).max(0.0)
+pub fn reserved_height(ui: &egui::Ui) -> f32 {
+    CompanionLayout::new(ui.clip_rect().shrink(PANEL_INSET), expansion(ui))
+        .outer
+        .height()
+        + 6.0
 }
 
-pub fn reserved_height(ui: &egui::Ui) -> f32 {
+pub fn show_sidebar(ui: &mut egui::Ui) {
+    let amount = expansion(ui);
+    let layout = CompanionLayout::new(ui.clip_rect().shrink(PANEL_INSET), amount);
+    let palette = Palette::of(ui);
+    ui.painter().rect_filled(layout.outer, 3, palette.surface);
+    if amount > 0.0 {
+        let clip = Rect::from_min_max(
+            layout.outer.min + egui::Vec2::splat(PANEL_BORDER),
+            egui::pos2(layout.outer.right() - PANEL_BORDER, layout.toggle.top()),
+        );
+        let mut content_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .id(egui::Id::new("saya_content"))
+                .max_rect(layout.outer),
+        );
+        content_ui.set_clip_rect(ui.clip_rect().intersect(clip));
+        content_ui.set_opacity(amount);
+        if amount < 1.0 {
+            content_ui.disable();
+        }
+        show_portrait(&mut content_ui, layout.portrait, layout.letter);
+    }
     let collapsed = ui
         .ctx()
         .data_mut(|data| data.get_temp::<Companion>(state_id()))
         .is_some_and(|state| state.collapsed);
-    if collapsed {
-        TOGGLE_HEIGHT
-    } else {
-        frame_width(ui) + DIALOGUE_HEIGHT + TOGGLE_HEIGHT - PORTRAIT_TOGGLE_OVERLAP
-    }
-}
-
-pub fn show_sidebar(ui: &mut egui::Ui) {
-    let toggle_rect = Rect::from_min_size(
-        egui::pos2(
-            ui.clip_rect().left() + 5.0,
-            ui.clip_rect().bottom() - 5.0 - TOGGLE_HEIGHT,
-        ),
-        egui::vec2(ui.clip_rect().width() - 10.0, TOGGLE_HEIGHT),
-    );
-    let state = ui
-        .ctx()
-        .data_mut(|data| data.get_temp::<Companion>(state_id()))
-        .unwrap_or_default();
-    if !state.collapsed {
-        let top = toggle_rect.top() + PORTRAIT_TOGGLE_OVERLAP - DIALOGUE_HEIGHT - frame_width(ui);
-        ui.add_space((top - ui.cursor().top()).max(0.0));
-        show(ui);
-    }
-    // Painting in the panel margins must not enlarge the sidebar's layout footprint.
     let mut strip_ui = ui.new_child(
         egui::UiBuilder::new()
             .id(egui::Id::new("saya_strip"))
-            .max_rect(toggle_rect)
+            .max_rect(layout.toggle)
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
-    show_toggle(&mut strip_ui, state.collapsed);
+    show_toggle(&mut strip_ui, collapsed);
+    crate::app::rendering::gothic::corners(ui.painter(), layout.outer, palette.metal);
 }
 
 fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
@@ -465,33 +435,12 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
     });
     let center = rect.center();
     let painter = ui.painter();
-    painter.rect_filled(rect, 0, palette.sunken);
-    painter.rect_stroke(
-        rect,
-        0,
-        egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.55)),
-        egui::StrokeKind::Inside,
+    painter.rect_filled(rect, 0, palette.surface);
+    painter.hline(
+        rect.x_range(),
+        rect.top(),
+        egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.35)),
     );
-    for side in [-1.0, 1.0] {
-        let start = center + egui::vec2(side * 18.0, 0.0);
-        let end = egui::pos2(
-            if side < 0.0 {
-                rect.left() + 16.0
-            } else {
-                rect.right() - 16.0
-            },
-            center.y,
-        );
-        painter.line_segment(
-            [start, end],
-            egui::Stroke::new(0.8_f32, palette.metal.gamma_multiply(0.5)),
-        );
-        crate::app::rendering::gothic::lamp(
-            painter,
-            Rect::from_center_size(end, egui::Vec2::splat(6.0)),
-            palette.metal,
-        );
-    }
     let direction = if collapsed { -1.0 } else { 1.0 };
     painter.add(egui::Shape::line(
         vec![
@@ -517,7 +466,7 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
     }
 }
 
-pub fn show(ui: &mut egui::Ui) {
+fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
     let time = ui.input(|input| input.time);
 
     let id = state_id();
@@ -526,15 +475,8 @@ pub fn show(ui: &mut egui::Ui) {
         .ctx()
         .data_mut(|data| data.get_temp(id).unwrap_or_default());
 
-    let width = frame_width(ui);
-    let size = egui::Vec2::splat(width);
-    let portrait_id = ui.next_auto_id();
-    let hover_rect = Rect::from_min_size(
-        egui::pos2(ui.clip_rect().center().x - width / 2.0, ui.cursor().top()),
-        size,
-    );
-    // The artwork reaches the panel edge, but the divider owns its resize gutter.
-    let hover_rect = hover_rect.intersect(ui.clip_rect().shrink2(egui::vec2(10.0, 0.0)));
+    let portrait_id = ui.make_persistent_id("saya_portrait");
+    let hover_rect = rect.intersect(ui.clip_rect().shrink2(egui::vec2(5.0, 0.0)));
     let response = pointing_hand(ui.interact(hover_rect, portrait_id, egui::Sense::click()));
 
     state.hold_while_hovered(response.hovered(), time);
@@ -549,23 +491,14 @@ pub fn show(ui: &mut egui::Ui) {
     }
 
     let font = egui::TextStyle::Small.resolve(ui.style());
-    let galley = letter_text(ui, width * FRAME_RAIL_SPAN, state.line(time), &font);
-    let (_, slot) = ui.allocate_space(egui::vec2(ui.available_width(), width));
-    // The frame uses the panel's side margins without widening the job list.
-    let rect = Rect::from_center_size(egui::pos2(ui.clip_rect().center().x, slot.center().y), size);
-    // Tuck the portrait's crop edges beneath the frame rails.
-    let opening = Rect::from_min_max(
-        rect.min + rect.size() * egui::vec2(0.065, 0.066),
-        rect.min + rect.size() * egui::vec2(0.935, 0.936),
-    );
-    paint(ui, opening, &format!("{expression:?}"), expression.bytes());
+    let galley = letter_text(ui, letter.width(), state.line(time), &font);
+    paint(ui, rect, &format!("{expression:?}"), expression.bytes());
     if let Some(elapsed) = state.love_elapsed(time) {
-        paint_love_hearts(ui, opening, elapsed);
+        paint_love_hearts(ui, rect, elapsed);
         ui.ctx().request_repaint();
     }
-    show_letter(ui, rect, galley);
-    paint(ui, rect, "portrait-frame", FRAME_ART);
-    crate::app::rendering::pixel::subtle_outline(ui, &response, opening, Palette::of(ui).metal);
+    show_letter(ui, letter, galley);
+    crate::app::rendering::pixel::subtle_outline(ui, &response, rect, Palette::of(ui).metal);
 
     if !state.hovered && time < state.until {
         ui.ctx()
@@ -613,14 +546,11 @@ mod tests {
                             .chain([wide_text.as_str()])
                         {
                             assert!(line.chars().count() <= MAX_DIALOGUE_CHARACTERS, "{line}");
-                            let width = (width - 4.0) * FRAME_RAIL_SPAN;
+                            let width = width - (PANEL_INSET + PANEL_BORDER) * 2.0;
                             let galley = letter_text(ui, width, line, &font);
                             assert!(
                                 galley.size().y
-                                    <= DIALOGUE_HEIGHT
-                                        - LETTER_TOP_PADDING
-                                        - LETTER_BOTTOM_PADDING
-                                        - LETTER_TRIM_HEIGHT,
+                                    <= DIALOGUE_HEIGHT - LETTER_TOP_PADDING - LETTER_BOTTOM_PADDING,
                                 "{line}"
                             );
                             assert!(
@@ -631,13 +561,71 @@ mod tests {
                         }
                     }
                 }
-                let narrow = letter_text(ui, 296.0 * FRAME_RAIL_SPAN, "Hello, Human.", &font);
-                let wide = letter_text(ui, 456.0 * FRAME_RAIL_SPAN, "Hello, Human.", &font);
+                let narrow = letter_text(ui, 288.0, "Hello, Human.", &font);
+                let wide = letter_text(ui, 448.0, "Hello, Human.", &font);
                 assert!(
                     wide.job.sections[0].format.font_id.size
                         > narrow.job.sections[0].format.font_id.size
                 );
             });
+        }
+    }
+
+    #[test]
+    fn companion_sections_share_one_frame_and_animation_keeps_the_caret_anchored() {
+        for width in [300.0, 460.0] {
+            let bounds = Rect::from_min_size(Pos2::ZERO, egui::vec2(width, 800.0));
+            let expanded = CompanionLayout::new(bounds, 1.0);
+            assert_eq!(expanded.portrait.width(), expanded.portrait.height());
+            assert_eq!(expanded.portrait.left_bottom(), expanded.letter.left_top());
+            assert_eq!(expanded.letter.left_bottom(), expanded.toggle.left_top());
+            assert_eq!(expanded.portrait.width(), expanded.letter.width());
+            assert_eq!(expanded.letter.width(), expanded.toggle.width());
+            let mut previous = 0.0;
+            for amount in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                let layout = CompanionLayout::new(bounds, amount);
+                assert_eq!(layout.toggle, expanded.toggle);
+                assert!(layout.outer.height() > previous);
+                previous = layout.outer.height();
+            }
+        }
+    }
+
+    #[test]
+    fn collapse_animation_has_intermediate_states_and_can_reverse() {
+        let ctx = egui::Context::default();
+        for (time, collapsed) in [
+            (0.0, false),
+            (0.1, true),
+            (0.22, true),
+            (0.5, true),
+            (0.6, false),
+            (0.72, false),
+            (1.0, false),
+        ] {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(time),
+                    ..Default::default()
+                },
+                |ui| {
+                    ctx.data_mut(|data| {
+                        let mut state = data.get_temp::<Companion>(state_id()).unwrap_or_default();
+                        state.collapsed = collapsed;
+                        data.insert_temp(state_id(), state);
+                    });
+                    let value = expansion(ui);
+                    if time == 0.22 || time == 0.72 {
+                        assert!(value > 0.0 && value < 1.0);
+                    }
+                    if time == 0.5 {
+                        assert_eq!(value, 0.0);
+                    }
+                    if time == 0.0 || time == 1.0 {
+                        assert_eq!(value, 1.0);
+                    }
+                },
+            );
         }
     }
 
