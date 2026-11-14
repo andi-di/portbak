@@ -255,44 +255,50 @@ fn paint_inner_ornament(ui: &egui::Ui, portrait: Rect) {
         .add(ornament_mesh(texture.id(), portrait));
 }
 
-fn caret_ornament_size(asset: egui::Vec2, pane: egui::Vec2) -> egui::Vec2 {
-    let scale = ((pane.y - 4.0) / asset.y)
-        .min((pane.x * 0.5 - 20.0) / asset.x)
-        .max(0.0);
-    asset * scale
+fn caret_corner_mesh(texture: egui::TextureId, rect: Rect) -> egui::Mesh {
+    let mut mesh = egui::Mesh::with_texture(texture);
+    let bounds = rect.shrink(2.0);
+    let side = 9.0_f32.min(bounds.height() / 2.0);
+    for row in 0..2 {
+        for column in 0..2 {
+            let min = egui::pos2(
+                if column == 0 {
+                    bounds.left()
+                } else {
+                    bounds.right() - side
+                },
+                if row == 0 {
+                    bounds.top()
+                } else {
+                    bounds.bottom() - side
+                },
+            );
+            let uv = Rect::from_min_max(
+                egui::pos2(column as f32 * 0.08, row as f32 * 0.08),
+                egui::pos2((1 - column) as f32 * 0.08, (1 - row) as f32 * 0.08),
+            );
+            mesh.add_rect_with_uv(
+                Rect::from_min_size(min, egui::Vec2::splat(side)),
+                uv,
+                Color32::WHITE,
+            );
+        }
+    }
+    mesh
 }
 
 fn paint_caret_ornament(ui: &egui::Ui, rect: Rect) {
     let Some(texture) = texture(
         ui.ctx(),
-        "caret-ornament",
-        include_bytes!("../../../assets/themes/midnight-neko/caret-ornament.png"),
+        "portrait-ornament",
+        include_bytes!("../../../assets/themes/midnight-neko/portrait-ornament.png"),
         true,
     ) else {
         return;
     };
-    let size = caret_ornament_size(texture.size_vec2() * egui::vec2(0.5, 1.0), rect.size());
-    let (width, height) = (size.x, size.y);
-    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
-    for right in [false, true] {
-        let target = Rect::from_min_size(
-            egui::pos2(
-                if right {
-                    rect.right() - width
-                } else {
-                    rect.left()
-                },
-                rect.center().y - height / 2.0,
-            ),
-            egui::vec2(width, height),
-        );
-        let uv = if right {
-            Rect::from_min_max(egui::pos2(0.5, 0.0), egui::pos2(0.0, 1.0))
-        } else {
-            Rect::from_min_max(Pos2::ZERO, egui::pos2(0.5, 1.0))
-        };
-        painter.image(texture.id(), target, uv, Color32::WHITE);
-    }
+    ui.painter()
+        .with_clip_rect(ui.clip_rect().intersect(rect))
+        .add(caret_corner_mesh(texture.id(), rect));
 }
 
 fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
@@ -770,13 +776,14 @@ mod tests {
     }
 
     #[test]
-    fn caret_artwork_keeps_its_aspect_ratio_at_both_sidebar_widths() {
-        let asset = egui::vec2(1024.0, 128.0);
+    fn caret_decoration_is_confined_to_small_corners() {
         for width in [288.0, 448.0] {
-            let size = caret_ornament_size(asset, egui::vec2(width, TOGGLE_HEIGHT));
-            assert!((size.x / size.y - asset.x / asset.y).abs() < 0.001);
-            assert!(size.x <= width * 0.5 - 20.0);
-            assert!(size.y <= TOGGLE_HEIGHT - 4.0);
+            let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(width, TOGGLE_HEIGHT));
+            let mesh = caret_corner_mesh(egui::TextureId::default(), rect);
+            for vertex in mesh.vertices {
+                assert!(rect.contains(vertex.pos));
+                assert!(vertex.pos.x <= 11.0 || vertex.pos.x >= width - 11.0);
+            }
         }
     }
 

@@ -27,7 +27,7 @@ and punctuation. The unified companion panel has one outer frame around a square
 portrait, plain letterbox and caret strip. A single divider separates the portrait
 from the letterbox; the outer frame stays plain. A separate transparent silver-vine and burgundy-rose
 overlay forms a symmetrical inner lining rooted at the portrait border. The strip contains
-a centered caret and mirrored silver/burgundy scrollwork growing inward from its side edges.
+a centered caret and small matching corner caps.
 
 The letterbox stays 60 logical pixels tall, with 46 pixels available for text and
 7 pixels of top and bottom padding. This fits three lines at the normal font size.
@@ -44,13 +44,13 @@ Minimizing and maximizing use a 240 ms eased slide and fade. The caret strip
 stays fixed at the bottom, while the job list smoothly gains or gives up space.
 The animation can reverse without jumping. Saya starts expanded on every launch.
 
-`portrait-ornament.png` is a purpose-built transparent frame with straight edge
-rails and inward-growing silver vines and burgundy roses. It is drawn edge-to-edge
+`portrait-ornament.png` follows the original `saya-frame.png` style with fine
+bevelled silver rails, muted burgundy enamel, tiny curled corner caps, restrained
+thorn stems and small ribbon accents. Sparse, narrow details keep Saya dominant. It is drawn edge-to-edge
 inside the portrait, without enlargement or floating margins. One quadrant is
 reflected across both axes for exact symmetry.
 
-`caret-ornament.png` is one long, shallow silver flourish with roses and ruby
-pendants. It is cropped to its alpha bounds; its left half supplies the flourish and is mirrored on the right. Both sides
-scale uniformly at their natural aspect ratio, leaving the central caret clear. Both assets are clipped to their own panes and were made with
-built-in imagegen; their adjacent `.prompt.txt` files record the prompts. Textures
+The min/max pane uses only small mirrored corner caps sampled from the same
+frame artwork, with the center left clear for the caret. The frame was made with
+built-in imagegen; `portrait-ornament.prompt.txt` records the prompt. Textures
 larger than 1024 pixels are reduced when loaded for GPU compatibility.
