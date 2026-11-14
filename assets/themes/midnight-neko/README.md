@@ -26,8 +26,8 @@ Keep each dialogue line to **120 Unicode characters maximum**, including spaces
 and punctuation. The unified companion panel has one outer frame around a square
 portrait, plain letterbox and caret strip. A single divider separates the portrait
 from the letterbox; the outer frame stays plain. A separate transparent silver-vine and burgundy-rose
-overlay forms a symmetrical inner lining one pixel inside the portrait border. The strip contains
-only the centered caret.
+overlay forms a symmetrical inner lining rooted at the portrait border. The strip contains
+a centered caret and mirrored silver/burgundy scrollwork growing inward from its side edges.
 
 The letterbox stays 60 logical pixels tall, with 46 pixels available for text and
 7 pixels of top and bottom padding. This fits three lines at the normal font size.
@@ -46,6 +46,8 @@ The animation can reverse without jumping. Saya starts expanded on every launch.
 
 `portrait-ornament.png` was generated with built-in imagegen. Transparent outer
 padding is trimmed at texture upload, then the top-left quadrant is reflected
-across both axes for exact symmetry. The lining is placed one logical pixel
-inside the portrait and clipped there, so it never crosses the frame or divider.
+across both axes for exact symmetry. The ornament is enlarged beyond the portrait and cropped at its edges. Fine
+mirrored vine stems start directly at the border and arch inward to connect the
+leaf and rose detailing. The visible artwork remains clipped inside the
+portrait, clear of the dialogue and caret strip.
 See `portrait-ornament.prompt.txt` for the prompt.

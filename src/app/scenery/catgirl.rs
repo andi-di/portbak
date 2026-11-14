@@ -245,10 +245,12 @@ fn paint_inner_ornament(ui: &egui::Ui, portrait: Rect) {
     ) else {
         return;
     };
-    let lining = portrait.shrink(1.0);
+    // Crop the outer stems at the portrait edge so the branches grow inward from the border.
+    let growth = (portrait.width() * 0.02).clamp(6.0, 9.0);
     ui.painter()
-        .with_clip_rect(ui.clip_rect().intersect(lining))
-        .add(ornament_mesh(texture.id(), lining));
+        .with_clip_rect(ui.clip_rect().intersect(portrait))
+        .add(ornament_mesh(texture.id(), portrait.expand(growth)));
+    crate::app::rendering::gothic::portrait_vines(ui.painter(), portrait);
 }
 
 fn paint(ui: &egui::Ui, rect: Rect, name: &str, bytes: &[u8]) {
@@ -512,6 +514,7 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
         rect.top(),
         egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.35)),
     );
+    crate::app::rendering::gothic::caret_scrollwork(painter, rect);
     let direction = if collapsed { -1.0 } else { 1.0 };
     painter.add(egui::Shape::line(
         vec![
@@ -704,11 +707,12 @@ mod tests {
     #[test]
     fn ornament_is_mirrored_and_stays_inside_the_portrait_border() {
         let portrait = Rect::from_min_size(Pos2::ZERO, egui::vec2(288.0, 288.0));
-        let lining = portrait.shrink(1.0);
-        let mesh = ornament_mesh(egui::TextureId::default(), lining);
-        assert_eq!(mesh.calc_bounds(), lining);
+        let growth = portrait.expand(6.0);
+        let mesh = ornament_mesh(egui::TextureId::default(), growth);
+        assert_eq!(mesh.calc_bounds(), growth);
+        assert!(growth.contains_rect(portrait));
         for vertex in &mesh.vertices {
-            assert!(lining.contains(vertex.pos));
+            assert!(growth.contains(vertex.pos));
             let mirrored = mesh
                 .vertices
                 .iter()
