@@ -1,6 +1,6 @@
 param([string]$Name = '*')
 
-# The small SVG subset keeps these two precision icons reproducible without extra packages.
+# The small SVG subset keeps precision icon sources reproducible without extra packages.
 Add-Type -AssemblyName System.Drawing
 Add-Type -ReferencedAssemblies System.Drawing, System.Xml -TypeDefinition @'
 using System;
