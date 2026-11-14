@@ -358,11 +358,11 @@ When rebuilding from this document, implement the complete behavior and acceptan
 - Removing the selected job selects its preceding neighbor, or the next job when removing the first. Removing the last job returns to the start screen.
 - Check now is disabled until source and destination are selected and the schedule is runnable.
 - Folder selection keeps the main window responsive, including animations and cursor movement.
-- Keyboard focus follows visual order. Job cards use an inset dashed focus outline, distinct from selection. Folder rows focus the path field, Choose folder, then Open in file manager.
+- Keyboard focus follows visual order. Job cards use a subtle focus tint, distinct from selection. Folder rows focus the path field, Choose folder, then Open in file manager.
 - The footer shows a single activity light with progress in its tooltip.
 - Scheduling modes use consistent spacing; Check immediately when enabled follows the schedule fields with a separate gap.
 - Job errors align to the right of the check status and wrap when space is insufficient.
 
 - Keep job and application settings compact, with consistent section spacing and tightly padded next-execution readouts.
 
-- Interactive app branding and Saya's portrait have subtle hover feedback and a distinct keyboard-focus outline. Theme cards also show keyboard focus.
+- Interactive app branding and Saya's portrait have subtle hover feedback and a keyboard-focus tint. Saya's portrait uses no hover tint. Theme cards also show keyboard focus.

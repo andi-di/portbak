@@ -59,27 +59,24 @@ fn artwork_feedback(ui: &egui::Ui, response: &Response, rect: Rect, color: Color
             color.gamma_multiply(0.04 * strength),
         );
     }
-    ui.painter().rect_stroke(
-        rect,
-        style::control_radius(ui.ctx()),
-        Stroke::new(1.0_f32, color.gamma_multiply(0.35 * strength)),
-        StrokeKind::Inside,
-    );
+    if response.hovered() {
+        ui.painter().rect_stroke(
+            rect,
+            style::control_radius(ui.ctx()),
+            Stroke::new(1.0_f32, color.gamma_multiply(0.35 * strength)),
+            StrokeKind::Inside,
+        );
+    }
+    focus_tint(ui, response, rect, color);
+}
+
+pub fn focus_tint(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
     if response.has_focus() {
-        let focus = rect.shrink(3.0);
-        let points = [
-            focus.left_top(),
-            focus.right_top(),
-            focus.right_bottom(),
-            focus.left_bottom(),
-            focus.left_top(),
-        ];
-        ui.painter().extend(egui::Shape::dashed_line(
-            &points,
-            Stroke::new(1.0_f32, color.gamma_multiply(0.85)),
-            3.0,
-            3.0,
-        ));
+        ui.painter().rect_filled(
+            rect,
+            style::control_radius(ui.ctx()),
+            color.gamma_multiply(0.08),
+        );
     }
 }
 

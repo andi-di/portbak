@@ -119,7 +119,10 @@ impl App {
                     pixel::panel_decoration(ui, 1.9);
                 }
                 ui.horizontal(|ui| {
-                    let brand = ui.horizontal(logo);
+                    let brand = ui.horizontal(|ui| {
+                        logo(ui);
+                        ui.allocate_space(egui::vec2(10.0, 0.0));
+                    });
                     let home = ui
                         .interact(
                             brand.response.rect,
@@ -528,22 +531,7 @@ impl App {
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
-        if response.has_focus() {
-            let focus = rect.shrink(4.0);
-            let corners = [
-                focus.left_top(),
-                focus.right_top(),
-                focus.right_bottom(),
-                focus.left_bottom(),
-                focus.left_top(),
-            ];
-            ui.painter().extend(egui::Shape::dashed_line(
-                &corners,
-                egui::Stroke::new(1.5_f32, palette.ink),
-                3.0,
-                3.0,
-            ));
-        }
+        pixel::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
         ui.add_space(CARD_SHADOW);
         response.clicked()
     }
