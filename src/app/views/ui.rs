@@ -142,7 +142,7 @@ impl App {
         let palette = palette_of(&ctx);
         let gothic = Skin::of(&ctx).finish == Finish::Gothic;
         let margin = if gothic {
-            egui::Margin::symmetric(40, 17)
+            egui::Margin::symmetric(24, 17)
         } else {
             egui::Margin {
                 left: 20,
@@ -843,7 +843,7 @@ mod tests {
                         _ => None,
                     })
                     .expect("brand hover frame");
-                assert!(hover.left() >= 36.0 && hover.top() >= 16.0);
+                assert!((22.0..=26.0).contains(&hover.left()) && hover.top() >= 16.0);
                 assert!(bottom - hover.bottom() >= 16.0);
                 assert!(bottom <= 86.0, "header should remain compact: {bottom}");
             }
