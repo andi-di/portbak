@@ -66,6 +66,7 @@ Provide:
   - The strip contains only a centered downward/upward caret. It stays at the same bottom position in both states. Minimize/maximize with a reversible 240 ms eased slide and fade, reclaiming job-list space smoothly. Start expanded on every launch.
 - Moonveil uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
 - Moonveil job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge). Align the head with the lower card border and keep the badge inside it.
+- Keep sidebar job cards compact, with six logical pixels between cards including shadow clearance.
 - Moonveil sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered. The welcome figure stays static and does not react to clicks.
   - Hold the header’s Kurobane emblem for two uninterrupted seconds to open “Saya’s Looking Glass”; show a burgundy progress ring during the hold. Ordinary clicks still return home; a completed hold does not navigate.
   - The searchable, scrollable gallery includes every registered expression, including Neutral, in an adaptive grid. Selecting one previews its overlay and holds it until the gallery closes; Esc closes the gallery before home navigation.

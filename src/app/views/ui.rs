@@ -418,6 +418,7 @@ impl App {
                 }
                 if show_mascot {
                     ui.vertical_centered(crate::app::scenery::saya::show_sidebar);
+                        ui.spacing_mut().item_spacing.y = 2.0;
                 }
             });
         let edge = panel.response.rect;
