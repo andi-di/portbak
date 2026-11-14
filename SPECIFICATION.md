@@ -54,6 +54,7 @@ Provide:
   - Accent, green and red fills use the iOS system colors. The empty state shows a still grey symbol; backup lists use plain grey date headers and blue folder symbols; job symbols are blue (grey when disabled) and the job count is plain grey text; Settings opens with a large title. Empty-state descriptions and explanatory notes are secondary grey.
   - Pages blur content progressively where it scrolls out of view at the top or bottom edge, fading it into the backdrop.
 - Moonveil uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.
+  - Center header contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
 - Moonveil Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
   - Only InLove has a portrait overlay: briefly rising hearts. All other expressions have no overlay.
   - Hearts play once on InLove entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.

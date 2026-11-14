@@ -140,12 +140,18 @@ impl App {
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
-            left: 20,
-            right: 20,
-            top: 14,
-            bottom: 0,
-        });
+        let gothic = Skin::of(&ctx).finish == Finish::Gothic;
+        let margin = if gothic {
+            egui::Margin::symmetric(28, 22)
+        } else {
+            egui::Margin {
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: 0,
+            }
+        };
+        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(margin);
         egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
@@ -229,6 +235,9 @@ impl App {
                         );
                     });
                 });
+                if gothic {
+                    return;
+                }
                 ui.add_space(12.0);
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
@@ -655,6 +664,20 @@ fn logo(ui: &mut egui::Ui) {
         }
     }
     ui.add_space(6.0);
+    if skin.finish == Finish::Gothic {
+        let font = style::face_font(ui.ctx(), 24.0 * skin.typography.display_scale);
+        let galley = ui
+            .painter()
+            .layout_no_wrap("PORTBAK".into(), font, palette.gold);
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(galley.size().x, mascot.rect.height()),
+            egui::Sense::hover(),
+        );
+        // Center the visible letters, rather than the font's ascent/descent space.
+        let origin = rect.center() - galley.mesh_bounds.center().to_vec2();
+        ui.painter().galley(origin, galley, palette.gold);
+        return;
+    }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         pixel::display_label(
@@ -750,6 +773,82 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn moonveil_header_centers_title_and_keeps_hover_clear_of_ornaments() {
+        let ctx = egui::Context::default();
+        let mut app = App::new(
+            Config {
+                skin: "moonveil".into(),
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.ensure_skin(&ctx);
+        for frame in 0..3 {
+            let mut bottom = 0.0;
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(frame as f64 * 0.1),
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 960.0),
+                    )),
+                    events: vec![egui::Event::PointerMoved(egui::pos2(140.0, 50.0))],
+                    ..Default::default()
+                },
+                |ui| {
+                    app.show_header(ui);
+                    bottom = ui.available_rect_before_wrap().top();
+                },
+            );
+            if frame == 2 {
+                let texture = ctx
+                    .data_mut(|data| {
+                        data.get_temp::<Result<egui::TextureHandle, String>>(egui::Id::new((
+                            "saya_artwork",
+                            "family-emblem",
+                        )))
+                    })
+                    .unwrap()
+                    .unwrap();
+                let emblem = output
+                    .shapes
+                    .iter()
+                    .find_map(|shape| match &shape.shape {
+                        egui::Shape::Mesh(mesh) if mesh.texture_id == texture.id() => {
+                            Some(mesh.calc_bounds())
+                        }
+                        _ => None,
+                    })
+                    .unwrap();
+                let title = output.shapes.iter().find(|shape| matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == "PORTBAK")).unwrap().shape.visual_bounding_rect();
+                assert!((title.center().y - emblem.center().y).abs() <= 1.0);
+                assert!(
+                    (emblem.center().y - bottom * 0.5).abs() <= 1.0,
+                    "{emblem:?} / {bottom}"
+                );
+                let hover = output
+                    .shapes
+                    .iter()
+                    .find_map(|shape| match &shape.shape {
+                        egui::Shape::Rect(rect)
+                            if rect.stroke.width == 1.0
+                                && rect.rect.width() > 200.0
+                                && rect.rect.width() < 600.0
+                                && rect.rect.height() > 50.0 =>
+                        {
+                            Some(rect.rect)
+                        }
+                        _ => None,
+                    })
+                    .expect("brand hover frame");
+                assert!(hover.left() >= 24.0 && hover.top() >= 18.0);
+                assert!(bottom - hover.bottom() >= 18.0);
+            }
+        }
+    }
+
     #[test]
     #[ignore = "manual release-mode CPU rendering profile"]
     fn profile_moonveil() {
