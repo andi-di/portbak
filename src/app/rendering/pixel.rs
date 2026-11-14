@@ -36,6 +36,14 @@ pub(crate) fn pointing_hand(response: Response) -> Response {
 
 /// Gentle feedback for interactive artwork that has no button face.
 pub fn subtle_highlight(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    artwork_feedback(ui, response, rect, color, true);
+}
+
+pub fn subtle_outline(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    artwork_feedback(ui, response, rect, color, false);
+}
+
+fn artwork_feedback(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32, tint: bool) {
     let strength = ui.ctx().animate_bool_with_time(
         response.id.with("subtle_highlight"),
         response.hovered() || response.has_focus(),
@@ -44,11 +52,13 @@ pub fn subtle_highlight(ui: &egui::Ui, response: &Response, rect: Rect, color: C
     if strength <= 0.0 {
         return;
     }
-    ui.painter().rect_filled(
-        rect,
-        style::control_radius(ui.ctx()),
-        color.gamma_multiply(0.04 * strength),
-    );
+    if tint {
+        ui.painter().rect_filled(
+            rect,
+            style::control_radius(ui.ctx()),
+            color.gamma_multiply(0.04 * strength),
+        );
+    }
     ui.painter().rect_stroke(
         rect,
         style::control_radius(ui.ctx()),

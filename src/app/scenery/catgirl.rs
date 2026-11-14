@@ -686,7 +686,7 @@ pub fn show(ui: &mut egui::Ui) {
     }
     show_letter(ui, rect, galley);
     paint(ui, rect, "portrait-frame", FRAME_ART);
-    crate::app::rendering::pixel::subtle_highlight(ui, &response, opening, Palette::of(ui).metal);
+    crate::app::rendering::pixel::subtle_outline(ui, &response, opening, Palette::of(ui).metal);
 
     if time < state.until {
         ui.ctx()
