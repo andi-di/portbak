@@ -23,9 +23,9 @@ crescents and silver sparks form a bounded trail. All effects stay enabled.
 ## Saya dialogue budget
 
 Keep each dialogue line to **120 Unicode characters maximum**, including spaces
-and punctuation. The letterbox has a fixed 64-logical-pixel body height, with
-42 pixels available for text after padding and decorative trim. Its width follows
-the sidebar. Text scales from 9.5 to at most 11.5 logical pixels with wider
+and punctuation. The letterbox has a fixed 56-logical-pixel body height, with
+41 pixels available for text after padding and decorative trim. Its width follows
+the sidebar. Text scales from 11 to at most 13 logical pixels with wider
 sidebars and shrinks in half-pixel steps for longer lines, down to a minimum of 8 logical pixels. Long unbroken words may
 wrap between characters. Do not insert manual line breaks.
 

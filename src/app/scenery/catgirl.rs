@@ -217,17 +217,17 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 }
 
 // Leave room for the longest wrapped line when Saya changes expressions.
-const DIALOGUE_HEIGHT: f32 = 64.0;
+const DIALOGUE_HEIGHT: f32 = 56.0;
 const MAX_DIALOGUE_CHARACTERS: usize = 120;
 const MIN_DIALOGUE_FONT_SIZE: f32 = 8.0;
 // Tuck the trim's transparent lower edge beneath the strip so they read as one panel.
 const PORTRAIT_TOGGLE_OVERLAP: f32 = 4.0;
 const TOGGLE_HEIGHT: f32 = 28.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
-const LETTER_TRIM_HEIGHT: f32 = 14.0;
-const LETTER_TOP_PADDING: f32 = 3.0;
-const LETTER_BOTTOM_PADDING: f32 = 5.0;
-const LETTER_TEXT_INSET: f32 = 16.0;
+const LETTER_TRIM_HEIGHT: f32 = 10.0;
+const LETTER_TOP_PADDING: f32 = 2.0;
+const LETTER_BOTTOM_PADDING: f32 = 3.0;
+const LETTER_TEXT_INSET: f32 = 12.0;
 // The straight rails' outer edges sit 4.8% in from either texture edge.
 const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
 const FRAME_ART: &[u8] = include_bytes!("../../../assets/themes/midnight-neko/saya-frame.png");
@@ -242,7 +242,7 @@ fn letter_text(
     let minimum_width = (300.0 - 4.0) * FRAME_RAIL_SPAN;
     let scale = (width / minimum_width).sqrt().clamp(1.0, 1.25);
     let mut font = font.clone();
-    font.size = (9.5 * scale).min(11.5);
+    font.size = (11.0 * scale).min(13.0);
     let text_width = (width - 2.0 * LETTER_TEXT_INSET).max(1.0);
     let text_height =
         DIALOGUE_HEIGHT - LETTER_TOP_PADDING - LETTER_BOTTOM_PADDING - LETTER_TRIM_HEIGHT;

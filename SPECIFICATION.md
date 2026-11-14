@@ -64,8 +64,8 @@ Provide:
 - Midnight Neko uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
 - Midnight Neko job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge). Align the head with the lower card border and keep the badge inside it.
 - Midnight Neko sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered. The welcome figure stays static and does not react to clicks.
-- Saya's letterbox body stays 64 logical pixels tall. Its width follows the sidebar; font size scales from 9.5 to at most 11.5 logical pixels with width and shrinks for long dialogue, down to 8 logical pixels. Limit dialogue to 120 characters including spaces and punctuation, and verify rendered bounds at minimum sidebar width.
-- The Saya caret strip meets the sidebar borders, replacing its lower corner ornaments.
+- Saya's letterbox body stays 56 logical pixels tall. Its width follows the sidebar; font size scales from 11 to at most 13 logical pixels with width and shrinks for long dialogue, down to 8 logical pixels. Limit dialogue to 120 characters including spaces and punctuation, and verify rendered bounds at minimum sidebar width.
+- The Saya caret strip meets the sidebar borders, replacing its lower corner ornaments. Keep only the silver frame; omit the redundant dark outer stroke and separator.
 - Saya's page pools:
   - Start screen: BoredExpectant, Pleading, Waiting. Job settings: BoredExpectant, Curious, Dominant, Smug.
   - Backups: Dominant, Praying, Smug. Application Job settings: Curious, Question, Waiting. Theme settings: Cute, Flirty, Seductive.

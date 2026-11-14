@@ -335,8 +335,16 @@ impl App {
             top: 16 + inset / 2,
             bottom: 8 + inset,
         });
+        let frame = if Skin::of(&ctx).finish == Finish::Gothic {
+            frame.stroke(egui::Stroke::NONE)
+        } else {
+            frame
+        };
         let panel = egui::Panel::left("jobs")
-            .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
+            .show_separator_line(!matches!(
+                Skin::of(&ctx).finish,
+                Finish::Liquid | Finish::Gothic
+            ))
             .resizable(false)
             .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
@@ -1250,7 +1258,7 @@ mod tests {
                 .expect("bottom strip")
                 .rect;
             assert!(
-                rect.bottom() + 64.0 - 4.0 <= strip.top() + 0.1,
+                rect.bottom() + 56.0 - 4.0 <= strip.top() + 0.1,
                 "portrait={rect:?}, strip={strip:?}"
             );
             assert!(
