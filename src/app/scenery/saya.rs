@@ -27,7 +27,9 @@ fn state_id() -> egui::Id {
     egui::Id::new("saya_sidebar_companion")
 }
 
-pub use gallery::{is_open as gallery_open, show as show_gallery, suppress_home_click};
+pub use gallery::{
+    close as close_gallery, is_open as gallery_open, show as show_gallery, suppress_home_click,
+};
 pub use reactions::{Action, Page};
 
 pub fn trigger(ctx: &egui::Context, action: Action) {

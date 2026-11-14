@@ -50,18 +50,27 @@ impl eframe::App for App {
             .backup_history
             .as_ref()
             .is_some_and(|history| history.confirming_restore)
-            && !crate::app::scenery::saya::gallery_open(&ctx)
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
         {
+            crate::app::scenery::saya::close_gallery(&ctx);
             self.selected = None;
             self.settings_open = false;
             self.backups_tab = false;
         }
         self.show_header(ui);
         self.show_footer(ui);
-        self.show_job_list(ui);
+        if !crate::app::scenery::saya::gallery_open(&ctx) {
+            self.show_job_list(ui);
+        }
         self.close_inactive_history();
-        if self.settings_open {
+        if crate::app::scenery::saya::gallery_open(&ctx) {
+            crate::app::scenery::saya::show_gallery(ui);
+            if !crate::app::scenery::saya::gallery_open(&ctx) {
+                self.selected = None;
+                self.settings_open = false;
+                self.backups_tab = false;
+            }
+        } else if self.settings_open {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
@@ -70,8 +79,9 @@ impl eframe::App for App {
         if self.config != before {
             self.dirty = true;
         }
-        crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
-        crate::app::scenery::saya::show_gallery(&ctx);
+        if !crate::app::scenery::saya::gallery_open(&ctx) {
+            crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
+        }
         pixel::paint_overlays(&ctx);
     }
 }
@@ -165,6 +175,7 @@ impl App {
                         palette.ink,
                     );
                     if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
+                        crate::app::scenery::saya::close_gallery(&ctx);
                         self.selected = None;
                         self.settings_open = false;
                         self.backups_tab = false;
@@ -211,6 +222,7 @@ impl App {
                                     .sprite(Sprite::Gear)
                                     .selected(self.settings_open);
                                 if ui.add(settings).hint("Settings").clicked() {
+                                    crate::app::scenery::saya::close_gallery(&ctx);
                                     self.toggle_settings();
                                 }
                             },
@@ -386,6 +398,7 @@ impl App {
                     new_job
                 };
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
+                    crate::app::scenery::saya::close_gallery(ui.ctx());
                     self.add_job();
                     crate::app::scenery::saya::trigger(
                         ui.ctx(),
@@ -407,6 +420,7 @@ impl App {
                     .auto_shrink([false, false])
                     .max_height(list_height)
                     .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
                         for job in &self.config.jobs {
                             if self.job_card(ui, job) {
                                 clicked = Some(job.id);
@@ -414,11 +428,11 @@ impl App {
                         }
                     });
                 if let Some(id) = clicked {
+                    crate::app::scenery::saya::close_gallery(ui.ctx());
                     self.toggle_job(id);
                 }
                 if show_mascot {
                     ui.vertical_centered(crate::app::scenery::saya::show_sidebar);
-                        ui.spacing_mut().item_spacing.y = 2.0;
                 }
             });
         let edge = panel.response.rect;

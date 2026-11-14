@@ -117,7 +117,13 @@ fn select(ctx: &egui::Context, expression: Expression, time: f64) {
     ctx.request_repaint();
 }
 
-fn close(ctx: &egui::Context) {
+pub fn close(ctx: &egui::Context) {
+    let mut gallery = state(ctx);
+    if !gallery.open {
+        return;
+    }
+    gallery.open = false;
+    ctx.data_mut(|data| data.insert_temp(id(), gallery));
     ctx.data_mut(|data| {
         let mut companion = data
             .get_temp::<SayaCompanion>(state_id())
@@ -131,49 +137,59 @@ fn close(ctx: &egui::Context) {
     });
 }
 
-pub fn show(ctx: &egui::Context) {
-    let mut gallery = state(ctx);
+pub fn show(ui: &mut egui::Ui) {
+    let ctx = ui.ctx().clone();
+    let mut gallery = state(&ctx);
     if !gallery.open {
         return;
     }
-    let width = (ctx.content_rect().width() - 80.0).clamp(260.0, 900.0);
-    let height = (ctx.content_rect().height() - 200.0).clamp(160.0, 620.0);
+    if ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        close(&ctx);
+        return;
+    }
     let mut dismiss = false;
-    let modal = egui::Modal::new(id().with("modal")).show(ctx, |ui| {
-        ui.set_width(width);
-        ui.heading("Saya’s Looking Glass");
-        ui.add_space(8.0);
-        if width >= 600.0 {
-            ui.horizontal_top(|ui| {
-                ui.vertical(|ui| {
-                    ui.set_width(220.0);
-                    preview(ui, &gallery, 220.0);
-                });
-                ui.add_space(12.0);
-                ui.vertical(|ui| {
-                    grid(ui, &mut gallery, height);
+    egui::CentralPanel::default()
+        .frame(
+            crate::app::views::widgets::page_frame(ui)
+                .inner_margin(egui::Margin::same(crate::app::views::widgets::PAGE_PADDING)),
+        )
+        .show_inside(ui, |ui| {
+            pixel::paint_scenery(ui);
+            ui.horizontal(|ui| {
+                ui.heading("Saya’s Looking Glass");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add_space(8.0);
+                    dismiss = ui.add(PixelButton::new("Back")).clicked();
                 });
             });
-        } else {
-            ui.vertical_centered(|ui| preview(ui, &gallery, 144.0));
-            grid(ui, &mut gallery, (height - 190.0).max(100.0));
-        }
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
             ui.weak(format!("{} expressions", Expression::ALL.len()));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                dismiss = ui.add(PixelButton::new("Close")).clicked();
-            });
+            ui.add_space(12.0);
+            let width = ui.available_width();
+            let height = ui.available_height();
+            if width >= 520.0 {
+                let size = (width * 0.48).min(460.0).min((height - 120.0).max(160.0));
+                ui.horizontal_top(|ui| {
+                    ui.vertical(|ui| {
+                        ui.set_width(size);
+                        preview(ui, &gallery, size, (height - size - 60.0).max(80.0));
+                    });
+                    ui.add_space(16.0);
+                    ui.vertical(|ui| grid(ui, &mut gallery, (height - 38.0).max(80.0)));
+                });
+            } else {
+                let size = width.min((height * 0.42).clamp(120.0, 360.0));
+                ui.vertical_centered(|ui| preview(ui, &gallery, size, 100.0));
+                grid(ui, &mut gallery, (ui.available_height() - 38.0).max(80.0));
+            }
         });
-    });
-    if dismiss || modal.should_close() {
+    if dismiss {
         gallery.open = false;
-        close(ctx);
+        close(&ctx);
     }
     ctx.data_mut(|data| data.insert_temp(id(), gallery));
 }
 
-fn preview(ui: &mut egui::Ui, gallery: &Gallery, size: f32) {
+fn preview(ui: &mut egui::Ui, gallery: &Gallery, size: f32, dialogue_height: f32) {
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), egui::Sense::hover());
     let expression = gallery.selected;
     super::paint(ui, rect, &format!("{expression:?}"), expression.bytes());
@@ -198,7 +214,28 @@ fn preview(ui: &mut egui::Ui, gallery: &Gallery, size: f32) {
             .color(Palette::of(ui).ink),
     );
     ui.add_space(6.0);
-    ui.label(companion.line(time));
+    ui.label(
+        egui::RichText::new("Dialogue")
+            .strong()
+            .color(Palette::of(ui).ink),
+    );
+    egui::ScrollArea::vertical()
+        .id_salt("gallery_dialogue")
+        .max_height(dialogue_height)
+        .show(ui, |ui| {
+            for (index, line) in expression.lines().iter().enumerate() {
+                ui.horizontal_top(|ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{}.", index + 1)).color(Palette::of(ui).dim),
+                    );
+                    ui.add(
+                        egui::Label::new(egui::RichText::new(*line).color(Palette::of(ui).ink))
+                            .wrap(),
+                    );
+                });
+                ui.add_space(6.0);
+            }
+        });
 }
 
 fn columns(width: f32, spacing: f32) -> usize {
@@ -351,6 +388,15 @@ mod tests {
     #[test]
     fn gallery_selection_holds_expression_and_close_restores_neutral() {
         let ctx = egui::Context::default();
+        ctx.data_mut(|data| {
+            data.insert_temp(
+                id(),
+                Gallery {
+                    open: true,
+                    ..Default::default()
+                },
+            )
+        });
         select(&ctx, Expression::Sad, 1.0);
         let companion = ctx
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
@@ -368,6 +414,30 @@ mod tests {
             .data_mut(|data| data.get_temp::<SayaCompanion>(state_id()))
             .unwrap();
         assert_eq!(companion.visible(100.1), Expression::Neutral);
+    }
+
+    #[test]
+    fn preview_lists_every_authored_line_for_the_selected_expression() {
+        let ctx = egui::Context::default();
+        for expression in Expression::ALL {
+            let gallery = Gallery {
+                selected: *expression,
+                ..Default::default()
+            };
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1024.0, 4096.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| preview(ui, &gallery, 300.0, 3000.0),
+            );
+            for line in expression.lines() {
+                assert!(output.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == *line)), "{expression:?}: {line}");
+            }
+        }
     }
 
     #[test]
@@ -394,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn gallery_fits_small_and_large_viewports_and_escape_closes_it() {
+    fn gallery_page_fits_small_and_large_viewports_and_escape_closes_it() {
         for size in [
             egui::vec2(600.0, 700.0),
             egui::vec2(1024.0, 940.0),
@@ -425,20 +495,13 @@ mod tests {
                         modifiers: egui::Modifiers::NONE,
                     });
                 }
-                let output = ctx.run_ui(input, |_| show(&ctx));
+                let output = ctx.run_ui(input, show);
                 if frame == 1 {
                     let title = output.shapes.iter().find(|shape| matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text.contains("Looking Glass"))).expect("gallery heading");
                     assert!(
                         Rect::from_min_size(egui::Pos2::ZERO, size)
                             .contains_rect(title.shape.visual_bounding_rect()),
                         "heading outside viewport: {size:?}"
-                    );
-                    let rect = ctx
-                        .memory(|memory| memory.area_rect(id().with("modal")))
-                        .unwrap();
-                    assert!(
-                        rect.width() <= size.x && rect.height() <= size.y,
-                        "{size:?}: {rect:?}"
                     );
                 }
             }
