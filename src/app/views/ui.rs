@@ -521,14 +521,24 @@ impl App {
         );
         ui.painter().set(
             background,
-            card_shapes(
-                ui.ctx(),
-                rect,
-                selected || response.has_focus(),
-                response.hovered(),
-                glass_hover,
-            ),
+            card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
+        if response.has_focus() {
+            let focus = rect.shrink(4.0);
+            let corners = [
+                focus.left_top(),
+                focus.right_top(),
+                focus.right_bottom(),
+                focus.left_bottom(),
+                focus.left_top(),
+            ];
+            ui.painter().extend(egui::Shape::dashed_line(
+                &corners,
+                egui::Stroke::new(1.5_f32, palette.ink),
+                3.0,
+                3.0,
+            ));
+        }
         ui.add_space(CARD_SHADOW);
         response.clicked()
     }
