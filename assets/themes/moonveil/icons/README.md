@@ -57,5 +57,5 @@ Keep character colors in the Saya heads and surrounding controls. Functional
 icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.
 
-The restore arrow uses a lighter curved stroke and a wider inner opening; keep
+The restore arrow has balanced top and bottom strokes and a wide inner opening; keep
 its light/dark masks identical and preserve the standard canvas and visible extent.
