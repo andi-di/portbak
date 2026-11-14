@@ -142,7 +142,7 @@ impl App {
         let palette = palette_of(&ctx);
         let gothic = Skin::of(&ctx).finish == Finish::Gothic;
         let margin = if gothic {
-            egui::Margin::symmetric(28, 22)
+            egui::Margin::symmetric(40, 17)
         } else {
             egui::Margin {
                 left: 20,
@@ -177,7 +177,7 @@ impl App {
                     pixel::subtle_highlight(
                         ui,
                         &home,
-                        brand.response.rect.expand(3.0),
+                        brand.response.rect.expand(if gothic { 2.0 } else { 3.0 }),
                         palette.ink,
                     );
                     if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
@@ -843,8 +843,9 @@ mod tests {
                         _ => None,
                     })
                     .expect("brand hover frame");
-                assert!(hover.left() >= 24.0 && hover.top() >= 18.0);
-                assert!(bottom - hover.bottom() >= 18.0);
+                assert!(hover.left() >= 36.0 && hover.top() >= 16.0);
+                assert!(bottom - hover.bottom() >= 16.0);
+                assert!(bottom <= 86.0, "header should remain compact: {bottom}");
             }
         }
     }

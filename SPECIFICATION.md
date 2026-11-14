@@ -54,7 +54,7 @@ Provide:
   - Accent, green and red fills use the iOS system colors. The empty state shows a still grey symbol; backup lists use plain grey date headers and blue folder symbols; job symbols are blue (grey when disabled) and the job count is plain grey text; Settings opens with a large title. Empty-state descriptions and explanatory notes are secondary grey.
   - Pages blur content progressively where it scrolls out of view at the top or bottom edge, fading it into the backdrop.
 - Moonveil uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed.
-  - Center header contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
+  - Keep the header compact and center its contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
 - Moonveil Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
   - Only Love has a portrait overlay: briefly rising hearts. All other expressions have no overlay.
   - Hearts play once on Love entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.
@@ -65,7 +65,7 @@ Provide:
 - When Saya enters her Love expression, three ruby hearts briefly rise and fade inside the sidebar frame. Holding the expression does not replay the effect.
 - Saya's bottom-anchored companion panel uses one continuous outer silver frame around a square portrait, plain letterbox and attached caret strip. Keep the portrait and outer border plain, without ornaments. Keep one divider beneath the portrait and no gaps between sections. Show it on an empty start screen; scroll jobs above it.
   - The strip contains only a centered downward/upward caret. It stays at the same bottom position in both states. Minimize/maximize with a reversible 240 ms eased slide and fade, reclaiming job-list space smoothly. Start expanded on every launch.
-- Moonveil uses Saya's ornate Kurobane family emblem beside the app and job names at 56 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
+- Moonveil uses Saya's ornate Kurobane family emblem beside the app and job names at 48 and 80 logical pixels respectively. The 72-pixel job status heads retain the same reference colors in both modes and use separately rendered play and pause badges.
 - Moonveil job cards use distinct Saya heads for jobs with automatic backups enabled (open eyes and small fangs visible beneath closed lips with a play badge) or disabled (sleeping Saya with a pause badge). Align the head with the lower card border and keep the badge inside it.
 - Keep sidebar job cards compact, with six logical pixels between cards including shadow clearance.
 - Moonveil sidebar clicks select among all 26 refined non-neutral Saya expressions without immediate repeats. Direct clicks switch immediately, including while hovered. The welcome figure stays static and does not react to clicks.
