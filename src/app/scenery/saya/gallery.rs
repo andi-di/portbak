@@ -158,8 +158,7 @@ pub fn show(ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 ui.heading("Saya’s Looking Glass");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(8.0);
-                    dismiss = ui.add(PixelButton::new("Back")).clicked();
+                    dismiss = close_button(ui).clicked();
                 });
             });
             ui.weak(format!("{} expressions", Expression::ALL.len()));
@@ -187,6 +186,22 @@ pub fn show(ui: &mut egui::Ui) {
         close(&ctx);
     }
     ctx.data_mut(|data| data.insert_temp(id(), gallery));
+}
+
+fn close_button(ui: &mut egui::Ui) -> egui::Response {
+    let response = ui
+        .add(PixelButton::new("").compact().min_size(Vec2::splat(36.0)))
+        .on_hover_text("Close gallery (Esc)");
+    response
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close gallery"));
+    let center = response.rect.center();
+    let stroke = egui::Stroke::new(1.8_f32, Palette::of(ui).ink);
+    for direction in [-1.0, 1.0] {
+        let offset = egui::vec2(6.0, 6.0 * direction);
+        ui.painter()
+            .line_segment([center - offset, center + offset], stroke);
+    }
+    response
 }
 
 fn preview(ui: &mut egui::Ui, gallery: &Gallery, size: f32, dialogue_height: f32) {
