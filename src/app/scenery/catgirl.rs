@@ -217,12 +217,16 @@ pub fn paint_emblem(ui: &egui::Ui, rect: egui::Rect) {
 }
 
 // Leave room for the longest wrapped line when Saya changes expressions.
-const DIALOGUE_HEIGHT: f32 = 100.0;
+const DIALOGUE_HEIGHT: f32 = 64.0;
+const MAX_DIALOGUE_CHARACTERS: usize = 120;
+const MIN_DIALOGUE_FONT_SIZE: f32 = 8.0;
+// Tuck the trim's transparent lower edge beneath the strip so they read as one panel.
+const PORTRAIT_TOGGLE_OVERLAP: f32 = 4.0;
 const TOGGLE_HEIGHT: f32 = 28.0;
 const LETTER_TRIM_OVERHANG: f32 = 7.0;
-const LETTER_TRIM_HEIGHT: f32 = 20.0;
-const LETTER_TOP_PADDING: f32 = 4.0;
-const LETTER_BOTTOM_PADDING: f32 = 8.0;
+const LETTER_TRIM_HEIGHT: f32 = 14.0;
+const LETTER_TOP_PADDING: f32 = 3.0;
+const LETTER_BOTTOM_PADDING: f32 = 5.0;
 const LETTER_TEXT_INSET: f32 = 16.0;
 // The straight rails' outer edges sit 4.8% in from either texture edge.
 const FRAME_RAIL_SPAN: f32 = 1.0 - 2.0 * 0.048;
@@ -234,18 +238,32 @@ fn letter_text(
     line: &str,
     font: &egui::FontId,
 ) -> std::sync::Arc<egui::Galley> {
-    let mut job = egui::text::LayoutJob::simple(
-        line.to_owned(),
-        font.clone(),
-        Palette::of(ui).ink,
-        (width - 2.0 * LETTER_TEXT_INSET).max(1.0),
-    );
-    job.halign = egui::Align::Center;
-    ui.fonts_mut(|fonts| fonts.layout_job(job))
-}
-
-fn letter_height(galley: &egui::Galley) -> f32 {
-    galley.size().y.max(24.0) + LETTER_TOP_PADDING + LETTER_BOTTOM_PADDING + LETTER_TRIM_HEIGHT
+    debug_assert!(line.chars().count() <= MAX_DIALOGUE_CHARACTERS);
+    let minimum_width = (300.0 - 4.0) * FRAME_RAIL_SPAN;
+    let scale = (width / minimum_width).sqrt().clamp(1.0, 1.25);
+    let mut font = font.clone();
+    font.size = (9.5 * scale).min(11.5);
+    let text_width = (width - 2.0 * LETTER_TEXT_INSET).max(1.0);
+    let text_height =
+        DIALOGUE_HEIGHT - LETTER_TOP_PADDING - LETTER_BOTTOM_PADDING - LETTER_TRIM_HEIGHT;
+    loop {
+        let mut job = egui::text::LayoutJob::simple(
+            line.to_owned(),
+            font.clone(),
+            Palette::of(ui).ink,
+            text_width,
+        );
+        job.halign = egui::Align::Center;
+        let mut galley = ui.fonts_mut(|fonts| fonts.layout_job(job.clone()));
+        if galley.size().x > text_width {
+            job.wrap.break_anywhere = true;
+            galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+        }
+        if galley.size().y <= text_height || font.size <= MIN_DIALOGUE_FONT_SIZE {
+            return galley;
+        }
+        font.size = (font.size - 0.5).max(MIN_DIALOGUE_FONT_SIZE);
+    }
 }
 
 fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::Galley>) {
@@ -257,7 +275,7 @@ fn show_letter(ui: &mut egui::Ui, portrait: Rect, galley: std::sync::Arc<egui::G
         ),
         egui::pos2(
             portrait.center().x + width / 2.0,
-            portrait.bottom() + letter_height(&galley) - LETTER_TRIM_OVERHANG,
+            portrait.bottom() + DIALOGUE_HEIGHT - LETTER_TRIM_OVERHANG,
         ),
     );
     ui.painter().rect_filled(rect, 0.0, Palette::of(ui).surface);
@@ -394,40 +412,35 @@ pub fn reserved_height(ui: &egui::Ui) -> f32 {
     if collapsed {
         TOGGLE_HEIGHT
     } else {
-        frame_width(ui) + DIALOGUE_HEIGHT + TOGGLE_HEIGHT + ui.spacing().item_spacing.y
+        frame_width(ui) + DIALOGUE_HEIGHT + TOGGLE_HEIGHT - PORTRAIT_TOGGLE_OVERLAP
     }
 }
 
 pub fn show_sidebar(ui: &mut egui::Ui) {
-    let area = ui.available_rect_before_wrap();
     let toggle_rect = Rect::from_min_size(
-        egui::pos2(area.left(), area.bottom() - TOGGLE_HEIGHT),
-        egui::vec2(area.width(), TOGGLE_HEIGHT),
+        egui::pos2(
+            ui.clip_rect().left() + 5.0,
+            ui.clip_rect().bottom() - 5.0 - TOGGLE_HEIGHT,
+        ),
+        egui::vec2(ui.clip_rect().width() - 10.0, TOGGLE_HEIGHT),
     );
     let state = ui
         .ctx()
         .data_mut(|data| data.get_temp::<Companion>(state_id()))
         .unwrap_or_default();
-    let expanded_height = if state.collapsed {
-        0.0
-    } else {
-        let width = frame_width(ui);
-        let font = egui::TextStyle::Small.resolve(ui.style());
-        let time = ui.input(|input| input.time);
-        let galley = letter_text(ui, width * FRAME_RAIL_SPAN, state.line(time), &font);
-        width + letter_height(&galley) + ui.spacing().item_spacing.y
-    };
-    ui.add_space((ui.available_height() - expanded_height - TOGGLE_HEIGHT).max(0.0));
     if !state.collapsed {
+        let top = toggle_rect.top() + PORTRAIT_TOGGLE_OVERLAP - DIALOGUE_HEIGHT - frame_width(ui);
+        ui.add_space((top - ui.cursor().top()).max(0.0));
         show(ui);
     }
-    ui.scope_builder(
+    // Painting in the panel margins must not enlarge the sidebar's layout footprint.
+    let mut strip_ui = ui.new_child(
         egui::UiBuilder::new()
             .id(egui::Id::new("saya_strip"))
             .max_rect(toggle_rect)
             .layout(egui::Layout::top_down(egui::Align::Center)),
-        |ui| show_toggle(ui, state.collapsed),
     );
+    show_toggle(&mut strip_ui, state.collapsed);
 }
 
 fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
@@ -436,8 +449,9 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
         egui::vec2(ui.available_width(), TOGGLE_HEIGHT),
         egui::Sense::hover(),
     );
+    let hit_rect = rect.intersect(ui.clip_rect().shrink2(egui::vec2(5.0, 0.0)));
     let response = pointing_hand(ui.interact(
-        rect,
+        hit_rect,
         ui.make_persistent_id("saya_toggle"),
         egui::Sense::click(),
     ));
@@ -451,7 +465,13 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
     });
     let center = rect.center();
     let painter = ui.painter();
-    painter.rect_filled(rect, 3, palette.sunken);
+    painter.rect_filled(rect, 0, palette.sunken);
+    painter.rect_stroke(
+        rect,
+        0,
+        egui::Stroke::new(1.0_f32, palette.metal.gamma_multiply(0.55)),
+        egui::StrokeKind::Inside,
+    );
     for side in [-1.0, 1.0] {
         let start = center + egui::vec2(side * 18.0, 0.0);
         let end = egui::pos2(
@@ -573,39 +593,52 @@ pub fn show_welcome(ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn every_dialogue_line_fits_the_reserved_height_at_minimum_sidebar_width() {
-        use super::{
-            frame_width, letter_height, letter_text, reserved_height, Expression, FRAME_RAIL_SPAN,
-        };
-        use eframe::egui;
-
+    fn dialogue_budget_fits_the_fixed_box_at_every_sidebar_width() {
         let ctx = egui::Context::default();
         crate::app::theme::style::install(&ctx, crate::app::theme::skins::find("midnight-neko"));
-        let _ = ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(
-                    egui::Pos2::ZERO,
-                    egui::vec2(300.0, crate::MIN_WINDOW_SIZE.y),
-                )),
-                ..Default::default()
-            },
-            |ui| {
-                let width = frame_width(ui);
+        for theme in [egui::Theme::Light, egui::Theme::Dark] {
+            ctx.set_theme(theme);
+            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
                 let font = egui::TextStyle::Small.resolve(ui.style());
-                for expression in [Expression::Neutral]
-                    .into_iter()
-                    .chain(Expression::REACTIONS)
-                {
-                    for line in expression.lines() {
-                        let galley = letter_text(ui, width * FRAME_RAIL_SPAN, line, &font);
-                        assert!(
-                            width + letter_height(&galley) <= reserved_height(ui),
-                            "{line}"
-                        );
+                let wide_text = "W".repeat(MAX_DIALOGUE_CHARACTERS);
+                for width in [300.0, 350.0, 460.0] {
+                    for expression in Expression::REACTIONS
+                        .into_iter()
+                        .chain([Expression::Neutral])
+                    {
+                        for line in expression
+                            .lines()
+                            .iter()
+                            .copied()
+                            .chain([wide_text.as_str()])
+                        {
+                            assert!(line.chars().count() <= MAX_DIALOGUE_CHARACTERS, "{line}");
+                            let width = (width - 4.0) * FRAME_RAIL_SPAN;
+                            let galley = letter_text(ui, width, line, &font);
+                            assert!(
+                                galley.size().y
+                                    <= DIALOGUE_HEIGHT
+                                        - LETTER_TOP_PADDING
+                                        - LETTER_BOTTOM_PADDING
+                                        - LETTER_TRIM_HEIGHT,
+                                "{line}"
+                            );
+                            assert!(
+                                galley.size().x <= width - LETTER_TEXT_INSET * 2.0 + 1.0,
+                                "{line}: {:?}, width={width}",
+                                galley.size()
+                            );
+                        }
                     }
                 }
-            },
-        );
+                let narrow = letter_text(ui, 296.0 * FRAME_RAIL_SPAN, "Hello, Human.", &font);
+                let wide = letter_text(ui, 456.0 * FRAME_RAIL_SPAN, "Hello, Human.", &font);
+                assert!(
+                    wide.job.sections[0].format.font_id.size
+                        > narrow.job.sections[0].format.font_id.size
+                );
+            });
+        }
     }
 
     #[test]

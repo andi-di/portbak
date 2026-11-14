@@ -341,7 +341,7 @@ impl App {
             .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.0);
+                pixel::sidebar_decoration(ui);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(
@@ -364,6 +364,11 @@ impl App {
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
+                let new_job = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                    new_job.compact()
+                } else {
+                    new_job
+                };
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
                     self.add_job();
                     crate::app::scenery::catgirl::trigger(
@@ -400,8 +405,16 @@ impl App {
                 }
             });
         let edge = panel.response.rect;
-        let grab =
-            egui::Rect::from_center_size(edge.right_center(), egui::vec2(10.0, edge.height()));
+        let divider_x = edge.right()
+            - if Skin::of(&ctx).finish == Finish::Gothic {
+                5.0
+            } else {
+                0.0
+            };
+        let grab = egui::Rect::from_center_size(
+            egui::pos2(divider_x, edge.center().y),
+            egui::vec2(10.0, edge.height()),
+        );
         let resize = ui
             .interact(grab, egui::Id::new("jobs_resize"), egui::Sense::drag())
             .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
@@ -1113,75 +1126,84 @@ mod tests {
 
     #[test]
     fn dragged_sidebar_width_survives_frames_and_restart() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("config.json");
-        let mut app = App::new(
-            Config::default(),
-            path.clone(),
-            tempfile::tempfile().unwrap(),
-        );
-        let ctx = egui::Context::default();
-        app.ensure_skin(&ctx);
-        let frame = |app: &mut App, ctx: &egui::Context, events| {
-            let input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(
-                    egui::Pos2::ZERO,
-                    egui::vec2(1100.0, 960.0),
-                )),
-                events,
-                ..Default::default()
+        for skin in ["modern", "midnight-neko"] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("config.json");
+            let mut app = App::new(
+                Config {
+                    skin: skin.into(),
+                    ..Config::default()
+                },
+                path.clone(),
+                tempfile::tempfile().unwrap(),
+            );
+            let ctx = egui::Context::default();
+            app.ensure_skin(&ctx);
+            let frame = |app: &mut App, ctx: &egui::Context, events| {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1100.0, 960.0),
+                    )),
+                    events,
+                    ..Default::default()
+                };
+                let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
             };
-            let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
-        };
-        frame(&mut app, &ctx, vec![]);
-        let start = egui::pos2(300.0, 300.0);
-        let end = egui::pos2(390.0, 300.0);
-        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
-        frame(
-            &mut app,
-            &ctx,
-            vec![egui::Event::PointerButton {
-                pos: start,
-                button: egui::PointerButton::Primary,
-                pressed: true,
-                modifiers: egui::Modifiers::NONE,
-            }],
-        );
-        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(end)]);
-        frame(
-            &mut app,
-            &ctx,
-            vec![egui::Event::PointerButton {
-                pos: end,
-                button: egui::PointerButton::Primary,
-                pressed: false,
-                modifiers: egui::Modifiers::NONE,
-            }],
-        );
-        assert!(
-            (app.config.sidebar_width - 390.0).abs() < 1.0,
-            "width: {}",
-            app.config.sidebar_width
-        );
-        for _ in 0..5 {
             frame(&mut app, &ctx, vec![]);
-            let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+            frame(&mut app, &ctx, vec![]);
+            let inset = if skin == "midnight-neko" { 5.0 } else { 0.0 };
+            let start = egui::pos2(300.0 - inset, 300.0);
+            let end = egui::pos2(390.0 - inset, 300.0);
+            let handle = ctx.read_response(egui::Id::new("jobs_resize")).unwrap();
+            assert!((handle.rect.center().x - start.x).abs() < 1.0);
+            frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
+            frame(
+                &mut app,
+                &ctx,
+                vec![egui::Event::PointerButton {
+                    pos: start,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            frame(&mut app, &ctx, vec![egui::Event::PointerMoved(end)]);
+            frame(
+                &mut app,
+                &ctx,
+                vec![egui::Event::PointerButton {
+                    pos: end,
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            assert!(
+                (app.config.sidebar_width - 390.0).abs() < 1.0,
+                "width: {}",
+                app.config.sidebar_width
+            );
+            for _ in 0..5 {
+                frame(&mut app, &ctx, vec![]);
+                let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+                    .unwrap()
+                    .rect
+                    .width();
+                assert!((width - 390.0).abs() < 1.0, "width: {width}");
+            }
+            assert!(app.persist());
+            let config: Config = crate::engine::load(&path).unwrap();
+            let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
+            let new_ctx = egui::Context::default();
+            restarted.ensure_skin(&new_ctx);
+            frame(&mut restarted, &new_ctx, vec![]);
+            let width = egui::containers::panel::PanelState::load(&new_ctx, egui::Id::new("jobs"))
                 .unwrap()
                 .rect
                 .width();
-            assert!((width - 390.0).abs() < 1.0, "width: {width}");
+            assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
         }
-        assert!(app.persist());
-        let config: Config = crate::engine::load(&path).unwrap();
-        let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
-        let new_ctx = egui::Context::default();
-        restarted.ensure_skin(&new_ctx);
-        frame(&mut restarted, &new_ctx, vec![]);
-        let width = egui::containers::panel::PanelState::load(&new_ctx, egui::Id::new("jobs"))
-            .unwrap()
-            .rect
-            .width();
-        assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
     }
 
     #[test]
@@ -1223,9 +1245,17 @@ mod tests {
             });
             let (rect, clip) = portrait.expect("full-width square portrait");
             assert!(clip.contains_rect(rect), "{rect:?} outside {clip:?}");
+            let strip = ctx
+                .read_response(egui::Id::new("saya_strip").with("saya_toggle"))
+                .expect("bottom strip")
+                .rect;
             assert!(
-                rect.bottom() + 100.0 <= clip.bottom(),
-                "{rect:?} in {clip:?}"
+                rect.bottom() + 64.0 - 4.0 <= strip.top() + 0.1,
+                "portrait={rect:?}, strip={strip:?}"
+            );
+            assert!(
+                clip.expand(1.0).contains_rect(strip),
+                "clip={clip:?}, strip={strip:?}"
             );
         }
     }

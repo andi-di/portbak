@@ -235,6 +235,14 @@ fn icon_asset(sprite: Sprite, dark: bool) -> (&'static str, &'static [u8]) {
 }
 
 pub fn corners(painter: &egui::Painter, rect: Rect, color: Color32) {
+    frame_corners(painter, rect, color, true);
+}
+
+pub fn top_corners(painter: &egui::Painter, rect: Rect, color: Color32) {
+    frame_corners(painter, rect, color, false);
+}
+
+fn frame_corners(painter: &egui::Painter, rect: Rect, color: Color32, bottom: bool) {
     painter.rect_stroke(
         rect,
         3,
@@ -248,6 +256,9 @@ pub fn corners(painter: &egui::Painter, rect: Rect, color: Color32) {
         (rect.left_bottom(), Vec2::new(1.0, -1.0)),
         (rect.right_bottom(), Vec2::new(-1.0, -1.0)),
     ] {
+        if !bottom && direction.y < 0.0 {
+            continue;
+        }
         let start = corner + direction * 4.0;
         painter.add(egui::Shape::line(
             vec![

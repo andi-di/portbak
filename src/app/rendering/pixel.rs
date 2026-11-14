@@ -105,6 +105,7 @@ pub struct PixelButton {
     label: String,
     sprite: Option<Sprite>,
     icon_only: bool,
+    compact: bool,
     tone: Tone,
     selected: bool,
     min_size: Vec2,
@@ -116,6 +117,7 @@ impl PixelButton {
             label: label.into(),
             sprite: None,
             icon_only: false,
+            compact: false,
             tone: Tone::Plain,
             selected: false,
             min_size: Vec2::ZERO,
@@ -129,6 +131,11 @@ impl PixelButton {
 
     pub fn icon_only(mut self) -> Self {
         self.icon_only = true;
+        self
+    }
+
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
         self
     }
 
@@ -178,7 +185,9 @@ impl PixelButton {
 
     fn icon_scale(&self, ui: &egui::Ui) -> f32 {
         if Skin::of(ui.ctx()).finish == Finish::Gothic {
-            if self.sprite == Some(Sprite::Plus) {
+            if self.compact {
+                24.0 / 12.0
+            } else if self.sprite == Some(Sprite::Plus) {
                 40.0 / 12.0
             } else {
                 32.0 / 12.0
@@ -211,7 +220,7 @@ impl PixelButton {
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
         let mut padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
         if gothic {
-            padding.y = padding.y.min(6.0);
+            padding.y = padding.y.min(if self.compact { 4.0 } else { 6.0 });
         }
         let finish = Skin::of(ui.ctx()).finish;
         if finish == Finish::Liquid {
@@ -947,6 +956,20 @@ pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
             .stroke(Stroke::new(1.0_f32, Palette::of_ctx(ctx).outline))
     } else {
         egui::Frame::new().fill(style::glazed(ctx, fill))
+    }
+}
+
+pub fn sidebar_decoration(ui: &egui::Ui) {
+    if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
+        gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
+        gothic::top_corners(
+            ui.painter(),
+            ui.clip_rect().shrink(5.0),
+            Palette::of(ui).metal,
+        );
+    } else {
+        panel_decoration(ui, 1.0);
     }
 }
 

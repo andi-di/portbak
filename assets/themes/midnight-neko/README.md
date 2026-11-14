@@ -19,3 +19,17 @@ Scenery remains behind controls. Bats avoid the pointer and scatter on clicks;
 one approaches at a distance. Flying bats deform one consistent sprite smoothly
 and mirror with direction. Three petal shapes tumble and vary in size; petals,
 crescents and silver sparks form a bounded trail. All effects stay enabled.
+
+## Saya dialogue budget
+
+Keep each dialogue line to **120 Unicode characters maximum**, including spaces
+and punctuation. The letterbox has a fixed 64-logical-pixel body height, with
+42 pixels available for text after padding and decorative trim. Its width follows
+the sidebar. Text scales from 9.5 to at most 11.5 logical pixels with wider
+sidebars and shrinks in half-pixel steps for longer lines, down to a minimum of 8 logical pixels. Long unbroken words may
+wrap between characters. Do not insert manual line breaks.
+
+The dialogue-fit test checks every authored line and 120 wide characters in both
+brightness modes at 300, 350, and 460 logical-pixel sidebar widths. Run
+`cargo test --locked dialogue_budget` after editing dialogue. Both the character
+budget and rendered bounds must pass; do not enlarge the box for individual lines.
