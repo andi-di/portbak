@@ -23,9 +23,12 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
 pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f64) {
     match expression {
         Expression::Angry => anger_mark(ui, rect, elapsed as f32),
-        Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
+        Expression::Love => {
+            super::paint_love_hearts(ui, rect, elapsed);
+            eye_glow(ui, rect, expression, elapsed as f32);
+        }
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
-        Expression::Crazy | Expression::Killer => red_eyes(ui, rect, expression, elapsed as f32),
+        Expression::Crazy | Expression::Killer => eye_glow(ui, rect, expression, elapsed as f32),
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
@@ -255,31 +258,38 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     }
 }
 
-fn red_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
-    if !(0.0..2.2).contains(&elapsed) {
+fn eye_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
+    let duration = duration(expression).unwrap_or(0.0) as f32;
+    if !(0.0..duration).contains(&elapsed) {
         return;
     }
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let (eyes, tilt) = match expression {
+        Expression::Love => ([(221.0, 164.0), (287.0, 148.0)], -0.22),
         Expression::Crazy => ([(220.0, 174.0), (280.0, 149.0)], -0.38),
         Expression::Killer => ([(225.0, 182.0), (290.0, 174.0)], -0.12),
         _ => return,
     };
-    let strength = envelope(elapsed / 2.2) * (0.9 + 0.1 * (elapsed * 7.0).sin());
+    let strength = envelope(elapsed / duration) * (0.9 + 0.1 * (elapsed * 7.0).sin());
+    let rose = expression == Expression::Love;
+    let outer = if rose {
+        Color32::from_rgb(249, 111, 170)
+    } else {
+        Color32::from_rgb(215, 8, 36)
+    };
+    let inner = if rose {
+        Color32::from_rgb(255, 184, 210)
+    } else {
+        Color32::from_rgb(255, 25, 43)
+    };
     let scale = rect.width() / 512.0;
     let rotation = egui::emath::Rot2::from_angle(tilt);
     let mut mesh = egui::Mesh::default();
     for (x, y) in eyes {
         let center = rect.min + Vec2::new(x, y) * scale;
         for (extent, color) in [
-            (
-                Vec2::new(17.0, 7.0),
-                Color32::from_rgb(215, 8, 36).gamma_multiply(strength * 0.6),
-            ),
-            (
-                Vec2::new(6.0, 4.0),
-                Color32::from_rgb(255, 25, 43).gamma_multiply(strength * 0.85),
-            ),
+            (Vec2::new(17.0, 7.0), outer.gamma_multiply(strength * 0.6)),
+            (Vec2::new(6.0, 4.0), inner.gamma_multiply(strength * 0.85)),
         ] {
             let base = mesh.vertices.len() as u32;
             mesh.colored_vertex(center, color);
