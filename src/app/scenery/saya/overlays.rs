@@ -13,6 +13,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
         Expression::Pouting => Some(1.4),
+        Expression::Wink => Some(1.5),
         _ => None,
     }
 }
@@ -27,6 +28,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
+        Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
     }
 }
@@ -37,6 +39,51 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn wink_stars(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    // Outer corner of the closed eye, on the viewer's left in wink.png.
+    let origin = rect.min + Vec2::new(201.0, 175.0) * scale;
+    let mut mesh = egui::Mesh::default();
+    for (index, (delay, travel, radius)) in [
+        (0.0, Vec2::new(-49.0, -23.0), 7.0),
+        (0.12, Vec2::new(-70.0, -5.0), 5.0),
+        (0.25, Vec2::new(-37.0, -43.0), 6.0),
+        (0.36, Vec2::new(-48.0, 11.0), 4.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let progress = (elapsed - delay) / 1.1;
+        if !(0.0..1.0).contains(&progress) {
+            continue;
+        }
+        let strength = envelope(progress);
+        let distance = 1.0 - (1.0 - progress).powi(2);
+        let center =
+            origin + (travel * distance + Vec2::new(0.0, progress * progress * 8.0)) * scale;
+        let base = mesh.vertices.len() as u32;
+        mesh.colored_vertex(center, Color32::WHITE.gamma_multiply(strength));
+        for point in 0..10 {
+            let angle = point as f32 * std::f32::consts::TAU / 10.0 - std::f32::consts::FRAC_PI_2
+                + progress * (index as f32 - 1.5) * 0.7;
+            let size =
+                radius * scale * (0.55 + 0.45 * strength) * if point % 2 == 0 { 1.0 } else { 0.42 };
+            let color = if point % 2 == 0 {
+                Color32::from_rgb(255, 239, 206)
+            } else {
+                Color32::from_rgb(218, 148, 178)
+            };
+            mesh.colored_vertex(
+                center + Vec2::angled(angle) * size,
+                color.gamma_multiply(strength),
+            );
+            mesh.add_triangle(base, base + point + 1, base + (point + 1) % 10 + 1);
+        }
+    }
+    painter.add(mesh);
 }
 
 fn fatigue_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
