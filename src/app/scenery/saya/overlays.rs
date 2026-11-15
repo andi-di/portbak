@@ -39,22 +39,32 @@ fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let mut mesh = egui::Mesh::default();
     // Deterministic trajectories avoid random jitter and per-frame particle state.
     for index in 0..64 {
-        let seed = ((index * 37 + 17) % 101) as f32 / 101.0;
-        let phase = index as f32 * 2.399_963;
-        let age = elapsed - seed * 0.9;
+        let random = |channel: u32| {
+            let mut bits = (index as u32 + 1).wrapping_mul(0x9e37_79b9) ^ channel;
+            bits = (bits ^ (bits >> 16)).wrapping_mul(0x7feb_352d);
+            bits = (bits ^ (bits >> 15)).wrapping_mul(0x846c_a68b);
+            (bits ^ (bits >> 16)) as f32 / u32::MAX as f32
+        };
+        let phase = random(1) * std::f32::consts::TAU;
+        let age = elapsed - random(2) * 1.05;
         if age <= 0.0 {
             continue;
         }
-        let column = ((index * 23 + 7) % 67) as f32 / 67.0;
-        let x = 0.04 + column * 0.92 + ((phase + age * 4.5).sin() - phase.sin()) * 0.025;
-        let y = -0.06 + (0.45 + seed * 0.22) * age + 0.12 * age * age;
+        let sway = 0.012 + random(3) * 0.038;
+        let flutter = 2.0 + random(4) * 5.0;
+        let x = 0.04
+            + random(5) * 0.92
+            + ((phase + age * flutter).sin() - phase.sin()) * sway
+            + (random(6) - 0.5) * 0.07 * age;
+        let y = -0.06 + (0.32 + random(7) * 0.42) * age + (0.07 + random(8) * 0.1) * age * age;
         let center = rect.min + rect.size() * Vec2::new(x, y);
         let opacity = (age * 10.0).min(1.0) * ((2.4 - elapsed) / 0.6).clamp(0.0, 1.0);
         let color = colors[index % colors.len()].gamma_multiply(opacity);
-        let rotation = egui::emath::Rot2::from_angle(phase + age * (2.0 + seed * 5.0));
-        let width = rect.width() * (0.008 + seed * 0.007);
-        let flip = (age * (6.0 + seed * 5.0) + phase).cos();
-        let length = width * if index % 3 == 0 { 3.2 } else { 1.5 };
+        let spin = (1.5 + random(9) * 5.5) * if random(10) < 0.5 { -1.0 } else { 1.0 };
+        let rotation = egui::emath::Rot2::from_angle(phase + age * spin);
+        let width = rect.width() * (0.006 + random(11) * 0.01);
+        let flip = (age * (4.0 + random(12) * 8.0) + phase).cos();
+        let length = width * (1.1 + random(13) * 2.3);
         let base = mesh.vertices.len() as u32;
         // Folded foil has a bright crease and a darker underside as it tumbles.
         for (point, shade) in [
