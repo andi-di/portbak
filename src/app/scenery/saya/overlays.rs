@@ -160,7 +160,7 @@ fn anger_mark(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let fade = (elapsed / 0.1).min(1.0) * ((1.6 - elapsed) / 0.3).min(1.0);
     let pulse = 1.0 + 0.09 * (elapsed * 17.0).sin();
     let scale = rect.width() / 512.0 * pulse * (elapsed / 0.14).min(1.0);
-    let center = rect.min + rect.size() * Vec2::new(0.63, 0.25);
+    let center = rect.min + rect.size() * Vec2::new(0.57, 0.25);
     for [a, b, c] in [
         [
             Vec2::new(-8.0, -19.0),
