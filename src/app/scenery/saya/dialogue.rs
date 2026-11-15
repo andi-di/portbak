@@ -16,9 +16,9 @@ impl Expression {
                 "Speak, Mortal. What do you want from me now?",
             ],
             Self::Celebrating => &[
-                "Naturally, everything went according to my plan.",
+                "Yay, you’re back! Ahem. You certainly took your time, Human.",
                 "An excellent result. My influence is unmistakable.",
-                "A triumph worthy of tea in the garden!",
+                "You’re staying to keep me company? Wonderful! I mean... I suppose you may stay.",
                 "You did rather well, Minion. Under my guidance, of course.",
             ],
             Self::Crazy => &[
