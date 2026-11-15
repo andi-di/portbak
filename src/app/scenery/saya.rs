@@ -884,6 +884,7 @@ mod tests {
                         | Expression::Embarrassed
                         | Expression::Energetic
                         | Expression::Shy
+                        | Expression::Sleepy
                 )
                 .then_some(10.2 - 10.0)
             );

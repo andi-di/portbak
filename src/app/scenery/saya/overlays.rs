@@ -22,6 +22,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Pleading | Expression::Hungry => Some(2.2),
         Expression::Praying => Some(2.4),
         Expression::Question => Some(2.2),
+        Expression::Sleepy => Some(1.9),
         Expression::Wink => Some(1.5),
         _ => None,
     }
@@ -53,6 +54,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
         Expression::Praying => holy_light(ui, rect, elapsed as f32),
         Expression::Question => fingertip_lines(ui, rect, elapsed as f32),
+        Expression::Sleepy => sleep_bubble(ui, rect, elapsed as f32),
         Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
     }
@@ -64,6 +66,73 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn sleep_bubble(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..1.9).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let nose = rect.min + Vec2::new(259.0, 194.0) * scale;
+    let growth = (elapsed / 1.35).min(1.0);
+    let radius = (2.0 + 17.0 * growth.powf(0.7)) * scale;
+    let wobble = (elapsed * 8.0).sin() * 0.06;
+    let center = nose + Vec2::new(0.86, -0.51) * radius;
+    if elapsed < 1.35 {
+        let fade = (elapsed / 0.12).min(1.0);
+        let mut outline = Vec::with_capacity(40);
+        let mut mesh = egui::Mesh::default();
+        mesh.colored_vertex(
+            center,
+            Color32::from_rgb(211, 224, 248).gamma_multiply(fade * 0.12),
+        );
+        for index in 0..40 {
+            let angle = index as f32 * std::f32::consts::TAU / 40.0;
+            let point = center
+                + Vec2::angled(angle) * Vec2::new(radius * (1.0 + wobble), radius * (1.0 - wobble));
+            outline.push(point);
+            mesh.colored_vertex(
+                point,
+                Color32::from_rgb(232, 238, 255).gamma_multiply(fade * 0.3),
+            );
+            mesh.add_triangle(0, index + 1, (index + 1) % 40 + 1);
+        }
+        painter.add(mesh);
+        painter.add(egui::Shape::closed_line(
+            outline,
+            egui::Stroke::new(
+                scale.max(0.6),
+                Color32::from_rgb(193, 194, 221).gamma_multiply(fade * 0.85),
+            ),
+        ));
+        let highlight = (0..=12)
+            .map(|index| {
+                let angle = -2.7 + index as f32 / 12.0 * 1.1;
+                center + Vec2::angled(angle) * radius * 0.75
+            })
+            .collect();
+        painter.add(egui::Shape::line(
+            highlight,
+            egui::Stroke::new(
+                (1.8 * scale).max(0.7),
+                Color32::WHITE.gamma_multiply(fade * 0.85),
+            ),
+        ));
+    } else {
+        let pop = (elapsed - 1.35) / 0.55;
+        for index in 0..7 {
+            let direction = Vec2::angled(index as f32 * std::f32::consts::TAU / 7.0);
+            let position = center + direction * radius * (1.0 + pop * 0.8);
+            painter.line_segment(
+                [position, position + direction * (4.5 * scale * (1.0 - pop))],
+                egui::Stroke::new(
+                    scale.max(0.6),
+                    Color32::from_rgb(238, 238, 255).gamma_multiply(1.0 - pop),
+                ),
+            );
+        }
+    }
 }
 
 fn kiss_print(ui: &egui::Ui, rect: Rect, elapsed: f32) {
