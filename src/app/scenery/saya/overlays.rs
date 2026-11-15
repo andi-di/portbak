@@ -72,15 +72,15 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let scale = rect.width() / 512.0;
     let strength = (elapsed / 0.18).min(1.0) * ((2.2 - elapsed) / 0.4).min(1.0);
-    let ink = Color32::from_rgb(107, 57, 79).gamma_multiply(strength);
+    let ink = Color32::from_rgb(30, 20, 31).gamma_multiply(strength);
     let at = |point: Vec2| rect.min + point * scale;
     for (start, end) in [
-        ((211.0, 184.0), (191.0, 179.0)),
-        ((210.0, 189.0), (188.0, 190.0)),
-        ((212.0, 194.0), (194.0, 201.0)),
-        ((288.0, 170.0), (305.0, 159.0)),
-        ((290.0, 175.0), (311.0, 171.0)),
-        ((290.0, 180.0), (309.0, 183.0)),
+        ((225.0, 188.0), (182.0, 176.0)),
+        ((224.0, 194.0), (177.0, 191.0)),
+        ((225.0, 200.0), (183.0, 207.0)),
+        ((282.0, 175.0), (321.0, 154.0)),
+        ((285.0, 181.0), (329.0, 173.0)),
+        ((287.0, 187.0), (330.0, 193.0)),
     ] {
         let start = Vec2::from(start);
         let end = Vec2::from(end);
@@ -89,26 +89,26 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
                 at(start),
                 at(start + (end - start) * (elapsed / 0.25).min(1.0)),
             ],
-            egui::Stroke::new((1.5 * scale).max(0.7), ink),
+            egui::Stroke::new((1.7 * scale).max(0.7), ink),
         );
     }
     // Her raised right hand is on the viewer's left in cute.png.
-    let center = at(Vec2::new(165.0, 238.0));
+    let center = at(Vec2::new(168.0, 238.0));
     let pop = 1.0 + 0.08 * (elapsed * 9.0).sin() * (1.0 - elapsed / 2.2);
-    let rotation = egui::emath::Rot2::from_angle(-0.18);
+    let rotation = egui::emath::Rot2::from_angle(0.08);
     for (offset, radius) in [
-        (Vec2::new(0.0, 3.0), 7.5),
-        (Vec2::new(-9.0, -5.0), 3.3),
-        (Vec2::new(-3.5, -10.0), 3.5),
-        (Vec2::new(3.5, -10.0), 3.5),
-        (Vec2::new(9.0, -5.0), 3.3),
+        (Vec2::new(0.0, 8.0), 13.5),
+        (Vec2::new(-18.0, -6.0), 6.4),
+        (Vec2::new(-7.0, -17.0), 6.8),
+        (Vec2::new(7.0, -17.0), 6.8),
+        (Vec2::new(18.0, -6.0), 6.4),
     ] {
         let position = center + rotation * offset * scale * pop;
         painter.circle(
             position,
             radius * scale * pop,
-            Color32::from_rgb(233, 151, 180).gamma_multiply(strength * 0.92),
-            egui::Stroke::new(scale.max(0.6), ink),
+            Color32::from_rgb(236, 143, 179).gamma_multiply(strength),
+            egui::Stroke::new((3.0 * scale * pop).max(1.0), ink),
         );
     }
 }
