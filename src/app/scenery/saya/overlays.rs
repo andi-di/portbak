@@ -41,15 +41,13 @@ fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     for index in 0..64 {
         let seed = ((index * 37 + 17) % 101) as f32 / 101.0;
         let phase = index as f32 * 2.399_963;
-        let age = elapsed - seed * 0.32;
+        let age = elapsed - seed * 0.9;
         if age <= 0.0 {
             continue;
         }
-        let side = if index % 2 == 0 { -1.0 } else { 1.0 };
-        let x = 0.5
-            + side * (0.12 + seed * 0.35) * (age * 4.0).min(1.0)
-            + (phase + age * 4.5).sin() * 0.035 * age;
-        let y = 0.62 - (0.95 + seed * 0.45) * age + 0.72 * age * age;
+        let column = ((index * 23 + 7) % 67) as f32 / 67.0;
+        let x = 0.04 + column * 0.92 + ((phase + age * 4.5).sin() - phase.sin()) * 0.025;
+        let y = -0.06 + (0.45 + seed * 0.22) * age + 0.12 * age * age;
         let center = rect.min + rect.size() * Vec2::new(x, y);
         let opacity = (age * 10.0).min(1.0) * ((2.4 - elapsed) / 0.6).clamp(0.0, 1.0);
         let color = colors[index % colors.len()].gamma_multiply(opacity);
