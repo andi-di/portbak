@@ -12,6 +12,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
+        Expression::Hurt => Some(1.2),
         Expression::Pouting => Some(1.4),
         Expression::Pleading | Expression::Hungry => Some(2.2),
         Expression::Praying => Some(2.4),
@@ -32,6 +33,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
+        Expression::Hurt => scratches(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
         Expression::Praying => holy_light(ui, rect, elapsed as f32),
@@ -46,6 +48,36 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn scratches(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    for index in 0..3 {
+        let age = elapsed - index as f32 * 0.065;
+        if !(0.0..1.0).contains(&age) {
+            continue;
+        }
+        let offset = Vec2::new(index as f32 * 10.0, index as f32 * 8.0);
+        let start = rect.min + (Vec2::new(389.0, 271.0) + offset) * scale;
+        let direction = Vec2::new(-47.0, 55.0) * scale;
+        let end = start + direction * (age / 0.16).min(1.0);
+        let middle = start.lerp(end, 0.58);
+        let normal = Vec2::new(-direction.y, direction.x).normalized() * 1.5 * scale;
+        let opacity = ((1.0 - age) / 0.55).min(1.0);
+        painter.add(egui::Shape::convex_polygon(
+            vec![start, middle + normal, end, middle - normal],
+            Color32::from_rgb(168, 27, 56).gamma_multiply(opacity),
+            egui::Stroke::NONE,
+        ));
+        painter.line_segment(
+            [start, end],
+            egui::Stroke::new(
+                (0.65 * scale).max(0.4),
+                Color32::from_rgb(255, 198, 204).gamma_multiply(opacity * 0.8),
+            ),
+        );
+    }
 }
 
 fn wet_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
