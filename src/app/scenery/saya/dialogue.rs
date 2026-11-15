@@ -65,7 +65,7 @@ impl Expression {
             ],
             Self::Excited => &[
                 "You came back! I mean... good timing!",
-                "Oh! You must tell me everything. Briefly, of course.",
+                "A first edition? For me? Oh, thank you, Human!",
                 "You remembered what I like! I... that was very thoughtful of you!",
                 "I knew you would return, Human! Come, tell me what you have been up to!",
             ],
@@ -89,7 +89,7 @@ impl Expression {
             ],
             Self::Flirty => &[
                 "More wine, Darling? Or shall we find somewhere a little more private?",
-                "Another glance? I shall allow it.",
+                "Do you like my dress, Darling? I chose it especially for our evening together.",
                 "The evening needn’t end here. My chambers are just upstairs.",
                 "Come sit closer, Mortal. I should hate to spend our date admiring you from afar.",
             ],
@@ -102,19 +102,19 @@ impl Expression {
             Self::Happy => &[
                 "It's nice having you around.",
                 "The evening is rather pleasant with you here.",
-                "I saved you a place. It seemed practical.",
+                "I’m glad you returned safely, Human.",
                 "Come, sit with me, Human. I was hoping we might spend some time together.",
             ],
             Self::Hungry => &[
-                "I would be much more agreeable after a meal.",
-                "Do not look so alarmed. I can ask politely.",
-                "Tea is lovely, but it will not quite suffice tonight.",
-                "Is that your pulse, Human? It is terribly distracting.",
+                "That looks delicious... You weren’t planning to eat all of it yourself, were you?",
+                "Those strawberries look lovely. You did save a few for me, didn’t you?",
+                "I was trying to read, but all I can think about is supper.",
+                "You look delicious, Mortal. I am trying very hard to remember my manners.",
             ],
             Self::Hurt => &[
                 "A few scratches. The other creatures fared worse.",
                 "Help me with this bandage, would you?",
-                "I won. Allow me a moment to appreciate the cost.",
+                "What’s with that concerned look? I am hurt, not defeated.",
                 "No lectures, Human. Just stay close for a while.",
             ],
             Self::Killer => &[
@@ -154,7 +154,7 @@ impl Expression {
                 "Hmph. Even the bats noticed my new ribbons.",
             ],
             Self::Praying => &[
-                "May your files remain safe.",
+                "I pray for your safe return, Human.",
                 "A quiet evening and a little good fortune for you.",
                 "Just this once, let everything turn out well for you. Please.",
                 "I shall keep you in my thoughts, Mortal. You need not make a fuss about it.",
@@ -162,7 +162,7 @@ impl Expression {
             Self::Question => &[
                 "Might I ask you something?",
                 "Would you... care to join me for tea later?",
-                "Do you prefer the garden by moonlight? I was merely curious.",
+                "Is it possible that you like me, Human?",
                 "There is something I wished to ask. Please do not laugh.",
             ],
             Self::Sad => &[
@@ -173,7 +173,7 @@ impl Expression {
             ],
             Self::Seductive => &[
                 "You are quite intriguing, Mortal. I should like to know you a little better.",
-                "Come closer, Human. I do not intend to raise my voice.",
+                "I have no wish to say goodnight to you just yet. Follow me, I want to show you something.",
                 "I have a quieter place in mind, Mortal. Come, and I shall show you.",
                 "You may linger. I find your company rather tempting.",
             ],
@@ -186,7 +186,7 @@ impl Expression {
             Self::Sleepy => &[
                 "Mm... juss five more minutes, Human...",
                 "The book was fascinating. The hour was unreasonable.",
-                "My hair is perfectly presentable... is it not?",
+                "Mornin’... I dreamed you were here. Oh... you are. Hehe.",
                 "Don’ go yet... you’re warm. Jus’ stay there a little.",
             ],
             Self::Smug => &[
@@ -198,7 +198,7 @@ impl Expression {
             Self::Sweating => &[
                 "Give me a moment. That was more running than I intended.",
                 "Immortal does not mean tireless.",
-                "A towel, Human. And perhaps a little dignity.",
+                "Could you bring me a towel, Human? Please.",
                 "Let me catch my breath before you ask.",
             ],
             Self::Tongue => &[
@@ -210,11 +210,11 @@ impl Expression {
             Self::Waiting => &[
                 "Oh, you’re here. I was just about to find something else to do.",
                 "You certainly know how to keep a lady waiting. Hypothetically, of course.",
-                "You took your time, Human. The tea nearly cooled.",
+                "I wasn’t waiting for you or anything, Human.",
                 "I happened to be here when you returned. How convenient.",
             ],
             Self::Wink => &[
-                "That was meant for you. Try to keep up.",
+                "You can leave it to me, Human. I know exactly what I’m doing.",
                 "Our little secret, Human.",
                 "Consider that a little encouragement, Human. You are doing rather well.",
                 "You noticed? Good. I dislike wasting a perfectly good wink.",
