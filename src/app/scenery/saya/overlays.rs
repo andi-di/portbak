@@ -290,48 +290,22 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     // Pouting faces left; the puff leaves her pursed lips at (202, 183).
     let mouth = rect.min + Vec2::new(202.0, 183.0) * scale;
     let travel = 1.0 - (1.0 - progress).powi(3);
-    let origin = mouth + Vec2::new(-travel * 16.0, -travel * 3.0) * scale;
-    let puff_scale = scale * (0.6 + travel * 0.55);
-    // Three rounded lobes and a swept, open neck match the reference huff.
-    let curves = [
-        [(0.0, -3.0), (-3.0, 1.0), (-13.0, 9.0), (-20.0, 11.0)],
-        [(-20.0, 11.0), (-22.0, 1.0), (-35.0, 0.0), (-39.0, 9.0)],
-        [(-39.0, 9.0), (-44.0, 16.0), (-39.0, 20.0), (-35.0, 22.0)],
-        [(-35.0, 22.0), (-45.0, 22.0), (-47.0, 35.0), (-41.0, 38.0)],
-        [(-41.0, 38.0), (-37.0, 41.0), (-32.0, 39.0), (-29.0, 37.0)],
-        [(-29.0, 37.0), (-29.0, 48.0), (-22.0, 49.0), (-16.0, 44.0)],
-        [(-16.0, 44.0), (-9.0, 39.0), (-12.0, 32.0), (-17.0, 29.0)],
-        [(-17.0, 29.0), (-7.0, 25.0), (4.0, 17.0), (5.0, 6.0)],
-    ];
-    let mut outline = Vec::with_capacity(81);
-    for curve in curves {
-        let [a, b, c, d] = curve.map(|(x, y)| Vec2::new(x, y));
-        for step in 0..10 {
-            let t = step as f32 / 10.0;
-            let u = 1.0 - t;
-            let point =
-                a * u.powi(3) + b * (3.0 * u * u * t) + c * (3.0 * u * t * t) + d * t.powi(3);
-            outline.push(origin + point * puff_scale);
-        }
-    }
-    outline.push(origin + Vec2::new(5.0, 6.0) * puff_scale);
-    let fill = Color32::from_rgb(246, 243, 250).gamma_multiply(strength * 0.9);
-    let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(origin + Vec2::new(-28.0, 26.0) * puff_scale, fill);
-    for point in &outline {
-        mesh.colored_vertex(*point, fill);
-    }
-    for index in 0..outline.len() as u32 {
-        mesh.add_triangle(0, index + 1, (index + 1) % outline.len() as u32 + 1);
-    }
-    painter.add(mesh);
-    painter.add(egui::Shape::line(
-        outline,
-        egui::Stroke::new(
-            (1.35 * scale).max(0.75),
-            Color32::from_rgb(81, 40, 48).gamma_multiply(strength * 0.85),
-        ),
-    ));
+    let Some(texture) = super::texture(
+        ui.ctx(),
+        "pouting-exhale",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/pouting-exhale.png"),
+    ) else {
+        return;
+    };
+    let side = 49.0 * scale * (0.75 + 0.25 * travel);
+    let opening = mouth + Vec2::new(-travel * 12.0, -travel * 2.0) * scale;
+    let min = opening - Vec2::new(0.77, 0.34) * side;
+    painter.image(
+        texture.id(),
+        Rect::from_min_size(min, Vec2::splat(side)),
+        Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        Color32::WHITE.gamma_multiply(strength),
+    );
 }
 
 fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
