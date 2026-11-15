@@ -11,6 +11,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Crazy | Expression::Killer => Some(2.2),
         Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
+        Expression::Exhausted => Some(2.2),
         Expression::Pouting => Some(1.4),
         _ => None,
     }
@@ -24,6 +25,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Crazy | Expression::Killer => red_eyes(ui, rect, expression, elapsed as f32),
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
+        Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         _ => {}
     }
@@ -35,6 +37,32 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn fatigue_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let fade = (elapsed / 0.22).min(1.0) * ((2.2 - elapsed) / 0.4).min(1.0);
+    // Follow each upper eyelid while keeping the fatigue strokes vertical.
+    for (left, bottom) in [(195.0, 178.0), (266.0, 157.0)] {
+        for index in 0..7 {
+            let x = left + index as f32 * 3.8;
+            let end_y = bottom - index as f32 * 1.3;
+            let length = 8.0 + ((index * 7 + 3) % 9) as f32;
+            let start = rect.min + Vec2::new(x, end_y - length) * scale;
+            let end = rect.min + Vec2::new(x, end_y - 1.5) * scale;
+            painter.line_segment(
+                [start, end],
+                egui::Stroke::new(
+                    (0.9 * scale).max(0.55),
+                    Color32::from_rgb(24, 17, 28).gamma_multiply(fade * 0.78),
+                ),
+            );
+        }
+    }
 }
 
 fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
