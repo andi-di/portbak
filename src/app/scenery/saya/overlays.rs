@@ -42,46 +42,51 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     // Pouting faces left; the puff leaves her pursed lips at (202, 183).
     let mouth = rect.min + Vec2::new(202.0, 183.0) * scale;
     let travel = 1.0 - (1.0 - progress).powi(3);
-    let center = mouth + Vec2::new(-13.0 - travel * 42.0, -travel * 10.0) * scale;
-    let size = (5.0 + travel * 12.0) * scale;
+    let origin = mouth + Vec2::new(-travel * 16.0, -travel * 3.0) * scale;
+    let puff_scale = scale * (0.6 + travel * 0.55);
+    // The cloud outline ends on either side of the mouth, leaving its neck open.
+    let curves = [
+        [(-4.0, -2.0), (-11.0, -2.0), (-12.0, -5.0), (-17.0, -6.0)],
+        [
+            (-17.0, -6.0),
+            (-16.0, -15.0),
+            (-29.0, -17.0),
+            (-32.0, -10.0),
+        ],
+        [(-32.0, -10.0), (-43.0, -16.0), (-49.0, -5.0), (-42.0, 0.0)],
+        [(-42.0, 0.0), (-49.0, 9.0), (-37.0, 17.0), (-31.0, 10.0)],
+        [(-31.0, 10.0), (-26.0, 17.0), (-15.0, 12.0), (-17.0, 6.0)],
+        [(-17.0, 6.0), (-11.0, 5.0), (-10.0, 2.0), (-4.0, 2.0)],
+    ];
+    let mut outline = Vec::with_capacity(61);
+    for curve in curves {
+        let [a, b, c, d] = curve.map(|(x, y)| Vec2::new(x, y));
+        for step in 0..10 {
+            let t = step as f32 / 10.0;
+            let u = 1.0 - t;
+            let point =
+                a * u.powi(3) + b * (3.0 * u * u * t) + c * (3.0 * u * t * t) + d * t.powi(3);
+            outline.push(origin + point * puff_scale);
+        }
+    }
+    outline.push(origin + Vec2::new(-4.0, 2.0) * puff_scale);
+    let fill = Color32::from_rgb(246, 243, 250).gamma_multiply(strength * 0.9);
     let mut mesh = egui::Mesh::default();
-    let fill = Color32::from_rgb(240, 235, 246).gamma_multiply(strength * 0.88);
-    mesh.colored_vertex(center, fill);
-    let mut outline = Vec::with_capacity(48);
-    for index in 0..48 {
-        let angle = index as f32 * std::f32::consts::TAU / 48.0;
-        let lobe = 1.0 + 0.13 * (angle * 5.0 + 0.4).cos();
-        let point = center + Vec2::angled(angle) * Vec2::new(size * 1.25, size) * lobe;
-        outline.push(point);
-        mesh.colored_vertex(point, fill);
-        mesh.add_triangle(0, index + 1, (index + 1) % 48 + 1);
+    mesh.colored_vertex(origin + Vec2::new(-26.0, 0.0) * puff_scale, fill);
+    for point in &outline {
+        mesh.colored_vertex(*point, fill);
+    }
+    for index in 0..outline.len() as u32 {
+        mesh.add_triangle(0, index + 1, (index + 1) % outline.len() as u32 + 1);
     }
     painter.add(mesh);
-    let ink = Color32::from_rgb(166, 153, 183).gamma_multiply(strength * 0.85);
-    painter.add(egui::Shape::closed_line(
-        outline,
-        egui::Stroke::new(scale.max(0.6), ink),
-    ));
-    // A coiling inner line gives the huff its drawn anime shape.
-    let curl = (0..24)
-        .map(|index| {
-            let t = index as f32 / 23.0;
-            let angle = -0.6 + t * std::f32::consts::TAU;
-            center + Vec2::angled(angle) * size * (0.65 - t * 0.48)
-        })
-        .collect();
     painter.add(egui::Shape::line(
-        curl,
-        egui::Stroke::new(scale.max(0.6), ink),
+        outline,
+        egui::Stroke::new(
+            (1.15 * scale).max(0.7),
+            Color32::from_rgb(181, 170, 195).gamma_multiply(strength * 0.8),
+        ),
     ));
-    let trail = Color32::from_rgb(240, 235, 246).gamma_multiply(strength * (1.0 - progress) * 0.85);
-    painter.line_segment(
-        [
-            mouth + Vec2::new(-3.0, 0.0) * scale,
-            center + Vec2::new(size, size * 0.15),
-        ],
-        egui::Stroke::new((2.0 * scale).max(0.7), trail),
-    );
 }
 
 fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
