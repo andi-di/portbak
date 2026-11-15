@@ -64,7 +64,7 @@ Provide:
     - Excited: crystal sparkles, pupil glints and a brief silver eye glare.
     - Exhausted: uneven vertical black fatigue lines above her eyes.
     - Fed: stylized crimson drips flowing down the portrait surface.
-    - Flirty: a burgundy lipstick kiss imprint pressed onto the portrait surface.
+    - Flirty: a burgundy lipstick camera-kiss imprint and a soft ruby necklace-gem glow.
     - Flustered: a soft rosy glow over her blushing cheeks.
     - Hurt: three briefly revealed crimson claw scratches.
     - Love: rising ruby-heart clusters with silver trim and a rose-pink eye glow.

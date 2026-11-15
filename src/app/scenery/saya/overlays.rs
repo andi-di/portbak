@@ -39,7 +39,10 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Fed => blood_drips(ui, rect, elapsed as f32),
         Expression::Flustered => cheek_glow(ui, rect, elapsed as f32),
-        Expression::Flirty => kiss_print(ui, rect, elapsed as f32),
+        Expression::Flirty => {
+            necklace_glow(ui, rect, elapsed as f32);
+            kiss_print(ui, rect, elapsed as f32);
+        }
         Expression::Hurt => scratches(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
@@ -82,6 +85,39 @@ fn kiss_print(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
         Color32::WHITE.gamma_multiply(opacity),
     );
+}
+
+fn necklace_glow(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let center = rect.min + Vec2::new(291.0, 296.0) * scale;
+    let strength = envelope(elapsed / 2.2) * (0.9 + 0.1 * (elapsed * 6.0).sin());
+    let mut mesh = egui::Mesh::default();
+    for (extent, color) in [
+        (
+            Vec2::new(17.0, 22.0),
+            Color32::from_rgb(236, 34, 91).gamma_multiply(strength * 0.4),
+        ),
+        (
+            Vec2::new(5.0, 9.0),
+            Color32::from_rgb(255, 144, 180).gamma_multiply(strength * 0.65),
+        ),
+    ] {
+        let base = mesh.vertices.len() as u32;
+        mesh.colored_vertex(center, color);
+        for index in 0..32 {
+            let angle = index as f32 * std::f32::consts::TAU / 32.0;
+            mesh.colored_vertex(
+                center + Vec2::angled(angle) * extent * scale,
+                Color32::TRANSPARENT,
+            );
+            mesh.add_triangle(base, base + index + 1, base + (index + 1) % 32 + 1);
+        }
+    }
+    painter.add(mesh);
 }
 
 fn blood_drips(ui: &egui::Ui, rect: Rect, elapsed: f32) {
