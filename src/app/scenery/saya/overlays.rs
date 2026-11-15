@@ -122,6 +122,7 @@ fn excited(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     for (x, y, phase) in [(225.0, 162.0, 0.0), (293.0, 162.0, 0.22)] {
         let strength = envelope(elapsed / 1.8) * (0.72 + 0.28 * (elapsed * 12.0 + phase).cos());
         let center = at(x / 512.0, y / 512.0);
+        eye_glare(&painter, center, rect.width() / 512.0, elapsed, phase);
         let radius = rect.width() / 512.0 * (2.3 + 1.2 * strength);
         let color = Color32::from_rgb(255, 250, 224).gamma_multiply(strength);
         let mut mesh = egui::Mesh::default();
@@ -143,4 +144,32 @@ fn excited(ui: &egui::Ui, rect: Rect, elapsed: f32) {
             Color32::WHITE.gamma_multiply(strength),
         );
     }
+}
+
+fn eye_glare(painter: &egui::Painter, center: Pos2, scale: f32, elapsed: f32, phase: f32) {
+    let flash = envelope((elapsed - 0.12 - phase * 0.15) / 1.2);
+    if flash <= 0.0 {
+        return;
+    }
+    let mut mesh = egui::Mesh::default();
+    for (extent, color) in [
+        (
+            Vec2::new(12.0, 3.8),
+            Color32::from_rgb(217, 226, 255).gamma_multiply(flash * 0.42),
+        ),
+        (
+            Vec2::new(14.0, 0.9),
+            Color32::from_rgb(255, 252, 234).gamma_multiply(flash * 0.85),
+        ),
+    ] {
+        let base = mesh.vertices.len() as u32;
+        mesh.colored_vertex(center, color);
+        for index in 0..24 {
+            let angle = index as f32 * std::f32::consts::TAU / 24.0;
+            let offset = Vec2::angled(angle) * extent * scale * (0.75 + flash * 0.25);
+            mesh.colored_vertex(center + offset, Color32::TRANSPARENT);
+            mesh.add_triangle(base, base + index + 1, base + (index + 1) % 24 + 1);
+        }
+    }
+    painter.add(mesh);
 }
