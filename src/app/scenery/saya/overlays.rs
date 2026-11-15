@@ -12,6 +12,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
+        Expression::Fed => Some(2.4),
         Expression::Flustered => Some(2.2),
         Expression::Hurt => Some(1.2),
         Expression::Pouting => Some(1.4),
@@ -35,6 +36,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
+        Expression::Fed => blood_drips(ui, rect, elapsed as f32),
         Expression::Flustered => cheek_glow(ui, rect, elapsed as f32),
         Expression::Hurt => scratches(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
@@ -52,6 +54,57 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn blood_drips(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.4).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let fade = (elapsed / 0.12).min(1.0) * ((2.4 - elapsed) / 0.45).min(1.0);
+    let scale = rect.width() / 512.0;
+    let dark = Color32::from_rgb(65, 7, 24).gamma_multiply(fade * 0.9);
+    let ruby = Color32::from_rgb(151, 15, 43).gamma_multiply(fade * 0.9);
+    for (x, delay, depth, width) in [
+        (0.04, 0.0, 0.8, 5.0),
+        (0.16, 0.24, 0.51, 3.4),
+        (0.31, 0.09, 0.35, 2.8),
+        (0.46, 0.42, 0.25, 2.2),
+        (0.64, 0.16, 0.42, 3.5),
+        (0.78, 0.35, 0.6, 4.1),
+        (0.92, 0.05, 0.85, 5.8),
+    ] {
+        let age = elapsed - delay;
+        if age <= 0.0 {
+            continue;
+        }
+        let progress = (age / 1.9).min(1.0);
+        let length = rect.height() * depth * progress.powf(0.8);
+        let radius = width * scale;
+        let top = egui::pos2(rect.left() + rect.width() * x, rect.top() - radius);
+        let tip = top + Vec2::new(0.0, length);
+        for (extra, color) in [(scale, dark), (0.0, ruby)] {
+            let r = radius + extra;
+            painter.rect_filled(
+                Rect::from_min_max(top - Vec2::new(r, 0.0), tip + Vec2::new(r, 0.0)),
+                0.0,
+                color,
+            );
+            painter.circle_filled(tip, r, color);
+        }
+        if length > radius * 4.0 {
+            painter.line_segment(
+                [
+                    top + Vec2::new(-radius * 0.4, radius * 2.0),
+                    tip + Vec2::new(-radius * 0.4, -radius),
+                ],
+                egui::Stroke::new(
+                    scale.max(0.45),
+                    Color32::from_rgb(231, 72, 98).gamma_multiply(fade * 0.5),
+                ),
+            );
+        }
+    }
 }
 
 fn cheek_glow(ui: &egui::Ui, rect: Rect, elapsed: f32) {
