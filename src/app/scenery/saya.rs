@@ -867,6 +867,8 @@ mod tests {
                         | Expression::Excited
                         | Expression::Celebrating
                         | Expression::Pouting
+                        | Expression::Crazy
+                        | Expression::Killer
                 )
                 .then_some(10.2 - 10.0)
             );

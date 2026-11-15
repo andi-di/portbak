@@ -8,6 +8,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Angry => Some(1.6),
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
         Expression::Celebrating => Some(2.4),
+        Expression::Crazy | Expression::Killer => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Pouting => Some(1.4),
         _ => None,
@@ -19,6 +20,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Angry => anger_mark(ui, rect, elapsed as f32),
         Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
+        Expression::Crazy | Expression::Killer => red_eyes(ui, rect, expression, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         _ => {}
@@ -31,6 +33,45 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn red_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let (eyes, tilt) = match expression {
+        Expression::Crazy => ([(220.0, 174.0), (280.0, 149.0)], -0.38),
+        Expression::Killer => ([(225.0, 182.0), (290.0, 174.0)], -0.12),
+        _ => return,
+    };
+    let strength = envelope(elapsed / 2.2) * (0.9 + 0.1 * (elapsed * 7.0).sin());
+    let scale = rect.width() / 512.0;
+    let rotation = egui::emath::Rot2::from_angle(tilt);
+    let mut mesh = egui::Mesh::default();
+    for (x, y) in eyes {
+        let center = rect.min + Vec2::new(x, y) * scale;
+        for (extent, color) in [
+            (
+                Vec2::new(17.0, 7.0),
+                Color32::from_rgb(215, 8, 36).gamma_multiply(strength * 0.6),
+            ),
+            (
+                Vec2::new(6.0, 4.0),
+                Color32::from_rgb(255, 25, 43).gamma_multiply(strength * 0.85),
+            ),
+        ] {
+            let base = mesh.vertices.len() as u32;
+            mesh.colored_vertex(center, color);
+            for index in 0..32 {
+                let angle = index as f32 * std::f32::consts::TAU / 32.0;
+                let offset = rotation * (Vec2::angled(angle) * extent * scale);
+                mesh.colored_vertex(center + offset, Color32::TRANSPARENT);
+                mesh.add_triangle(base, base + index + 1, base + (index + 1) % 32 + 1);
+            }
+        }
+    }
+    painter.add(mesh);
 }
 
 fn anger_mark(ui: &egui::Ui, rect: Rect, elapsed: f32) {
