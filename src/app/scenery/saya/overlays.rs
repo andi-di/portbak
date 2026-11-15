@@ -325,19 +325,19 @@ fn holy_light(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let strength = envelope(elapsed / 2.4);
     let mut mesh = egui::Mesh::default();
     for (offset, spread, brightness) in
-        [(0.0, 0.31, 0.22), (-0.055, 0.12, 0.12), (0.06, 0.09, 0.14)]
+        [(0.0, 0.46, 0.32), (-0.075, 0.19, 0.2), (0.08, 0.15, 0.21)]
     {
         let base = mesh.vertices.len() as u32;
         for row in 0..=8 {
             let depth = row as f32 / 8.0;
-            let width = 0.025 + spread * depth;
+            let width = 0.065 + spread * depth;
             let center = 0.52 + offset + (elapsed * 0.8 + offset * 10.0).sin() * 0.012 * depth;
             for column in 0..=8 {
                 let across = column as f32 / 4.0 - 1.0;
                 let feather = (1.0 - across * across).powi(2);
                 let alpha = strength * brightness * feather * (1.0 - depth).powf(0.7);
                 mesh.colored_vertex(
-                    rect.min + rect.size() * Vec2::new(center + width * across, depth * 0.88),
+                    rect.min + rect.size() * Vec2::new(center + width * across, depth),
                     Color32::from_rgb(255, 241, 199).gamma_multiply(alpha),
                 );
                 if row < 8 && column < 8 {
