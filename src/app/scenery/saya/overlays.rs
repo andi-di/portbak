@@ -584,12 +584,14 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let side = 49.0 * scale * (0.75 + 0.25 * travel);
     let opening = mouth + Vec2::new(-travel * 12.0, -travel * 2.0) * scale;
     let min = opening - Vec2::new(0.77, 0.34) * side;
-    painter.image(
-        texture.id(),
+    let mut mesh = egui::Mesh::with_texture(texture.id());
+    mesh.add_rect_with_uv(
         Rect::from_min_size(min, Vec2::splat(side)),
         Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
         Color32::WHITE.gamma_multiply(strength),
     );
+    mesh.rotate(egui::emath::Rot2::from_angle(0.45), opening);
+    painter.add(mesh);
 }
 
 fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
