@@ -16,6 +16,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Pouting => Some(1.4),
         Expression::Pleading | Expression::Hungry => Some(2.2),
         Expression::Praying => Some(2.4),
+        Expression::Question => Some(2.2),
         Expression::Wink => Some(1.5),
         _ => None,
     }
@@ -37,6 +38,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
         Expression::Praying => holy_light(ui, rect, elapsed as f32),
+        Expression::Question => fingertip_lines(ui, rect, elapsed as f32),
         Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
     }
@@ -50,12 +52,38 @@ fn envelope(progress: f32) -> f32 {
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
 }
 
+fn fingertip_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let center = rect.min + Vec2::new(267.0, 342.0) * scale;
+    let strength = (elapsed / 0.15).min(1.0) * ((2.2 - elapsed) / 0.35).min(1.0);
+    let pulse = 0.85 + 0.15 * (elapsed * 10.0).cos();
+    for side in [-1.0, 1.0] {
+        for index in -1..=1 {
+            let direction = Vec2::new(index as f32 * 0.6, side).normalized();
+            let start = center + direction * (10.0 * scale);
+            let end =
+                center + direction * ((19.0 + if index == 0 { 3.0 } else { 0.0 }) * scale * pulse);
+            painter.line_segment(
+                [start, end],
+                egui::Stroke::new(
+                    (1.6 * scale).max(0.7),
+                    Color32::from_rgb(102, 44, 68).gamma_multiply(strength),
+                ),
+            );
+        }
+    }
+}
+
 fn scratches(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let scale = rect.width() / 512.0;
     for index in 0..3 {
         let age = elapsed - index as f32 * 0.065;
-        if !(0.0..1.0).contains(&age) {
+        if age <= 0.0 || age >= 1.0 {
             continue;
         }
         let offset = Vec2::new(index as f32 * 10.0, index as f32 * 8.0);

@@ -876,6 +876,7 @@ mod tests {
                         | Expression::Pleading
                         | Expression::Hungry
                         | Expression::Hurt
+                        | Expression::Question
                 )
                 .then_some(10.2 - 10.0)
             );
