@@ -30,7 +30,7 @@ impl Expression {
             Self::Curious => &[
                 "What have you brought me, Human?",
                 "That has caught my interest. Do explain.",
-                "A small mystery? How considerate of you.",
+                "You seem rather pleased with yourself, Human. What have you been up to?",
                 "What occupies that mortal mind of yours?",
             ],
             Self::Cute => &[
