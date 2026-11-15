@@ -65,7 +65,7 @@ impl Expression {
             ],
             Self::Excited => &[
                 "You came back! I mean... good timing!",
-                "A first edition? For me? Oh, thank you, Human!",
+                "A first edition? For me? Thank you, Human! You’re the best!",
                 "You remembered what I like! I... that was very thoughtful of you!",
                 "I knew you would return, Human! Come, tell me what you have been up to!",
             ],
@@ -155,13 +155,13 @@ impl Expression {
             ],
             Self::Praying => &[
                 "I pray for your safe return, Human.",
-                "A quiet evening and a little good fortune for you.",
+                "I hope you come back soon, Human. I get lonely here without you.",
                 "Just this once, let everything turn out well for you. Please.",
                 "I shall keep you in my thoughts, Mortal. You need not make a fuss about it.",
             ],
             Self::Question => &[
                 "Might I ask you something?",
-                "Would you... care to join me for tea later?",
+                "Could you... stay with me tonight, Human?",
                 "Is it possible that you like me, Human?",
                 "There is something I wished to ask. Please do not laugh.",
             ],
@@ -185,7 +185,7 @@ impl Expression {
             ],
             Self::Sleepy => &[
                 "Mm... juss five more minutes, Human...",
-                "The book was fascinating. The hour was unreasonable.",
+                "G’mornin’, Human... mm... d’you need anything?",
                 "Mornin’... I dreamed you were here. Oh... you are. Hehe.",
                 "Don’ go yet... you’re warm. Jus’ stay there a little.",
             ],
@@ -217,7 +217,7 @@ impl Expression {
                 "You can leave it to me, Human. I know exactly what I’m doing.",
                 "Our little secret, Human.",
                 "Consider that a little encouragement, Human. You are doing rather well.",
-                "You noticed? Good. I dislike wasting a perfectly good wink.",
+                "Save me a dance tonight, Darling. I promise to behave. Mostly.",
             ],
         }
     }
