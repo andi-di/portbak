@@ -329,12 +329,12 @@ fn holy_light(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let strength = envelope(elapsed / 2.4);
     let mut mesh = egui::Mesh::default();
-    for (offset, spread, brightness) in [(0.0, 0.46, 0.32), (-0.075, 0.19, 0.2), (0.08, 0.15, 0.21)]
+    for (offset, spread, brightness) in [(0.0, 0.54, 0.32), (-0.075, 0.24, 0.2), (0.08, 0.20, 0.21)]
     {
         let base = mesh.vertices.len() as u32;
         for row in 0..=8 {
             let depth = row as f32 / 8.0;
-            let width = 0.065 + spread * depth;
+            let width = 0.085 + spread * depth;
             let center = 0.52 + offset + (elapsed * 0.8 + offset * 10.0).sin() * 0.012 * depth;
             for column in 0..=8 {
                 let across = column as f32 / 4.0 - 1.0;
