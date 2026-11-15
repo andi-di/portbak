@@ -13,7 +13,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
         Expression::Pouting => Some(1.4),
-        Expression::Pleading => Some(2.2),
+        Expression::Pleading | Expression::Hungry => Some(2.2),
         Expression::Praying => Some(2.4),
         Expression::Wink => Some(1.5),
         _ => None,
@@ -30,7 +30,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
-        Expression::Pleading => wet_eyes(ui, rect, elapsed as f32),
+        Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
         Expression::Praying => holy_light(ui, rect, elapsed as f32),
         Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
@@ -45,17 +45,22 @@ fn envelope(progress: f32) -> f32 {
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
 }
 
-fn wet_eyes(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+fn wet_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
     if !(0.0..2.2).contains(&elapsed) {
         return;
     }
-    let Some(texture) = super::texture(ui.ctx(), "Pleading", Expression::Pleading.bytes()) else {
+    let Some(texture) = super::texture(ui.ctx(), &format!("{expression:?}"), expression.bytes())
+    else {
         return;
     };
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let scale = rect.width() / 512.0;
     let strength = envelope(elapsed / 2.2);
-    for (x, y) in [(228.0, 181.0), (301.0, 171.0)] {
+    let eyes = match expression {
+        Expression::Hungry => [(222.0, 174.0), (289.0, 159.0)],
+        _ => [(228.0, 181.0), (301.0, 171.0)],
+    };
+    for (x, y) in eyes {
         let center = Vec2::new(x, y);
         let mut mesh = egui::Mesh::with_texture(texture.id());
         mesh.vertices.push(egui::epaint::Vertex {
