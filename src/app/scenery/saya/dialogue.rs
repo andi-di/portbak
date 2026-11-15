@@ -59,9 +59,9 @@ impl Expression {
             ],
             Self::Energetic => &[
                 "Shall we get to work?",
-                "Come along, Human. The evening will not wait.",
+                "You said you wanted something from me, Human? Well, here I am!",
                 "I have so many plans for tonight! You weren’t about to leave, were you?",
-                "One task at a time. We shall make splendid progress.",
+                "Can I help you with this task? Come on, let me try!",
             ],
             Self::Excited => &[
                 "You came back! I mean... good timing!",
