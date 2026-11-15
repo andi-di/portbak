@@ -218,7 +218,7 @@ fn fingertip_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
             let direction = Vec2::new(index as f32 * 0.6, side).normalized();
             let start = center + direction * (10.0 * scale);
             let end =
-                center + direction * ((19.0 + if index == 0 { 3.0 } else { 0.0 }) * scale * pulse);
+                center + direction * ((31.0 + if index == 0 { 5.0 } else { 0.0 }) * scale * pulse);
             painter.line_segment(
                 [start, end],
                 egui::Stroke::new(
