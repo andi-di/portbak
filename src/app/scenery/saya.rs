@@ -872,6 +872,7 @@ mod tests {
                         | Expression::Killer
                         | Expression::Exhausted
                         | Expression::Wink
+                        | Expression::Praying
                 )
                 .then_some(10.2 - 10.0)
             );

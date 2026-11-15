@@ -13,6 +13,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
         Expression::Pouting => Some(1.4),
+        Expression::Praying => Some(2.4),
         Expression::Wink => Some(1.5),
         _ => None,
     }
@@ -28,6 +29,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
+        Expression::Praying => holy_light(ui, rect, elapsed as f32),
         Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
     }
@@ -39,6 +41,40 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn holy_light(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.4).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let strength = envelope(elapsed / 2.4);
+    let mut mesh = egui::Mesh::default();
+    for (offset, spread, brightness) in
+        [(0.0, 0.31, 0.22), (-0.055, 0.12, 0.12), (0.06, 0.09, 0.14)]
+    {
+        let base = mesh.vertices.len() as u32;
+        for row in 0..=8 {
+            let depth = row as f32 / 8.0;
+            let width = 0.025 + spread * depth;
+            let center = 0.52 + offset + (elapsed * 0.8 + offset * 10.0).sin() * 0.012 * depth;
+            for column in 0..=8 {
+                let across = column as f32 / 4.0 - 1.0;
+                let feather = (1.0 - across * across).powi(2);
+                let alpha = strength * brightness * feather * (1.0 - depth).powf(0.7);
+                mesh.colored_vertex(
+                    rect.min + rect.size() * Vec2::new(center + width * across, depth * 0.88),
+                    Color32::from_rgb(255, 241, 199).gamma_multiply(alpha),
+                );
+                if row < 8 && column < 8 {
+                    let vertex = base + row * 9 + column;
+                    mesh.add_triangle(vertex, vertex + 1, vertex + 9);
+                    mesh.add_triangle(vertex + 1, vertex + 10, vertex + 9);
+                }
+            }
+        }
+    }
+    painter.add(mesh);
 }
 
 fn wink_stars(ui: &egui::Ui, rect: Rect, elapsed: f32) {
