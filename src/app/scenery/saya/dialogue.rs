@@ -40,10 +40,10 @@ impl Expression {
                 "I saved you the seat beside me, nya~",
             ],
             Self::Dominant => &[
-                "Your files are under my protection, Mortal.",
+                "Come here, Mortal. I prefer having you where I can see you.",
                 "Attend to your work. I shall oversee my domain.",
                 "A little discipline would suit you, Servant.",
-                "You may relax. I am keeping watch.",
+                "Sit beside me, Servant. You have my permission to stay.",
             ],
             Self::Drunk => &[
                 "The room is moving. I find that terribly rude.",
