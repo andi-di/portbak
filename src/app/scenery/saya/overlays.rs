@@ -35,9 +35,8 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
             eye_glow(ui, rect, expression, elapsed as f32);
         }
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
-        Expression::Crazy | Expression::Killer | Expression::Energetic => {
-            eye_glow(ui, rect, expression, elapsed as f32)
-        }
+        Expression::Crazy | Expression::Killer => eye_glow(ui, rect, expression, elapsed as f32),
+        Expression::Energetic => energetic_eyes(ui, rect, elapsed as f32),
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
@@ -481,23 +480,18 @@ fn eye_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let (eyes, tilt) = match expression {
         Expression::Love => ([(221.0, 164.0), (287.0, 148.0)], -0.22),
-        Expression::Energetic => ([(221.0, 165.0), (287.0, 149.0)], -0.22),
         Expression::Crazy => ([(220.0, 174.0), (280.0, 149.0)], -0.38),
         Expression::Killer => ([(225.0, 182.0), (290.0, 174.0)], -0.12),
         _ => return,
     };
     let strength = envelope(elapsed / duration) * (0.9 + 0.1 * (elapsed * 7.0).sin());
     let rose = expression == Expression::Love;
-    let outer = if expression == Expression::Energetic {
-        Color32::from_rgb(250, 208, 80)
-    } else if rose {
+    let outer = if rose {
         Color32::from_rgb(249, 111, 170)
     } else {
         Color32::from_rgb(215, 8, 36)
     };
-    let inner = if expression == Expression::Energetic {
-        Color32::from_rgb(255, 250, 196)
-    } else if rose {
+    let inner = if rose {
         Color32::from_rgb(255, 184, 210)
     } else {
         Color32::from_rgb(255, 25, 43)
@@ -518,6 +512,40 @@ fn eye_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
                 let offset = rotation * (Vec2::angled(angle) * extent * scale);
                 mesh.colored_vertex(center + offset, Color32::TRANSPARENT);
                 mesh.add_triangle(base, base + index + 1, base + (index + 1) % 32 + 1);
+            }
+        }
+    }
+    painter.add(mesh);
+}
+
+fn energetic_eyes(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let mut mesh = egui::Mesh::default();
+    for (eye, phase) in [
+        (Vec2::new(221.0, 165.0), 0.0),
+        (Vec2::new(287.0, 149.0), 0.7),
+    ] {
+        let strength = envelope(elapsed / 2.2) * (0.72 + 0.28 * (elapsed * 13.0 + phase).cos());
+        // Offset the glints from each pupil so its dark center stays visible.
+        for (offset, radius) in [(Vec2::new(-3.5, -1.5), 2.5), (Vec2::new(4.5, 1.0), 1.1)] {
+            let center = rect.min + (eye + offset) * scale;
+            let base = mesh.vertices.len() as u32;
+            mesh.colored_vertex(center, Color32::WHITE.gamma_multiply(strength));
+            for index in 0..8 {
+                let angle = index as f32 * std::f32::consts::FRAC_PI_4;
+                let length = radius
+                    * scale
+                    * (0.7 + 0.3 * strength)
+                    * if index % 2 == 0 { 1.0 } else { 0.2 };
+                mesh.colored_vertex(
+                    center + Vec2::angled(angle) * length,
+                    Color32::from_rgb(255, 226, 148).gamma_multiply(strength),
+                );
+                mesh.add_triangle(base, base + index + 1, base + (index + 1) % 8 + 1);
             }
         }
     }
