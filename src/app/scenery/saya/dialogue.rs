@@ -60,7 +60,7 @@ impl Expression {
             Self::Energetic => &[
                 "Shall we get to work?",
                 "Come along, Human. The evening will not wait.",
-                "I have had my tea. You may now attempt to keep up.",
+                "I have so many plans for tonight! You weren’t about to leave, were you?",
                 "One task at a time. We shall make splendid progress.",
             ],
             Self::Excited => &[
