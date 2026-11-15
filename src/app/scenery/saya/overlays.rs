@@ -22,9 +22,11 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
 }
 
 fn envelope(progress: f32) -> f32 {
-    (std::f32::consts::PI * progress.clamp(0.0, 1.0))
-        .sin()
-        .powf(0.7)
+    if !(0.0..1.0).contains(&progress) {
+        return 0.0;
+    }
+    // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
+    (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
 }
 
 fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
@@ -172,4 +174,38 @@ fn eye_glare(painter: &egui::Painter, center: Pos2, scale: f32, elapsed: f32, ph
         }
     }
     painter.add(mesh);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_is_finite_at_and_outside_its_boundaries() {
+        for progress in [-1.0, 0.0, f32::EPSILON, 0.5, 1.0 - f32::EPSILON, 1.0, 2.0] {
+            assert!((0.0..=1.0).contains(&envelope(progress)));
+        }
+        assert_eq!(envelope(1.0), 0.0);
+        assert_eq!(envelope(2.0), 0.0);
+    }
+
+    #[test]
+    fn excited_renders_through_glare_fade_without_invalid_geometry() {
+        let ctx = egui::Context::default();
+        for frame in 0..=120 {
+            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                excited(
+                    ui,
+                    Rect::from_min_size(Pos2::ZERO, Vec2::splat(300.0)),
+                    frame as f32 / 60.0,
+                );
+            });
+            for primitive in ctx.tessellate(output.shapes, output.pixels_per_point) {
+                if let egui::epaint::Primitive::Mesh(mesh) = primitive.primitive {
+                    assert!(mesh.is_valid());
+                    assert!(mesh.vertices.iter().all(|vertex| vertex.pos.is_finite()));
+                }
+            }
+        }
+    }
 }
