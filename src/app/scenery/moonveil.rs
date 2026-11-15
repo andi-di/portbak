@@ -775,11 +775,14 @@ mod tests {
         update(&mut state, screen, 30.05, Some(pointer), false);
         assert!(!state.bats[0].perched);
         assert!(state.bats[0].return_at >= 44.05);
+        let mut escape_distance = 0.0_f32;
         for step in 602..=780 {
             update(&mut state, screen, step as f32 * 0.05, None, false);
+            escape_distance = escape_distance.max(state.bats[0].position.distance(pointer));
         }
         assert!(state.bats.iter().all(|bat| screen.contains(bat.position)));
-        assert!(state.bats[0].position.distance(pointer) > 50.0);
+        // Roaming may bring the bat back later; verify that it escaped in between.
+        assert!(escape_distance > 50.0);
         for step in 781..=2200 {
             update(&mut state, screen, step as f32 * 0.05, None, false);
         }
