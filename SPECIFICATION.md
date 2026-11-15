@@ -67,7 +67,7 @@ Provide:
     - Fed: organic crimson rivulets with wet highlights flowing down the portrait surface.
     - Flirty: a burgundy lipstick camera-kiss imprint and a soft ruby necklace-gem glow.
     - Drunk, Embarrassed, Flustered and Shy: a soft rosy glow over their blushing cheeks.
-    - Hurt: three large crimson claw slashes across the portrait surface.
+    - Hurt: three detailed, torn crimson claw slashes revealed diagonally across the portrait surface.
     - Love: rising ruby-heart clusters with silver trim and a rose-pink eye glow.
     - Pleading and Hungry: watery eye reflections with subtle local refraction.
     - Pouting: a compact custom anime exhale cloud with an open mouth-facing neck.

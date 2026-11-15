@@ -236,33 +236,39 @@ fn fingertip_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
 }
 
 fn scratches(ui: &egui::Ui, rect: Rect, elapsed: f32) {
-    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
-    let scale = rect.width() / 512.0;
-    for index in 0..3 {
-        let age = elapsed - index as f32 * 0.065;
-        if age <= 0.0 || age >= 1.0 {
-            continue;
-        }
-        let offset = Vec2::new(index as f32 * 25.0, index as f32 * 23.0);
-        let start = rect.min + (Vec2::new(367.0, 63.0) + offset) * scale;
-        let direction = Vec2::new(-285.0, 316.0) * scale;
-        let end = start + direction * (age / 0.16).min(1.0);
-        let middle = start.lerp(end, 0.58);
-        let normal = Vec2::new(-direction.y, direction.x).normalized() * 6.5 * scale;
-        let opacity = ((1.0 - age) / 0.55).min(1.0);
-        painter.add(egui::Shape::convex_polygon(
-            vec![start, middle + normal, end, middle - normal],
-            Color32::from_rgb(168, 27, 56).gamma_multiply(opacity),
-            egui::Stroke::NONE,
-        ));
-        painter.line_segment(
-            [start, end],
-            egui::Stroke::new(
-                (1.25 * scale).max(0.65),
-                Color32::from_rgb(255, 198, 204).gamma_multiply(opacity * 0.8),
-            ),
-        );
+    if !(0.0..1.2).contains(&elapsed) {
+        return;
     }
+    let Some(texture) = super::texture(
+        ui.ctx(),
+        "hurt-scratches",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/hurt-scratches.png"),
+    ) else {
+        return;
+    };
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let fade = ((1.2 - elapsed) / 0.5).min(1.0);
+    let mut mesh = egui::Mesh::with_texture(texture.id());
+    // A diagonal reveal travels from the upper-right tips to the lower-left ends.
+    for row in 0..=16 {
+        let y = row as f32 / 16.0;
+        for column in 0..=16 {
+            let x = column as f32 / 16.0;
+            let distance = (1.0 - x + y) * 0.5;
+            let reveal = ((elapsed / 0.3 - distance) / 0.12).clamp(0.0, 1.0);
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: rect.min + rect.size() * Vec2::new(x, y),
+                uv: egui::pos2(x, y),
+                color: Color32::WHITE.gamma_multiply(fade * reveal),
+            });
+            if row < 16 && column < 16 {
+                let vertex = row * 17 + column;
+                mesh.add_triangle(vertex, vertex + 1, vertex + 17);
+                mesh.add_triangle(vertex + 1, vertex + 18, vertex + 17);
+            }
+        }
+    }
+    painter.add(mesh);
 }
 
 fn wet_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {

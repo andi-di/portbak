@@ -76,3 +76,6 @@ her raised right hand; cheek whiskers are aligned relative to her nose.
 
 Fed uses `overlays/fed-blood.png` for organic crimson rivulets and wet highlights,
 animated downward from the top with different flow rates across the image.
+
+Hurt uses `overlays/hurt-scratches.png`, a detailed crimson claw decal revealed
+diagonally across the portrait before fading.
