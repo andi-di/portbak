@@ -66,7 +66,7 @@ Provide:
     - Exhausted: uneven vertical black fatigue lines above her eyes.
     - Fed: organic crimson rivulets with wet highlights flowing down the portrait surface.
     - Flirty: a burgundy lipstick camera-kiss imprint and a soft ruby necklace-gem glow.
-    - Drunk, Embarrassed and Flustered: a soft rosy glow over their blushing cheeks.
+    - Drunk, Embarrassed, Flustered and Shy: a soft rosy glow over their blushing cheeks.
     - Hurt: three large crimson claw slashes across the portrait surface.
     - Love: rising ruby-heart clusters with silver trim and a rose-pink eye glow.
     - Pleading and Hungry: watery eye reflections with subtle local refraction.

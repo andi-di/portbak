@@ -13,7 +13,9 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
         Expression::Fed => Some(2.4),
-        Expression::Drunk | Expression::Embarrassed | Expression::Flustered => Some(2.2),
+        Expression::Drunk | Expression::Embarrassed | Expression::Flustered | Expression::Shy => {
+            Some(2.2)
+        }
         Expression::Flirty => Some(2.2),
         Expression::Hurt => Some(1.2),
         Expression::Pouting => Some(1.4),
@@ -40,7 +42,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Fed => blood_drips(ui, rect, elapsed as f32),
-        Expression::Drunk | Expression::Embarrassed | Expression::Flustered => {
+        Expression::Drunk | Expression::Embarrassed | Expression::Flustered | Expression::Shy => {
             cheek_glow(ui, rect, expression, elapsed as f32)
         }
         Expression::Flirty => {
@@ -176,6 +178,10 @@ fn cheek_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
         Expression::Drunk => [
             (Vec2::new(230.0, 166.0), Vec2::new(21.0, 11.0)),
             (Vec2::new(307.0, 163.0), Vec2::new(18.0, 10.0)),
+        ],
+        Expression::Shy => [
+            (Vec2::new(204.0, 211.0), Vec2::new(10.0, 7.0)),
+            (Vec2::new(257.0, 204.0), Vec2::new(16.0, 9.0)),
         ],
         Expression::Embarrassed => [
             (Vec2::new(214.0, 201.0), Vec2::new(14.0, 8.0)),
@@ -324,8 +330,7 @@ fn holy_light(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let strength = envelope(elapsed / 2.4);
     let mut mesh = egui::Mesh::default();
-    for (offset, spread, brightness) in
-        [(0.0, 0.46, 0.32), (-0.075, 0.19, 0.2), (0.08, 0.15, 0.21)]
+    for (offset, spread, brightness) in [(0.0, 0.46, 0.32), (-0.075, 0.19, 0.2), (0.08, 0.15, 0.21)]
     {
         let base = mesh.vertices.len() as u32;
         for row in 0..=8 {
