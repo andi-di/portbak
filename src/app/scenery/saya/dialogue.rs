@@ -13,7 +13,7 @@ impl Expression {
                 "You bore me, Mortal. Surely you have something interesting to say.",
                 "Two hundred years, and I have never been this bored.",
                 "I expected very little entertainment from you. Yet here we are.",
-                "Have you finished? I have counted every rose outside.",
+                "Speak, Mortal. What do you want from me now?",
             ],
             Self::Celebrating => &[
                 "Naturally, everything went according to my plan.",
