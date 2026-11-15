@@ -34,10 +34,10 @@ impl Expression {
                 "What occupies that mortal mind of yours?",
             ],
             Self::Cute => &[
-                "Don't call me cute.",
-                "This is regal composure. The ears are beside the point.",
-                "You saw no such thing. Especially not that smile.",
-                "Nya. A deliberate flourish, Human. Control yourself.",
+                "Nya~ There you are! Come keep me company.",
+                "Do you like my ears? I picked the ribbons to match, nya.",
+                "One little head pat wouldn’t hurt, nya?",
+                "I saved you the seat beside me, nya~",
             ],
             Self::Dominant => &[
                 "Your files are under my protection, Mortal.",
