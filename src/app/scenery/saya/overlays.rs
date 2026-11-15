@@ -14,6 +14,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Exhausted => Some(2.2),
         Expression::Fed => Some(2.4),
         Expression::Flustered => Some(2.2),
+        Expression::Flirty => Some(2.2),
         Expression::Hurt => Some(1.2),
         Expression::Pouting => Some(1.4),
         Expression::Pleading | Expression::Hungry => Some(2.2),
@@ -38,6 +39,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Fed => blood_drips(ui, rect, elapsed as f32),
         Expression::Flustered => cheek_glow(ui, rect, elapsed as f32),
+        Expression::Flirty => kiss_print(ui, rect, elapsed as f32),
         Expression::Hurt => scratches(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
@@ -54,6 +56,32 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn kiss_print(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let Some(texture) = super::texture(
+        ui.ctx(),
+        "flirty-kiss",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/flirty-kiss.png"),
+    ) else {
+        return;
+    };
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let approach = (elapsed / 0.25).min(1.0);
+    let press = 1.0 + 0.07 * (elapsed * 14.0).sin() * (-elapsed * 6.0).exp();
+    let side = rect.width() * 0.31 * (0.45 + 0.55 * approach) * press;
+    let center =
+        rect.min + rect.size() * Vec2::new(0.55 + approach * 0.025, 0.42 + approach * 0.045);
+    let opacity = (elapsed / 0.1).min(1.0) * ((2.2 - elapsed) / 0.55).min(1.0);
+    painter.image(
+        texture.id(),
+        Rect::from_center_size(center, Vec2::splat(side)),
+        Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        Color32::WHITE.gamma_multiply(opacity),
+    );
 }
 
 fn blood_drips(ui: &egui::Ui, rect: Rect, elapsed: f32) {

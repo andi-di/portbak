@@ -56,8 +56,23 @@ Provide:
 - Moonveil uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed. New job buttons have no decorative end dots.
   - Keep the header compact and center its contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
 - Moonveil Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
-  - Love has briefly rising ruby-heart clusters with silver trim and a rose-pink eye glow; Excited has staggered crystal sparkles around her hair and glints centered in her pupils with a brief silver eye glare. Celebrating has metallic confetti raining from the top of the portrait. Pouting exhales a simple anime cloud puff with an open mouth-facing end. Angry has a pulsing red anime anger mark near her temple. Crazy and Killer have red glows aligned to their eyes. Cute has long whiskers aligned to her cheeks and a black-and-pink paw print sized to her raised right hand. Exhausted has uneven vertical black fatigue lines above her eyes. Wink sends a short trail of stars outward from the outer corner of her closed eye. Praying receives soft golden holy light from above. Pleading and Hungry have watery eye reflections with subtle local refraction. Hurt has three briefly revealed crimson claw scratches. Question has small emphasis lines above and below her touching fingertips. Flustered has a soft rosy glow over her blushing cheeks. Fed has stylized crimson drips flowing down the portrait surface. These overlays play once on entry and stop when interrupted; hovering does not extend them.
-  - Hearts play once on Love entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.
+  - Portrait overlays play once on entry, remain clipped to the portrait and stop when interrupted. Hover does not extend them.
+    - Angry: a pulsing red anime anger mark near her temple.
+    - Celebrating: irregular metallic confetti raining from the top.
+    - Crazy and Killer: crimson eye glows.
+    - Cute: long cheek whiskers and a hand-sized black-and-pink paw print.
+    - Excited: crystal sparkles, pupil glints and a brief silver eye glare.
+    - Exhausted: uneven vertical black fatigue lines above her eyes.
+    - Fed: stylized crimson drips flowing down the portrait surface.
+    - Flirty: a burgundy lipstick kiss imprint pressed onto the portrait surface.
+    - Flustered: a soft rosy glow over her blushing cheeks.
+    - Hurt: three briefly revealed crimson claw scratches.
+    - Love: rising ruby-heart clusters with silver trim and a rose-pink eye glow.
+    - Pleading and Hungry: watery eye reflections with subtle local refraction.
+    - Pouting: a compact custom anime exhale cloud with an open mouth-facing neck.
+    - Praying: soft golden holy light from above.
+    - Question: emphasis lines above and below her touching fingertips.
+    - Wink: a star trail from the outer corner of her closed eye.
   - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
   - Enable automatic backups: Energetic; disable: Pouting; restore confirmation: Question; restored: Happy; protect a backup: Dominant.

@@ -67,3 +67,6 @@ no additional texture or persistent particle simulation is needed.
 
 Pouting uses the compact custom `overlays/pouting-exhale.png` anime huff sprite,
 with its open neck anchored beside her lips.
+
+Flirty uses the burgundy `overlays/flirty-kiss.png` lipstick imprint as a
+foreground camera-kiss stamp.

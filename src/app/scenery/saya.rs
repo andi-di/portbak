@@ -879,6 +879,7 @@ mod tests {
                         | Expression::Question
                         | Expression::Flustered
                         | Expression::Fed
+                        | Expression::Flirty
                 )
                 .then_some(10.2 - 10.0)
             );
