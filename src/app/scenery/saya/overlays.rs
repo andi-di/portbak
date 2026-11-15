@@ -12,6 +12,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
+        Expression::Flustered => Some(2.2),
         Expression::Hurt => Some(1.2),
         Expression::Pouting => Some(1.4),
         Expression::Pleading | Expression::Hungry => Some(2.2),
@@ -34,6 +35,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
+        Expression::Flustered => cheek_glow(ui, rect, elapsed as f32),
         Expression::Hurt => scratches(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         Expression::Pleading | Expression::Hungry => wet_eyes(ui, rect, expression, elapsed as f32),
@@ -50,6 +52,35 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn cheek_glow(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let strength = envelope(elapsed / 2.2);
+    let scale = rect.width() / 512.0;
+    let mut mesh = egui::Mesh::default();
+    for (center, extent) in [
+        (Vec2::new(275.0, 184.0), Vec2::new(19.0, 10.0)),
+        (Vec2::new(332.0, 176.0), Vec2::new(7.0, 9.0)),
+    ] {
+        let base = mesh.vertices.len() as u32;
+        mesh.colored_vertex(
+            rect.min + center * scale,
+            Color32::from_rgb(255, 110, 151).gamma_multiply(strength * 0.38),
+        );
+        for index in 0..32 {
+            let angle = index as f32 * std::f32::consts::TAU / 32.0;
+            mesh.colored_vertex(
+                rect.min + (center + Vec2::angled(angle) * extent) * scale,
+                Color32::TRANSPARENT,
+            );
+            mesh.add_triangle(base, base + index + 1, base + (index + 1) % 32 + 1);
+        }
+    }
+    painter.add(mesh);
 }
 
 fn fingertip_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
