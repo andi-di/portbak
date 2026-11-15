@@ -5,6 +5,7 @@ use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 
 pub(super) fn duration(expression: Expression) -> Option<f64> {
     match expression {
+        Expression::Angry => Some(1.6),
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
         Expression::Celebrating => Some(2.4),
         Expression::Excited => Some(1.8),
@@ -15,6 +16,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
 
 pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f64) {
     match expression {
+        Expression::Angry => anger_mark(ui, rect, elapsed as f32),
         Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
@@ -29,6 +31,50 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn anger_mark(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..1.6).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let fade = (elapsed / 0.1).min(1.0) * ((1.6 - elapsed) / 0.3).min(1.0);
+    let pulse = 1.0 + 0.09 * (elapsed * 17.0).sin();
+    let scale = rect.width() / 512.0 * pulse * (elapsed / 0.14).min(1.0);
+    let center = rect.min + rect.size() * Vec2::new(0.63, 0.25);
+    for [a, b, c] in [
+        [
+            Vec2::new(-8.0, -19.0),
+            Vec2::new(-3.0, -1.0),
+            Vec2::new(-22.0, 0.0),
+        ],
+        [
+            Vec2::new(8.0, -19.0),
+            Vec2::new(3.0, -1.0),
+            Vec2::new(22.0, 0.0),
+        ],
+        [
+            Vec2::new(-16.0, 13.0),
+            Vec2::new(0.0, 1.0),
+            Vec2::new(13.0, 23.0),
+        ],
+    ] {
+        let points: Vec<_> = (0..=16)
+            .map(|index| {
+                let t = index as f32 / 16.0;
+                center + (a * (1.0 - t).powi(2) + b * (2.0 * (1.0 - t) * t) + c * t * t) * scale
+            })
+            .collect();
+        for (width, color) in [
+            (9.0, Color32::from_rgb(49, 14, 25)),
+            (5.8, Color32::from_rgb(206, 32, 54)),
+        ] {
+            painter.add(egui::Shape::line(
+                points.clone(),
+                egui::Stroke::new(width * scale, color.gamma_multiply(fade)),
+            ));
+        }
+    }
 }
 
 fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
