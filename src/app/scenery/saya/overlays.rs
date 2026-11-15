@@ -238,12 +238,12 @@ fn scratches(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         if age <= 0.0 || age >= 1.0 {
             continue;
         }
-        let offset = Vec2::new(index as f32 * 10.0, index as f32 * 8.0);
-        let start = rect.min + (Vec2::new(389.0, 271.0) + offset) * scale;
-        let direction = Vec2::new(-47.0, 55.0) * scale;
+        let offset = Vec2::new(index as f32 * 25.0, index as f32 * 23.0);
+        let start = rect.min + (Vec2::new(367.0, 63.0) + offset) * scale;
+        let direction = Vec2::new(-285.0, 316.0) * scale;
         let end = start + direction * (age / 0.16).min(1.0);
         let middle = start.lerp(end, 0.58);
-        let normal = Vec2::new(-direction.y, direction.x).normalized() * 1.5 * scale;
+        let normal = Vec2::new(-direction.y, direction.x).normalized() * 6.5 * scale;
         let opacity = ((1.0 - age) / 0.55).min(1.0);
         painter.add(egui::Shape::convex_polygon(
             vec![start, middle + normal, end, middle - normal],
@@ -253,7 +253,7 @@ fn scratches(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         painter.line_segment(
             [start, end],
             egui::Stroke::new(
-                (0.65 * scale).max(0.4),
+                (1.25 * scale).max(0.65),
                 Color32::from_rgb(255, 198, 204).gamma_multiply(opacity * 0.8),
             ),
         );
