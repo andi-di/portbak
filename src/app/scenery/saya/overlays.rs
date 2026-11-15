@@ -128,51 +128,37 @@ fn blood_drips(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     if !(0.0..2.4).contains(&elapsed) {
         return;
     }
+    let Some(texture) = super::texture(
+        ui.ctx(),
+        "fed-blood",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/fed-blood.png"),
+    ) else {
+        return;
+    };
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let fade = (elapsed / 0.12).min(1.0) * ((2.4 - elapsed) / 0.45).min(1.0);
-    let scale = rect.width() / 512.0;
-    let dark = Color32::from_rgb(65, 7, 24).gamma_multiply(fade * 0.9);
-    let ruby = Color32::from_rgb(151, 15, 43).gamma_multiply(fade * 0.9);
-    for (x, delay, depth, width) in [
-        (0.04, 0.0, 0.8, 5.0),
-        (0.16, 0.24, 0.51, 3.4),
-        (0.31, 0.09, 0.35, 2.8),
-        (0.46, 0.42, 0.25, 2.2),
-        (0.64, 0.16, 0.42, 3.5),
-        (0.78, 0.35, 0.6, 4.1),
-        (0.92, 0.05, 0.85, 5.8),
-    ] {
-        let age = elapsed - delay;
-        if age <= 0.0 {
-            continue;
-        }
-        let progress = (age / 1.9).min(1.0);
-        let length = rect.height() * depth * progress.powf(0.8);
-        let radius = width * scale;
-        let top = egui::pos2(rect.left() + rect.width() * x, rect.top() - radius);
-        let tip = top + Vec2::new(0.0, length);
-        for (extra, color) in [(scale, dark), (0.0, ruby)] {
-            let r = radius + extra;
-            painter.rect_filled(
-                Rect::from_min_max(top - Vec2::new(r, 0.0), tip + Vec2::new(r, 0.0)),
-                0.0,
-                color,
-            );
-            painter.circle_filled(tip, r, color);
-        }
-        if length > radius * 4.0 {
-            painter.line_segment(
-                [
-                    top + Vec2::new(-radius * 0.4, radius * 2.0),
-                    tip + Vec2::new(-radius * 0.4, -radius),
-                ],
-                egui::Stroke::new(
-                    scale.max(0.45),
-                    Color32::from_rgb(231, 72, 98).gamma_multiply(fade * 0.5),
-                ),
-            );
+    let mut mesh = egui::Mesh::with_texture(texture.id());
+    // Let different rivulets descend at slightly different rates from the top rim.
+    for row in 0..=8 {
+        let y = row as f32 / 8.0;
+        for column in 0..=32 {
+            let x = column as f32 / 32.0;
+            let speed = 1.25 + 0.3 * (x * 19.0).sin();
+            let flow = (elapsed / speed).clamp(0.0, 1.0);
+            let depth = 0.08 + 0.92 * (1.0 - (1.0 - flow).powi(2));
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: rect.min + rect.size() * Vec2::new(x, y * depth),
+                uv: egui::pos2(x, y),
+                color: Color32::WHITE.gamma_multiply(fade),
+            });
+            if row < 8 && column < 32 {
+                let vertex = row * 33 + column;
+                mesh.add_triangle(vertex, vertex + 1, vertex + 33);
+                mesh.add_triangle(vertex + 1, vertex + 34, vertex + 33);
+            }
         }
     }
+    painter.add(mesh);
 }
 
 fn cheek_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {

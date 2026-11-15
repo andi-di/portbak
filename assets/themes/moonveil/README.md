@@ -73,3 +73,6 @@ foreground camera-kiss stamp.
 
 Cute uses `overlays/cute-paw.png`, a shaded black-and-pink paw stamp fitted over
 her raised right hand; cheek whiskers are aligned relative to her nose.
+
+Fed uses `overlays/fed-blood.png` for organic crimson rivulets and wet highlights,
+animated downward from the top with different flow rates across the image.

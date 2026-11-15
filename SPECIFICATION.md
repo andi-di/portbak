@@ -64,7 +64,7 @@ Provide:
     - Excited: crystal sparkles, pupil glints and a brief silver eye glare.
     - Energetic: a golden eye glow.
     - Exhausted: uneven vertical black fatigue lines above her eyes.
-    - Fed: stylized crimson drips flowing down the portrait surface.
+    - Fed: organic crimson rivulets with wet highlights flowing down the portrait surface.
     - Flirty: a burgundy lipstick camera-kiss imprint and a soft ruby necklace-gem glow.
     - Drunk, Embarrassed and Flustered: a soft rosy glow over their blushing cheeks.
     - Hurt: three briefly revealed crimson claw scratches.
