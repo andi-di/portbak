@@ -443,12 +443,12 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let ink = Color32::from_rgb(30, 20, 31).gamma_multiply(strength);
     let at = |point: Vec2| rect.min + point * scale;
     for (start, end) in [
-        ((225.0, 188.0), (182.0, 176.0)),
-        ((224.0, 194.0), (177.0, 191.0)),
-        ((225.0, 200.0), (183.0, 207.0)),
-        ((282.0, 175.0), (321.0, 154.0)),
-        ((285.0, 181.0), (329.0, 173.0)),
-        ((287.0, 187.0), (330.0, 193.0)),
+        ((226.0, 186.0), (184.0, 165.0)),
+        ((226.0, 189.0), (181.0, 174.0)),
+        ((227.0, 192.0), (182.0, 183.0)),
+        ((281.0, 176.0), (323.0, 158.0)),
+        ((282.0, 179.0), (326.0, 167.0)),
+        ((283.0, 182.0), (328.0, 176.0)),
     ] {
         let start = Vec2::from(start);
         let end = Vec2::from(end);
@@ -461,23 +461,21 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         );
     }
     // Her raised right hand is on the viewer's left in cute.png.
-    let center = at(Vec2::new(168.0, 238.0));
-    let pop = 1.0 + 0.08 * (elapsed * 9.0).sin() * (1.0 - elapsed / 2.2);
-    let rotation = egui::emath::Rot2::from_angle(0.08);
-    for (offset, radius) in [
-        (Vec2::new(0.0, 8.0), 13.5),
-        (Vec2::new(-18.0, -6.0), 6.4),
-        (Vec2::new(-7.0, -17.0), 6.8),
-        (Vec2::new(7.0, -17.0), 6.8),
-        (Vec2::new(18.0, -6.0), 6.4),
-    ] {
-        let position = center + rotation * offset * scale * pop;
-        painter.circle(
-            position,
-            radius * scale * pop,
-            Color32::from_rgb(236, 143, 179).gamma_multiply(strength),
-            egui::Stroke::new((3.0 * scale * pop).max(1.0), ink),
+    if let Some(texture) = super::texture(
+        ui.ctx(),
+        "cute-paw",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/cute-paw.png"),
+    ) {
+        let center = at(Vec2::new(168.0, 235.0));
+        let pop = 1.0 + 0.05 * (elapsed * 9.0).sin() * (1.0 - elapsed / 2.2);
+        let mut mesh = egui::Mesh::with_texture(texture.id());
+        mesh.add_rect_with_uv(
+            Rect::from_center_size(center, Vec2::splat(60.0 * scale * pop)),
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE.gamma_multiply(strength),
         );
+        mesh.rotate(egui::emath::Rot2::from_angle(0.08), center);
+        painter.add(mesh);
     }
 }
 

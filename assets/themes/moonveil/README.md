@@ -70,3 +70,6 @@ with its open neck anchored beside her lips.
 
 Flirty uses the burgundy `overlays/flirty-kiss.png` lipstick imprint as a
 foreground camera-kiss stamp.
+
+Cute uses `overlays/cute-paw.png`, a shaded black-and-pink paw stamp fitted over
+her raised right hand; cheek whiskers are aligned relative to her nose.
