@@ -53,9 +53,9 @@ impl Expression {
             ],
             Self::Embarrassed => &[
                 "You needn't stare, Human.",
-                "That compliment was entirely unnecessary... thank you.",
+                "You think I look lovely? W-well... you have surprisingly good taste, Human.",
                 "It is merely warm in here. Do not draw conclusions.",
-                "I had a perfectly dignified reply a moment ago.",
+                "I was only straightening your collar. Stop smiling like that.",
             ],
             Self::Energetic => &[
                 "Shall we get to work?",
