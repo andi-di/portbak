@@ -57,3 +57,6 @@ Hold the header emblem for two seconds to open it.
 Excited uses the transparent `overlays/excited-sparkles.png` sprite. Eye glints are
 anchored to pupil centers in the 512px expression artwork; update those anchors
 when replacing that portrait. Overlays play once and are clipped to the portrait.
+
+Love uses the transparent `overlays/love-hearts.png` ruby-heart cluster, rising
+and fading in three staggered bursts with its original one-shot timing.

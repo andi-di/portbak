@@ -394,44 +394,27 @@ fn paint_love_hearts(ui: &egui::Ui, opening: Rect, elapsed: f64) {
     let painter = ui
         .painter()
         .with_clip_rect(ui.clip_rect().intersect(opening));
-    // The top row has two lobes. The following rows taper to the point.
-    let rows = [
-        (1, 3, 0),
-        (5, 7, 0),
-        (0, 8, 1),
-        (0, 8, 2),
-        (1, 7, 3),
-        (2, 6, 4),
-        (3, 5, 5),
-        (4, 4, 6),
-    ];
+    let Some(texture) = texture(
+        ui.ctx(),
+        "love-hearts",
+        include_bytes!("../../../assets/themes/moonveil/overlays/love-hearts.png"),
+    ) else {
+        return;
+    };
     for (x, y, size, delay) in LOVE_HEARTS {
         let age = ((elapsed - delay) / LOVE_HEART_SECONDS) as f32;
         if !(0.0..1.0).contains(&age) {
             continue;
         }
         let opacity = (age * 12.0).min(1.0) * (1.0 - age).min(0.65) / 0.65;
-        let cell = (opening.width() * size / 9.0).max(0.75);
         let center = opening.min + opening.size() * egui::vec2(x, y - 0.14 * age);
-        let origin = (center - egui::vec2(4.5, 3.5) * cell).round();
-        let ruby = Color32::from_rgb(223, 54, 100).gamma_multiply(opacity);
-        for (left, right, row) in rows {
-            painter.rect_filled(
-                Rect::from_min_size(
-                    origin + egui::vec2(left as f32, row as f32) * cell,
-                    egui::vec2((right - left + 1) as f32, 1.0) * cell,
-                ),
-                0.0,
-                ruby,
-            );
-        }
-        painter.rect_filled(
-            Rect::from_min_size(
-                origin + egui::vec2(1.0, 1.0) * cell,
-                egui::vec2(2.0, 1.0) * cell,
-            ),
-            0.0,
-            Color32::from_rgb(255, 180, 199).gamma_multiply(opacity),
+        let width = opening.width() * size * 2.6;
+        let aspect = texture.size_vec2().y / texture.size_vec2().x;
+        painter.image(
+            texture.id(),
+            Rect::from_center_size(center, egui::vec2(width, width * aspect)),
+            Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE.gamma_multiply(opacity),
         );
     }
 }
