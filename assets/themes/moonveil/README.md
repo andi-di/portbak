@@ -82,3 +82,6 @@ diagonally across the portrait before fading.
 
 Cute's curved ink whiskers come from `overlays/cute-whiskers.png`; the two
 clusters are fitted independently around her nose.
+
+Question uses `overlays/question-lines.png` for tapered manga emphasis rays above
+and below her touching fingertips.

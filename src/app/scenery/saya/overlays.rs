@@ -282,25 +282,33 @@ fn fingertip_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     if !(0.0..2.2).contains(&elapsed) {
         return;
     }
+    let Some(texture) = super::texture(
+        ui.ctx(),
+        "question-lines",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/question-lines.png"),
+    ) else {
+        return;
+    };
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let scale = rect.width() / 512.0;
     let center = rect.min + Vec2::new(267.0, 342.0) * scale;
     let strength = (elapsed / 0.15).min(1.0) * ((2.2 - elapsed) / 0.35).min(1.0);
-    let pulse = 0.85 + 0.15 * (elapsed * 10.0).cos();
-    for side in [-1.0, 1.0] {
-        for index in -1..=1 {
-            let direction = Vec2::new(index as f32 * 0.6, side).normalized();
-            let start = center + direction * (10.0 * scale);
-            let end =
-                center + direction * ((31.0 + if index == 0 { 5.0 } else { 0.0 }) * scale * pulse);
-            painter.line_segment(
-                [start, end],
-                egui::Stroke::new(
-                    (1.6 * scale).max(0.7),
-                    Color32::from_rgb(102, 44, 68).gamma_multiply(strength),
-                ),
-            );
-        }
+    let pulse = 0.94 + 0.06 * (elapsed * 10.0).cos();
+    for angle in [0.0, std::f32::consts::PI] {
+        let mut mesh = egui::Mesh::with_texture(texture.id());
+        mesh.add_rect_with_uv(
+            Rect::from_min_size(
+                center - Vec2::new(13.0, 44.0 * pulse) * scale,
+                Vec2::new(26.0, 34.0 * pulse) * scale,
+            ),
+            Rect::from_min_max(
+                egui::pos2(280.0 / 1280.0, 280.0 / 1280.0),
+                egui::pos2(950.0 / 1280.0, 1040.0 / 1280.0),
+            ),
+            Color32::WHITE.gamma_multiply(strength),
+        );
+        mesh.rotate(egui::emath::Rot2::from_angle(angle), center);
+        painter.add(mesh);
     }
 }
 
