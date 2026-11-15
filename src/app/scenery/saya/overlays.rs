@@ -78,25 +78,36 @@ fn sleep_bubble(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let growth = (elapsed / 1.35).min(1.0);
     let radius = (2.0 + 17.0 * growth.powf(0.7)) * scale;
     let wobble = (elapsed * 8.0).sin() * 0.06;
-    let center = nose + Vec2::new(0.86, -0.51) * radius;
+    let center = nose + Vec2::new(1.15, -0.6) * radius;
     if elapsed < 1.35 {
         let fade = (elapsed / 0.12).min(1.0);
-        let mut outline = Vec::with_capacity(40);
+        let mut outline = Vec::with_capacity(60);
         let mut mesh = egui::Mesh::default();
         mesh.colored_vertex(
             center,
             Color32::from_rgb(211, 224, 248).gamma_multiply(fade * 0.12),
         );
-        for index in 0..40 {
-            let angle = index as f32 * std::f32::consts::TAU / 40.0;
-            let point = center
-                + Vec2::angled(angle) * Vec2::new(radius * (1.0 + wobble), radius * (1.0 - wobble));
-            outline.push(point);
+        let curves = [
+            [(0.0, 0.0), (0.5, -0.08), (0.45, -1.65), (1.35, -1.5)],
+            [(1.35, -1.5), (2.3, -1.3), (2.25, 0.2), (1.2, 0.25)],
+            [(1.2, 0.25), (0.6, 0.27), (0.25, 0.0), (0.0, 0.0)],
+        ];
+        for curve in curves {
+            let [a, b, c, d] = curve.map(|(x, y)| Vec2::new(x, y));
+            for step in 0..20 {
+                let t = step as f32 / 20.0;
+                let u = 1.0 - t;
+                let point =
+                    a * u.powi(3) + b * (3.0 * u * u * t) + c * (3.0 * u * t * t) + d * t.powi(3);
+                outline.push(nose + point * Vec2::new(1.0 + wobble, 1.0 - wobble) * radius);
+            }
+        }
+        for (index, point) in outline.iter().enumerate() {
             mesh.colored_vertex(
-                point,
+                *point,
                 Color32::from_rgb(232, 238, 255).gamma_multiply(fade * 0.3),
             );
-            mesh.add_triangle(0, index + 1, (index + 1) % 40 + 1);
+            mesh.add_triangle(0, index as u32 + 1, (index as u32 + 1) % 60 + 1);
         }
         painter.add(mesh);
         painter.add(egui::Shape::closed_line(
@@ -108,8 +119,8 @@ fn sleep_bubble(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         ));
         let highlight = (0..=12)
             .map(|index| {
-                let angle = -2.7 + index as f32 / 12.0 * 1.1;
-                center + Vec2::angled(angle) * radius * 0.75
+                let angle = -2.0 + index as f32 / 12.0 * 1.1;
+                center + Vec2::angled(angle) * Vec2::new(0.6, 0.65) * radius
             })
             .collect();
         painter.add(egui::Shape::line(

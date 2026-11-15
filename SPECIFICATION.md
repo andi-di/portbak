@@ -73,7 +73,7 @@ Provide:
     - Pouting: a compact custom anime exhale cloud with an open mouth-facing neck.
     - Praying: soft golden holy light from above.
     - Question: emphasis lines above and below her touching fingertips.
-    - Sleepy: a translucent nose bubble inflates, wobbles and pops into fading flecks.
+    - Sleepy: a translucent teardrop-shaped nose bubble inflates, wobbles and pops into fading flecks.
     - Wink: a star trail from the outer corner of her closed eye.
   - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
