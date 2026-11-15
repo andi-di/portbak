@@ -5,7 +5,7 @@ impl Expression {
         match self {
             Self::Angry => &[
                 "I wasn't waiting for you!",
-                "Do not mistake my patience for permission to tease me.",
+                "I was speaking to you, Human. Do not ignore me.",
                 "Call me cute once more. I dare you, Mortal.",
                 "Hmph! You are testing two centuries of restraint.",
             ],
