@@ -22,7 +22,7 @@ impl Expression {
                 "You did rather well, Minion. Under my guidance, of course.",
             ],
             Self::Crazy => &[
-                "Ahaha... you thought I wasn't paying attention?",
+                "Tell me who hurt you, Darling. You won’t have to deal with them again.",
                 "That look on your face... do it again, Human.",
                 "Two centuries of composure, and you test every one.",
                 "Stay close. I am in a rather unpredictable mood.",
