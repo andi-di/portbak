@@ -56,7 +56,7 @@ Provide:
 - Moonveil uses 32-pixel utility and job action icons and a 40-pixel welcome New job icon and a compact 24-pixel sidebar New job icon, with contrast adapted to the control foreground. Utility frames appear on hover, keyboard focus, or selection; important and destructive actions remain framed. New job buttons have no decorative end dots.
   - Keep the header compact and center its contents with equal top and bottom padding; keep the app-name hover frame clear of the corner ornaments.
 - Moonveil Saya reacts on page entry and actions, with no idle-random timer. New reactions replace the current expression immediately, including while hovered. Actions take precedence over page-entry reactions caused by the same action.
-  - Only Love has a portrait overlay: briefly rising hearts. All other expressions have no overlay.
+  - Love has briefly rising hearts; Excited has staggered crystal sparkles around her hair and glints centered in her pupils. These overlays play once on entry and stop when interrupted; hovering does not extend them.
   - Hearts play once on Love entry, stop when interrupted, and stay clipped inside the portrait. Hover pauses the expression reset timer but does not prolong the hearts.
   - Pick randomly from the event's pool, avoiding the previous reaction whenever alternatives exist. Expressions return to Neutral after three seconds; hover pauses and resumes the remaining countdown.
   - Successful backup completion and no-change checks do not trigger reactions. Failures trigger Sad.
