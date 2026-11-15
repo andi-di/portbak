@@ -437,9 +437,9 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let ink = Color32::from_rgb(30, 20, 31).gamma_multiply(strength);
     let at = |point: Vec2| rect.min + point * scale;
     for (start, end) in [
-        ((226.0, 186.0), (184.0, 165.0)),
-        ((226.0, 189.0), (181.0, 174.0)),
-        ((227.0, 192.0), (182.0, 183.0)),
+        ((234.0, 184.0), (188.0, 171.0)),
+        ((234.0, 187.0), (187.0, 180.0)),
+        ((235.0, 190.0), (189.0, 189.0)),
         ((281.0, 176.0), (323.0, 158.0)),
         ((282.0, 179.0), (326.0, 167.0)),
         ((283.0, 182.0), (328.0, 176.0)),
@@ -464,7 +464,7 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
         let pop = 1.0 + 0.05 * (elapsed * 9.0).sin() * (1.0 - elapsed / 2.2);
         let mut mesh = egui::Mesh::with_texture(texture.id());
         mesh.add_rect_with_uv(
-            Rect::from_center_size(center, Vec2::splat(60.0 * scale * pop)),
+            Rect::from_center_size(center, Vec2::splat(78.0 * scale * pop)),
             Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
             Color32::WHITE.gamma_multiply(strength),
         );

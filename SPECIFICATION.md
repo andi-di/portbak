@@ -60,7 +60,7 @@ Provide:
     - Angry: a pulsing red anime anger mark near her temple.
     - Celebrating: irregular metallic confetti raining from the top.
     - Crazy and Killer: crimson eye glows.
-    - Cute: long cheek whiskers and a hand-sized black-and-pink paw print.
+    - Cute: long cheek whiskers and an oversized black-and-pink paw print over her raised hand.
     - Excited: crystal sparkles, pupil glints and a brief silver eye glare.
     - Energetic: a golden eye glow.
     - Exhausted: uneven vertical black fatigue lines above her eyes.
