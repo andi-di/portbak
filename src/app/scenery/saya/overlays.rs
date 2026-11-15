@@ -415,7 +415,7 @@ fn fatigue_lines(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let scale = rect.width() / 512.0;
     let fade = (elapsed / 0.22).min(1.0) * ((2.2 - elapsed) / 0.4).min(1.0);
     // Follow each upper eyelid while keeping the fatigue strokes vertical.
-    for (left, bottom) in [(195.0, 178.0), (266.0, 157.0)] {
+    for (left, bottom) in [(195.0, 182.0), (266.0, 157.0)] {
         for index in 0..7 {
             let x = left + index as f32 * 3.8;
             let end_y = bottom - index as f32 * 1.3;
