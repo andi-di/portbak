@@ -23,9 +23,9 @@ impl Expression {
             ],
             Self::Crazy => &[
                 "Tell me who hurt you, Darling. You won’t have to deal with them again.",
-                "That look on your face... do it again, Human.",
-                "Two centuries of composure, and you test every one.",
-                "Stay close. I am in a rather unpredictable mood.",
+                "Are there any other girls, Darling? You would tell me, wouldn’t you?",
+                "I can only think of you, Darling. All day. All night.",
+                "Now that you’re here, Darling, we can be together forever.",
             ],
             Self::Curious => &[
                 "What have you brought me, Human?",
