@@ -13,6 +13,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
         Expression::Pouting => Some(1.4),
+        Expression::Pleading => Some(2.2),
         Expression::Praying => Some(2.4),
         Expression::Wink => Some(1.5),
         _ => None,
@@ -29,6 +30,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
+        Expression::Pleading => wet_eyes(ui, rect, elapsed as f32),
         Expression::Praying => holy_light(ui, rect, elapsed as f32),
         Expression::Wink => wink_stars(ui, rect, elapsed as f32),
         _ => {}
@@ -41,6 +43,58 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn wet_eyes(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let Some(texture) = super::texture(ui.ctx(), "Pleading", Expression::Pleading.bytes()) else {
+        return;
+    };
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let strength = envelope(elapsed / 2.2);
+    for (x, y) in [(228.0, 181.0), (301.0, 171.0)] {
+        let center = Vec2::new(x, y);
+        let mut mesh = egui::Mesh::with_texture(texture.id());
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos: rect.min + center * scale,
+            uv: ((center + Vec2::new((elapsed * 5.0).sin() * 0.7, 0.0)) / 512.0).to_pos2(),
+            color: Color32::WHITE.gamma_multiply(strength * 0.65),
+        });
+        for index in 0..32 {
+            let angle = index as f32 * std::f32::consts::TAU / 32.0;
+            let point = center + Vec2::angled(angle) * Vec2::new(9.0, 5.0);
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: rect.min + point * scale,
+                uv: (point / 512.0).to_pos2(),
+                color: Color32::TRANSPARENT,
+            });
+            mesh.add_triangle(0, index + 1, (index + 1) % 32 + 1);
+        }
+        painter.add(mesh);
+        let rim = (0..=16)
+            .map(|index| {
+                let angle = index as f32 * std::f32::consts::PI / 16.0;
+                rect.min + (center + Vec2::new(angle.cos() * 9.0, angle.sin() * 4.5)) * scale
+            })
+            .collect();
+        painter.add(egui::Shape::line(
+            rim,
+            egui::Stroke::new(
+                scale.max(0.55),
+                Color32::from_rgb(218, 235, 255).gamma_multiply(strength * 0.75),
+            ),
+        ));
+        for (offset, radius) in [(Vec2::new(-3.0, -2.0), 1.7), (Vec2::new(4.0, 1.5), 0.9)] {
+            painter.circle_filled(
+                rect.min + (center + offset) * scale,
+                radius * scale,
+                Color32::WHITE.gamma_multiply(strength * 0.9),
+            );
+        }
+    }
 }
 
 fn holy_light(ui: &egui::Ui, rect: Rect, elapsed: f32) {
