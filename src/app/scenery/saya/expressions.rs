@@ -26,16 +26,22 @@ expression_catalog! {
     Angry,
     Bored,
     Celebrating,
+    Crazy,
     Curious,
     Cute,
     Dominant,
+    Drunk,
     Embarrassed,
     Energetic,
     Excited,
+    Exhausted,
     Expectant,
+    Fed,
     Flirty,
     Flustered,
     Happy,
+    Hungry,
+    Hurt,
     Killer,
     Love,
     Meek,
@@ -50,7 +56,11 @@ expression_catalog! {
     Shy,
     Sleepy,
     Smug,
+    Sweating,
+    Tongue,
     Waiting,
+    Wink,
+
 }
 
 impl Expression {
@@ -93,6 +103,9 @@ impl Expression {
             Self::Celebrating => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/celebrating.png")
             }
+            Self::Crazy => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/crazy.png")
+            }
             Self::Curious => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/curious.png")
             }
@@ -101,6 +114,9 @@ impl Expression {
             }
             Self::Dominant => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/dominant.png")
+            }
+            Self::Drunk => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/drunk.png")
             }
             Self::Embarrassed => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/embarrassed.png")
@@ -111,8 +127,14 @@ impl Expression {
             Self::Excited => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/excited.png")
             }
+            Self::Exhausted => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/exhausted.png")
+            }
             Self::Expectant => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/expectant.png")
+            }
+            Self::Fed => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/fed.png")
             }
             Self::Flirty => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/flirty.png")
@@ -122,6 +144,12 @@ impl Expression {
             }
             Self::Happy => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/happy.png")
+            }
+            Self::Hungry => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/hungry.png")
+            }
+            Self::Hurt => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/hurt.png")
             }
             Self::Killer => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/killer.png")
@@ -162,8 +190,17 @@ impl Expression {
             Self::Smug => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/smug.png")
             }
+            Self::Sweating => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/sweating.png")
+            }
+            Self::Tongue => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/tongue.png")
+            }
             Self::Waiting => {
                 include_bytes!("../../../../assets/themes/moonveil/expressions/waiting.png")
+            }
+            Self::Wink => {
+                include_bytes!("../../../../assets/themes/moonveil/expressions/wink.png")
             }
         }
     }

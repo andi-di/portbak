@@ -891,7 +891,7 @@ mod tests {
             .chain([super::Expression::Neutral])
         {
             let lines = expression.lines();
-            assert!(lines.len() >= 4);
+            assert_eq!(lines.len(), 4);
             let unique: std::collections::HashSet<_> = lines.iter().collect();
             assert_eq!(unique.len(), lines.len());
             for previous in 0..lines.len() {

@@ -21,6 +21,12 @@ impl Expression {
                 "A triumph worthy of tea in the garden!",
                 "You did rather well, Minion. Under my guidance, of course.",
             ],
+            Self::Crazy => &[
+                "Ahaha... you thought I wasn't paying attention?",
+                "That look on your face... do it again, Human.",
+                "Two centuries of composure, and you test every one.",
+                "Stay close. I am in a rather unpredictable mood.",
+            ],
             Self::Curious => &[
                 "What have you brought me, Human?",
                 "That has caught my interest. Do explain.",
@@ -38,6 +44,12 @@ impl Expression {
                 "Attend to your work. I shall oversee my domain.",
                 "A little discipline would suit you, Servant.",
                 "You may relax. I am keeping watch.",
+            ],
+            Self::Drunk => &[
+                "The room is moving. I find that terribly rude.",
+                "I am perfectly composed. Why are there two of you?",
+                "One more toast, Human! To... whatever we were toasting.",
+                "You are excellent company. I may have said that already.",
             ],
             Self::Embarrassed => &[
                 "You needn't stare, Human.",
@@ -57,11 +69,23 @@ impl Expression {
                 "At last, something worthy of our attention!",
                 "I knew you would return. I simply did not expect to smile.",
             ],
+            Self::Exhausted => &[
+                "Even I have limits. Apparently.",
+                "The rest can wait. Sit with me a moment.",
+                "Two centuries old, and today still managed to exhaust me.",
+                "If you need me, speak softly. Very softly.",
+            ],
             Self::Expectant => &[
                 "Go on. I'm listening.",
                 "Well, Human? You have my attention.",
                 "I trust there was a reason for that lingering glance.",
                 "You may speak. I shall try to look less impressed.",
+            ],
+            Self::Fed => &[
+                "That was a most satisfying meal.",
+                "A little indulgence does wonders for my disposition.",
+                "You may relax, Human. I have already dined.",
+                "Something on my lips? How observant of you.",
             ],
             Self::Flirty => &[
                 "You do enjoy my company, Human.",
@@ -80,6 +104,18 @@ impl Expression {
                 "The evening is rather pleasant with you here.",
                 "I saved you a place. It seemed practical.",
                 "You may stay for another cup of tea.",
+            ],
+            Self::Hungry => &[
+                "I would be much more agreeable after a meal.",
+                "Do not look so alarmed. I can ask politely.",
+                "Tea is lovely, but it will not quite suffice tonight.",
+                "Is that your pulse, Human? It is terribly distracting.",
+            ],
+            Self::Hurt => &[
+                "A few scratches. The other creatures fared worse.",
+                "Help me with this bandage, would you?",
+                "I won. Allow me a moment to appreciate the cost.",
+                "No lectures, Human. Just stay close for a while.",
             ],
             Self::Killer => &[
                 "Nothing gets past me. Nothing.",
@@ -159,11 +195,29 @@ impl Expression {
                 "Another excellent decision: keeping me company.",
                 "I did tell you I had impeccable judgment.",
             ],
+            Self::Sweating => &[
+                "Give me a moment. That was more running than I intended.",
+                "Immortal does not mean tireless.",
+                "A towel, Human. And perhaps a little dignity.",
+                "Let me catch my breath before you ask.",
+            ],
+            Self::Tongue => &[
+                "Such a serious face. I had to do something.",
+                "Consider that my very dignified response.",
+                "Oh, did you expect another lecture?",
+                "You may call it childish. I call it effective.",
+            ],
             Self::Waiting => &[
                 "I was merely passing the time.",
                 "These ribbons required my attention. I was not waiting.",
                 "You took your time, Human. The tea nearly cooled.",
                 "I happened to be here when you returned. How convenient.",
+            ],
+            Self::Wink => &[
+                "That was meant for you. Try to keep up.",
+                "Our little secret, Human.",
+                "I trust you understood the hint.",
+                "You noticed? Good. I dislike wasting a perfectly good wink.",
             ],
         }
     }
