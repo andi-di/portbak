@@ -81,14 +81,17 @@ fn kiss_print(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let press = 1.0 + 0.07 * (elapsed * 14.0).sin() * (-elapsed * 6.0).exp();
     let side = rect.width() * 0.31 * (0.45 + 0.55 * approach) * press;
     let center =
-        rect.min + rect.size() * Vec2::new(0.55 + approach * 0.025, 0.42 + approach * 0.045);
+        rect.min + rect.size() * Vec2::new(0.475 - approach * 0.025, 0.50 + approach * 0.045);
     let opacity = (elapsed / 0.1).min(1.0) * ((2.2 - elapsed) / 0.55).min(1.0);
-    painter.image(
-        texture.id(),
+    let mut mesh = egui::Mesh::with_texture(texture.id());
+    mesh.add_rect_with_uv(
         Rect::from_center_size(center, Vec2::splat(side)),
         Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
         Color32::WHITE.gamma_multiply(opacity),
     );
+    // Counter the stamp's baked tilt to follow Flirty's upward-right mouth angle.
+    mesh.rotate(egui::emath::Rot2::from_angle(-0.45), center);
+    painter.add(mesh);
 }
 
 fn necklace_glow(ui: &egui::Ui, rect: Rect, elapsed: f32) {
