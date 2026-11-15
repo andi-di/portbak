@@ -48,7 +48,7 @@ impl Expression {
             Self::Drunk => &[
                 "The room is moving. I find that terribly rude.",
                 "I am perfectly composed. Why are there two of you?",
-                "One more toast, Human! To... whatever we were toasting.",
+                "Cheersh, Darling! To you, and me, and... hehehe, us!",
                 "You are excellent company. I may have said that already.",
             ],
             Self::Embarrassed => &[
