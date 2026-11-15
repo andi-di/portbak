@@ -867,6 +867,7 @@ mod tests {
                         | Expression::Excited
                         | Expression::Celebrating
                         | Expression::Pouting
+                        | Expression::Cute
                         | Expression::Crazy
                         | Expression::Killer
                 )

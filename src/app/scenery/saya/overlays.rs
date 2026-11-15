@@ -9,6 +9,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
         Expression::Celebrating => Some(2.4),
         Expression::Crazy | Expression::Killer => Some(2.2),
+        Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Pouting => Some(1.4),
         _ => None,
@@ -21,6 +22,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
         Expression::Crazy | Expression::Killer => red_eyes(ui, rect, expression, elapsed as f32),
+        Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Pouting => exhale(ui, rect, elapsed as f32),
         _ => {}
@@ -33,6 +35,54 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    if !(0.0..2.2).contains(&elapsed) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let scale = rect.width() / 512.0;
+    let strength = (elapsed / 0.18).min(1.0) * ((2.2 - elapsed) / 0.4).min(1.0);
+    let ink = Color32::from_rgb(107, 57, 79).gamma_multiply(strength);
+    let at = |point: Vec2| rect.min + point * scale;
+    for (start, end) in [
+        ((211.0, 184.0), (191.0, 179.0)),
+        ((210.0, 189.0), (188.0, 190.0)),
+        ((212.0, 194.0), (194.0, 201.0)),
+        ((288.0, 170.0), (305.0, 159.0)),
+        ((290.0, 175.0), (311.0, 171.0)),
+        ((290.0, 180.0), (309.0, 183.0)),
+    ] {
+        let start = Vec2::from(start);
+        let end = Vec2::from(end);
+        painter.line_segment(
+            [
+                at(start),
+                at(start + (end - start) * (elapsed / 0.25).min(1.0)),
+            ],
+            egui::Stroke::new((1.5 * scale).max(0.7), ink),
+        );
+    }
+    // Her raised right hand is on the viewer's left in cute.png.
+    let center = at(Vec2::new(165.0, 238.0));
+    let pop = 1.0 + 0.08 * (elapsed * 9.0).sin() * (1.0 - elapsed / 2.2);
+    let rotation = egui::emath::Rot2::from_angle(-0.18);
+    for (offset, radius) in [
+        (Vec2::new(0.0, 3.0), 7.5),
+        (Vec2::new(-9.0, -5.0), 3.3),
+        (Vec2::new(-3.5, -10.0), 3.5),
+        (Vec2::new(3.5, -10.0), 3.5),
+        (Vec2::new(9.0, -5.0), 3.3),
+    ] {
+        let position = center + rotation * offset * scale * pop;
+        painter.circle(
+            position,
+            radius * scale * pop,
+            Color32::from_rgb(233, 151, 180).gamma_multiply(strength * 0.92),
+            egui::Stroke::new(scale.max(0.6), ink),
+        );
+    }
 }
 
 fn red_eyes(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
@@ -334,20 +384,30 @@ mod tests {
     }
 
     #[test]
-    fn excited_renders_through_glare_fade_without_invalid_geometry() {
+    fn overlays_render_through_their_fades_without_invalid_geometry() {
         let ctx = egui::Context::default();
-        for frame in 0..=120 {
-            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
-                excited(
-                    ui,
-                    Rect::from_min_size(Pos2::ZERO, Vec2::splat(300.0)),
-                    frame as f32 / 60.0,
-                );
-            });
-            for primitive in ctx.tessellate(output.shapes, output.pixels_per_point) {
-                if let egui::epaint::Primitive::Mesh(mesh) = primitive.primitive {
-                    assert!(mesh.is_valid());
-                    assert!(mesh.vertices.iter().all(|vertex| vertex.pos.is_finite()));
+        for expression in Expression::ALL
+            .iter()
+            .copied()
+            .filter(|value| duration(*value).is_some())
+        {
+            for frame in 0..=180 {
+                let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                    paint(
+                        ui,
+                        Rect::from_min_size(Pos2::ZERO, Vec2::splat(300.0)),
+                        expression,
+                        frame as f64 / 60.0,
+                    );
+                });
+                for primitive in ctx.tessellate(output.shapes, output.pixels_per_point) {
+                    if let egui::epaint::Primitive::Mesh(mesh) = primitive.primitive {
+                        assert!(mesh.is_valid(), "{expression:?} at frame {frame}");
+                        assert!(
+                            mesh.vertices.iter().all(|vertex| vertex.pos.is_finite()),
+                            "{expression:?} at frame {frame}"
+                        );
+                    }
                 }
             }
         }
