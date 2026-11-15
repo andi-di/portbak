@@ -46,10 +46,10 @@ impl Expression {
                 "Sit beside me, Servant. You have my permission to stay.",
             ],
             Self::Drunk => &[
-                "The room is moving. I find that terribly rude.",
+                "Come heeere, Human! I missed you! ...Did I say that out loud? Hehehe!",
                 "I am perfectly composed. Why are there two of you?",
                 "Cheersh, Darling! To you, and me, and... hehehe, us!",
-                "You are excellent company. I may have said that already.",
+                "You’re staying? Yay! This is the besht evening in... in ages!",
             ],
             Self::Embarrassed => &[
                 "You needn't stare, Human.",
