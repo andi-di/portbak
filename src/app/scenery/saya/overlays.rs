@@ -44,21 +44,18 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let travel = 1.0 - (1.0 - progress).powi(3);
     let origin = mouth + Vec2::new(-travel * 16.0, -travel * 3.0) * scale;
     let puff_scale = scale * (0.6 + travel * 0.55);
-    // The cloud outline ends on either side of the mouth, leaving its neck open.
+    // Three rounded lobes and a swept, open neck match the reference huff.
     let curves = [
-        [(-4.0, -2.0), (-11.0, -2.0), (-12.0, -5.0), (-17.0, -6.0)],
-        [
-            (-17.0, -6.0),
-            (-16.0, -15.0),
-            (-29.0, -17.0),
-            (-32.0, -10.0),
-        ],
-        [(-32.0, -10.0), (-43.0, -16.0), (-49.0, -5.0), (-42.0, 0.0)],
-        [(-42.0, 0.0), (-49.0, 9.0), (-37.0, 17.0), (-31.0, 10.0)],
-        [(-31.0, 10.0), (-26.0, 17.0), (-15.0, 12.0), (-17.0, 6.0)],
-        [(-17.0, 6.0), (-11.0, 5.0), (-10.0, 2.0), (-4.0, 2.0)],
+        [(0.0, -3.0), (-3.0, 1.0), (-13.0, 9.0), (-20.0, 11.0)],
+        [(-20.0, 11.0), (-22.0, 1.0), (-35.0, 0.0), (-39.0, 9.0)],
+        [(-39.0, 9.0), (-44.0, 16.0), (-39.0, 20.0), (-35.0, 22.0)],
+        [(-35.0, 22.0), (-45.0, 22.0), (-47.0, 35.0), (-41.0, 38.0)],
+        [(-41.0, 38.0), (-37.0, 41.0), (-32.0, 39.0), (-29.0, 37.0)],
+        [(-29.0, 37.0), (-29.0, 48.0), (-22.0, 49.0), (-16.0, 44.0)],
+        [(-16.0, 44.0), (-9.0, 39.0), (-12.0, 32.0), (-17.0, 29.0)],
+        [(-17.0, 29.0), (-7.0, 25.0), (4.0, 17.0), (5.0, 6.0)],
     ];
-    let mut outline = Vec::with_capacity(61);
+    let mut outline = Vec::with_capacity(81);
     for curve in curves {
         let [a, b, c, d] = curve.map(|(x, y)| Vec2::new(x, y));
         for step in 0..10 {
@@ -69,10 +66,10 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
             outline.push(origin + point * puff_scale);
         }
     }
-    outline.push(origin + Vec2::new(-4.0, 2.0) * puff_scale);
+    outline.push(origin + Vec2::new(5.0, 6.0) * puff_scale);
     let fill = Color32::from_rgb(246, 243, 250).gamma_multiply(strength * 0.9);
     let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(origin + Vec2::new(-26.0, 0.0) * puff_scale, fill);
+    mesh.colored_vertex(origin + Vec2::new(-28.0, 26.0) * puff_scale, fill);
     for point in &outline {
         mesh.colored_vertex(*point, fill);
     }
@@ -83,8 +80,8 @@ fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     painter.add(egui::Shape::line(
         outline,
         egui::Stroke::new(
-            (1.15 * scale).max(0.7),
-            Color32::from_rgb(181, 170, 195).gamma_multiply(strength * 0.8),
+            (1.35 * scale).max(0.75),
+            Color32::from_rgb(81, 40, 48).gamma_multiply(strength * 0.85),
         ),
     ));
 }
