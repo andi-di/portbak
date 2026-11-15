@@ -7,7 +7,7 @@ impl Expression {
                 "I wasn't waiting for you!",
                 "I was speaking to you, Human. Do not ignore me.",
                 "Call me cute once more. I dare you, Mortal.",
-                "Hmph! You are testing two centuries of restraint.",
+                "You could have come back sooner, Human. Not that I was waiting for you.",
             ],
             Self::Bored => &[
                 "Still here. Still keeping watch.",
