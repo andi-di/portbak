@@ -8,7 +8,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Angry => Some(1.6),
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
         Expression::Celebrating => Some(2.4),
-        Expression::Crazy | Expression::Killer => Some(2.2),
+        Expression::Crazy | Expression::Killer | Expression::Energetic => Some(2.2),
         Expression::Cute => Some(2.2),
         Expression::Excited => Some(1.8),
         Expression::Exhausted => Some(2.2),
@@ -33,7 +33,9 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
             eye_glow(ui, rect, expression, elapsed as f32);
         }
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
-        Expression::Crazy | Expression::Killer => eye_glow(ui, rect, expression, elapsed as f32),
+        Expression::Crazy | Expression::Killer | Expression::Energetic => {
+            eye_glow(ui, rect, expression, elapsed as f32)
+        }
         Expression::Cute => cat_play(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         Expression::Exhausted => fatigue_lines(ui, rect, elapsed as f32),
@@ -487,18 +489,23 @@ fn eye_glow(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let (eyes, tilt) = match expression {
         Expression::Love => ([(221.0, 164.0), (287.0, 148.0)], -0.22),
+        Expression::Energetic => ([(221.0, 165.0), (287.0, 149.0)], -0.22),
         Expression::Crazy => ([(220.0, 174.0), (280.0, 149.0)], -0.38),
         Expression::Killer => ([(225.0, 182.0), (290.0, 174.0)], -0.12),
         _ => return,
     };
     let strength = envelope(elapsed / duration) * (0.9 + 0.1 * (elapsed * 7.0).sin());
     let rose = expression == Expression::Love;
-    let outer = if rose {
+    let outer = if expression == Expression::Energetic {
+        Color32::from_rgb(250, 208, 80)
+    } else if rose {
         Color32::from_rgb(249, 111, 170)
     } else {
         Color32::from_rgb(215, 8, 36)
     };
-    let inner = if rose {
+    let inner = if expression == Expression::Energetic {
+        Color32::from_rgb(255, 250, 196)
+    } else if rose {
         Color32::from_rgb(255, 184, 210)
     } else {
         Color32::from_rgb(255, 25, 43)

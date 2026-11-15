@@ -882,6 +882,7 @@ mod tests {
                         | Expression::Flirty
                         | Expression::Drunk
                         | Expression::Embarrassed
+                        | Expression::Energetic
                 )
                 .then_some(10.2 - 10.0)
             );
