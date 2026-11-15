@@ -860,12 +860,16 @@ mod tests {
             state.hold_while_hovered(true, 10.1);
             assert_eq!(
                 state.overlay_elapsed(10.2),
-                matches!(expression, Expression::Love | Expression::Excited).then_some(10.2 - 10.0)
+                matches!(
+                    expression,
+                    Expression::Love | Expression::Excited | Expression::Celebrating
+                )
+                .then_some(10.2 - 10.0)
             );
-            assert_eq!(state.overlay_elapsed(12.0), None);
-            assert_eq!(state.visible(12.0), expression);
+            assert_eq!(state.overlay_elapsed(12.5), None);
+            assert_eq!(state.visible(12.5), expression);
             state.set_expression(Expression::Neutral, 12.0, 0);
-            assert_eq!(state.overlay_elapsed(12.0), None);
+            assert_eq!(state.overlay_elapsed(12.5), None);
         }
     }
 

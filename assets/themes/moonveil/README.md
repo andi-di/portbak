@@ -60,3 +60,7 @@ when replacing that portrait. Overlays play once and are clipped to the portrait
 
 Love uses the transparent `overlays/love-hearts.png` ruby-heart cluster, rising
 and fading in three staggered bursts with its original one-shot timing.
+
+Celebrating renders 64 folded metallic confetti pieces in one shared mesh. Its
+2.4-second burst uses deterministic ballistic paths, flutter and shaded folds;
+no additional texture or persistent particle simulation is needed.

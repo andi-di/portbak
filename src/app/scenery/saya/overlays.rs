@@ -6,6 +6,7 @@ use eframe::egui::{self, Color32, Pos2, Rect, Vec2};
 pub(super) fn duration(expression: Expression) -> Option<f64> {
     match expression {
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
+        Expression::Celebrating => Some(2.4),
         Expression::Excited => Some(1.8),
         _ => None,
     }
@@ -14,6 +15,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
 pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: f64) {
     match expression {
         Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
+        Expression::Celebrating => confetti(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
         _ => {}
     }
@@ -23,6 +25,54 @@ fn envelope(progress: f32) -> f32 {
     (std::f32::consts::PI * progress.clamp(0.0, 1.0))
         .sin()
         .powf(0.7)
+}
+
+fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let colors = [
+        Color32::from_rgb(221, 222, 239),
+        Color32::from_rgb(157, 39, 75),
+        Color32::from_rgb(228, 150, 175),
+        Color32::from_rgb(173, 152, 203),
+        Color32::from_rgb(244, 220, 178),
+    ];
+    let mut mesh = egui::Mesh::default();
+    // Deterministic trajectories avoid random jitter and per-frame particle state.
+    for index in 0..64 {
+        let seed = ((index * 37 + 17) % 101) as f32 / 101.0;
+        let phase = index as f32 * 2.399_963;
+        let age = elapsed - seed * 0.32;
+        if age <= 0.0 {
+            continue;
+        }
+        let side = if index % 2 == 0 { -1.0 } else { 1.0 };
+        let x = 0.5
+            + side * (0.12 + seed * 0.35) * (age * 4.0).min(1.0)
+            + (phase + age * 4.5).sin() * 0.035 * age;
+        let y = 0.62 - (0.95 + seed * 0.45) * age + 0.72 * age * age;
+        let center = rect.min + rect.size() * Vec2::new(x, y);
+        let opacity = (age * 10.0).min(1.0) * ((2.4 - elapsed) / 0.6).clamp(0.0, 1.0);
+        let color = colors[index % colors.len()].gamma_multiply(opacity);
+        let rotation = egui::emath::Rot2::from_angle(phase + age * (2.0 + seed * 5.0));
+        let width = rect.width() * (0.008 + seed * 0.007);
+        let flip = (age * (6.0 + seed * 5.0) + phase).cos();
+        let length = width * if index % 3 == 0 { 3.2 } else { 1.5 };
+        let base = mesh.vertices.len() as u32;
+        // Folded foil has a bright crease and a darker underside as it tumbles.
+        for (point, shade) in [
+            (Vec2::new(-width * flip, -length), 0.65),
+            (Vec2::new(width * flip, -length * 0.7), 0.9),
+            (Vec2::new(width * flip * 0.6, length), 0.6),
+            (Vec2::new(-width * flip, length * 0.7), 0.8),
+            (Vec2::ZERO, 1.0),
+        ] {
+            mesh.colored_vertex(center + rotation * point, color.gamma_multiply(shade));
+        }
+        for corner in 0..4 {
+            mesh.add_triangle(base + 4, base + corner, base + (corner + 1) % 4);
+        }
+    }
+    painter.add(mesh);
 }
 
 fn excited(ui: &egui::Ui, rect: Rect, elapsed: f32) {
