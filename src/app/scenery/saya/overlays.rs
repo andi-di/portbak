@@ -508,25 +508,40 @@ fn cat_play(ui: &egui::Ui, rect: Rect, elapsed: f32) {
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
     let scale = rect.width() / 512.0;
     let strength = (elapsed / 0.18).min(1.0) * ((2.2 - elapsed) / 0.4).min(1.0);
-    let ink = Color32::from_rgb(30, 20, 31).gamma_multiply(strength);
     let at = |point: Vec2| rect.min + point * scale;
-    for (start, end) in [
-        ((234.0, 184.0), (188.0, 171.0)),
-        ((234.0, 187.0), (187.0, 180.0)),
-        ((235.0, 190.0), (189.0, 189.0)),
-        ((281.0, 176.0), (323.0, 158.0)),
-        ((282.0, 179.0), (326.0, 167.0)),
-        ((283.0, 182.0), (328.0, 176.0)),
-    ] {
-        let start = Vec2::from(start);
-        let end = Vec2::from(end);
-        painter.line_segment(
-            [
-                at(start),
-                at(start + (end - start) * (elapsed / 0.25).min(1.0)),
-            ],
-            egui::Stroke::new((1.7 * scale).max(0.7), ink),
-        );
+    if let Some(texture) = super::texture(
+        ui.ctx(),
+        "cute-whiskers",
+        include_bytes!("../../../../assets/themes/moonveil/overlays/cute-whiskers.png"),
+    ) {
+        // Sample each ink cluster independently to follow the nose and cheek angle.
+        for (root, left, uv_min, uv_max, angle) in [
+            (
+                Vec2::new(234.0, 188.0),
+                true,
+                egui::pos2(90.0 / 1774.0, 310.0 / 887.0),
+                egui::pos2(625.0 / 1774.0, 635.0 / 887.0),
+                -0.12,
+            ),
+            (
+                Vec2::new(282.0, 179.0),
+                false,
+                egui::pos2(1155.0 / 1774.0, 310.0 / 887.0),
+                egui::pos2(1688.0 / 1774.0, 635.0 / 887.0),
+                -0.20,
+            ),
+        ] {
+            let anchor = at(root);
+            let min = anchor - Vec2::new(if left { 48.0 } else { 0.0 }, 12.0) * scale;
+            let mut mesh = egui::Mesh::with_texture(texture.id());
+            mesh.add_rect_with_uv(
+                Rect::from_min_size(min, Vec2::new(48.0, 24.0) * scale),
+                Rect::from_min_max(uv_min, uv_max),
+                Color32::WHITE.gamma_multiply(strength),
+            );
+            mesh.rotate(egui::emath::Rot2::from_angle(angle), anchor);
+            painter.add(mesh);
+        }
     }
     // Her raised right hand is on the viewer's left in cute.png.
     if let Some(texture) = super::texture(

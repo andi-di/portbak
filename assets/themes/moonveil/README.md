@@ -79,3 +79,6 @@ animated downward from the top with different flow rates across the image.
 
 Hurt uses `overlays/hurt-scratches.png`, a detailed crimson claw decal revealed
 diagonally across the portrait before fading.
+
+Cute's curved ink whiskers come from `overlays/cute-whiskers.png`; the two
+clusters are fitted independently around her nose.
