@@ -2,18 +2,18 @@
 
 mod frutiger_aero;
 mod liquid_glass;
-mod midnight_neko;
 mod modern;
+mod moonveil;
 mod retro;
 
 use crate::app::theme::style::Skin;
 
 pub static ALL: &[&Skin] = &[
-    &retro::RETRO,
     &modern::MODERN,
-    &frutiger_aero::FRUTIGER_AERO,
-    &midnight_neko::MIDNIGHT_NEKO,
+    &retro::RETRO,
     &liquid_glass::LIQUID_GLASS,
+    &frutiger_aero::FRUTIGER_AERO,
+    &moonveil::MOONVEIL,
 ];
 
 pub fn default() -> &'static Skin {

@@ -4,7 +4,7 @@ use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::gothic;
 use crate::app::rendering::liquid::{self, Frost, Lens};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::{aurora, liquid_wallpaper, midnight_neko};
+use crate::app::scenery::{aurora, liquid_wallpaper, moonveil};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -20,7 +20,6 @@ const LIQUID_PADDING: f32 = 3.0;
 const SWITCH: Vec2 = Vec2::new(64.0, 28.0);
 /// Room between a liquid glass switch and the label before it.
 const LIQUID_SWITCH_GAP: f32 = 14.0;
-const MARQUEE_FRAME: Duration = Duration::from_millis(60);
 
 pub(crate) fn pointing_hand(response: Response) -> Response {
     let ctx = &response.ctx;
@@ -33,6 +32,52 @@ pub(crate) fn pointing_hand(response: Response) -> Response {
         ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     response
+}
+
+/// Gentle feedback for interactive artwork that has no button face.
+pub fn subtle_highlight(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    artwork_feedback(ui, response, rect, color, true);
+}
+
+pub fn subtle_outline(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    artwork_feedback(ui, response, rect, color, false);
+}
+
+fn artwork_feedback(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32, tint: bool) {
+    let strength = ui.ctx().animate_bool_with_time(
+        response.id.with("subtle_highlight"),
+        response.hovered() || response.has_focus(),
+        0.15,
+    );
+    if strength <= 0.0 {
+        return;
+    }
+    if tint {
+        ui.painter().rect_filled(
+            rect,
+            style::control_radius(ui.ctx()),
+            color.gamma_multiply(0.04 * strength),
+        );
+    }
+    if response.hovered() {
+        ui.painter().rect_stroke(
+            rect,
+            style::control_radius(ui.ctx()),
+            Stroke::new(1.0_f32, color.gamma_multiply(0.35 * strength)),
+            StrokeKind::Inside,
+        );
+    }
+    focus_tint(ui, response, rect, color);
+}
+
+pub fn focus_tint(ui: &egui::Ui, response: &Response, rect: Rect, color: Color32) {
+    if response.has_focus() {
+        ui.painter().rect_filled(
+            rect,
+            style::control_radius(ui.ctx()),
+            color.gamma_multiply(0.08),
+        );
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -60,6 +105,7 @@ pub struct PixelButton {
     label: String,
     sprite: Option<Sprite>,
     icon_only: bool,
+    compact: bool,
     tone: Tone,
     selected: bool,
     min_size: Vec2,
@@ -71,6 +117,7 @@ impl PixelButton {
             label: label.into(),
             sprite: None,
             icon_only: false,
+            compact: false,
             tone: Tone::Plain,
             selected: false,
             min_size: Vec2::ZERO,
@@ -84,6 +131,11 @@ impl PixelButton {
 
     pub fn icon_only(mut self) -> Self {
         self.icon_only = true;
+        self
+    }
+
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
         self
     }
 
@@ -115,28 +167,39 @@ impl PixelButton {
     }
 }
 
-impl Widget for PixelButton {
-    fn ui(self, ui: &mut egui::Ui) -> Response {
-        let m = style::metrics(ui.ctx());
-        let palette = Palette::of(ui);
-        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
-        let icon_scale = if gothic {
-            if self.sprite == Some(Sprite::Plus) {
+struct ButtonGeometry {
+    galley: std::sync::Arc<egui::Galley>,
+    icon: Vec2,
+    gap: f32,
+    content: Vec2,
+    face_size: Vec2,
+    margin: Vec2,
+}
+
+impl PixelButton {
+    pub fn size(&self, ui: &egui::Ui) -> Vec2 {
+        let scale = self.icon_scale(ui);
+        let geometry = self.geometry(ui, scale);
+        geometry.face_size + geometry.margin
+    }
+
+    fn icon_scale(&self, ui: &egui::Ui) -> f32 {
+        if Skin::of(ui.ctx()).finish == Finish::Gothic {
+            if self.compact {
+                24.0 / 12.0
+            } else if self.sprite == Some(Sprite::Plus) {
                 40.0 / 12.0
             } else {
                 32.0 / 12.0
             }
         } else {
             ICON_SCALE
-        };
-        let utility = gothic
-            && self.icon_only
-            && self.tone == Tone::Plain
-            && matches!(
-                self.sprite,
-                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
-            );
-        let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
+        }
+    }
+
+    fn geometry(&self, ui: &egui::Ui, icon_scale: f32) -> ButtonGeometry {
+        let m = style::metrics(ui.ctx());
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
         let text = if self.icon_only {
             String::new()
         } else {
@@ -157,7 +220,7 @@ impl Widget for PixelButton {
         let content = egui::vec2(icon.x + gap + galley.size().x, icon.y.max(galley.size().y));
         let mut padding = ui.spacing().button_padding + Vec2::splat(m.border * 2.0);
         if gothic {
-            padding.y = padding.y.min(6.0);
+            padding.y = padding.y.min(if self.compact { 4.0 } else { 6.0 });
         }
         let finish = Skin::of(ui.ctx()).finish;
         if finish == Finish::Liquid {
@@ -177,6 +240,40 @@ impl Widget for PixelButton {
         };
         // `min_size` bounds the whole footprint, so a full-width button cannot widen its panel.
         let face_size = (content + padding * 2.0).max(self.min_size - margin);
+        ButtonGeometry {
+            galley,
+            icon,
+            gap,
+            content,
+            face_size,
+            margin,
+        }
+    }
+}
+
+impl Widget for PixelButton {
+    fn ui(self, ui: &mut egui::Ui) -> Response {
+        let m = style::metrics(ui.ctx());
+        let palette = Palette::of(ui);
+        let finish = Skin::of(ui.ctx()).finish;
+        let gothic = Skin::of(ui.ctx()).finish == Finish::Gothic;
+        let icon_scale = self.icon_scale(ui);
+        let utility = gothic
+            && self.icon_only
+            && self.tone == Tone::Plain
+            && matches!(
+                self.sprite,
+                Some(Sprite::Gear | Sprite::Sun | Sprite::Moon | Sprite::Folder | Sprite::Monitor)
+            );
+        let modern = matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic);
+        let ButtonGeometry {
+            galley,
+            icon,
+            gap,
+            content,
+            face_size,
+            margin,
+        } = self.geometry(ui, icon_scale);
         let (rect, response) = ui.allocate_exact_size(face_size + margin, Sense::click());
         let enabled = ui.is_enabled();
         response.widget_info(|| {
@@ -237,7 +334,14 @@ impl Widget for PixelButton {
             let face = Rect::from_min_size(rect.min, face_size);
             if finish == Finish::Gothic {
                 if !utility || hovered || sunk || response.has_focus() {
-                    gothic::control(painter, face, fill, response.has_focus(), enabled);
+                    gothic::control(
+                        painter,
+                        face,
+                        fill,
+                        response.has_focus(),
+                        enabled,
+                        self.sprite != Some(Sprite::Plus),
+                    );
                 }
             } else {
                 crate::app::rendering::modern::control(
@@ -475,7 +579,7 @@ impl Widget for PixelCheckbox<'_> {
                     palette.sunken
                 };
                 if Skin::of(ui.ctx()).finish == Finish::Gothic {
-                    gothic::control(painter, square, fill, response.has_focus(), enabled);
+                    gothic::control(painter, square, fill, response.has_focus(), enabled, true);
                 } else {
                     crate::app::rendering::modern::control(
                         painter,
@@ -564,7 +668,7 @@ pub fn segmented<T: PartialEq + Copy>(
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
     let content = match Skin::of(ui.ctx()).finish {
-        Finish::Gothic => ui.text_style_height(&TextStyle::Button).max(40.0),
+        Finish::Gothic => ui.text_style_height(&TextStyle::Button).max(32.0),
         Finish::Liquid => ui.text_style_height(&TextStyle::Button) + LIQUID_PADDING * 2.0,
         _ => ui.text_style_height(&TextStyle::Button),
     };
@@ -587,7 +691,7 @@ pub fn section<R>(
         left: 0,
         top: 0,
         right: m.shadow,
-        bottom: m.shadow + 6,
+        bottom: m.shadow + 4,
     };
     let backing = ui.painter().add(egui::Shape::Noop);
     let mut frame = egui::Frame::new()
@@ -604,9 +708,9 @@ pub fn section<R>(
         ui.spacing_mut().item_spacing.y = 0.0;
         title_bar(ui, title, sprite, band);
         egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(16, 12))
+            .inner_margin(egui::Margin::symmetric(16, 10))
             .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 7.0;
+                ui.spacing_mut().item_spacing.y = 5.0;
                 ui.set_min_width(ui.available_width());
                 contents(ui)
             })
@@ -825,61 +929,6 @@ pub fn led(ui: &mut egui::Ui, color: Color32, lit: bool) -> Response {
     response
 }
 
-/// A themed activity track with identical geometry while idle and active.
-pub fn activity_track(ui: &mut egui::Ui, width: f32, color: Color32, active: bool) -> Response {
-    let m = style::metrics(ui.ctx());
-    if matches!(Skin::of(ui.ctx()).finish, Finish::Modern | Finish::Gothic) {
-        return crate::app::rendering::modern::progress(ui, width, color, active);
-    }
-    const CELL: f32 = 8.0;
-    const GAP: f32 = 2.0;
-    const TRAIL: usize = 6;
-    let palette = Palette::of(ui);
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 18.0), Sense::hover());
-    let painter = ui.painter();
-    if active {
-        ui.ctx().request_repaint_after(MARQUEE_FRAME);
-    }
-    let time = ui.input(|input| input.time);
-    match Skin::of(ui.ctx()).finish {
-        Finish::Glass => {
-            glass::progress(painter, rect, color, time, active);
-            return response;
-        }
-        Finish::Liquid => {
-            liquid::progress(painter, rect, color, time, active);
-            return response;
-        }
-        _ => {}
-    }
-    painter.rect_filled(rect, 0.0, palette.sunken);
-    painter.rect_stroke(
-        rect,
-        0.0,
-        Stroke::new(m.border, palette.outline),
-        StrokeKind::Inside,
-    );
-    let track = rect.shrink(m.border + 2.0);
-    let cells = ((track.width() + GAP) / (CELL + GAP)).floor().max(1.0) as usize;
-    let step = (time * 14.0) as usize % (cells + TRAIL);
-    for cell in 0..cells {
-        let behind = step
-            .checked_sub(cell)
-            .filter(|distance| active && *distance < TRAIL);
-        let fill = match behind {
-            Some(distance) => mix(color, palette.sunken, distance as f32 / TRAIL as f32),
-            None => mix(palette.sunken, palette.outline, 0.4),
-        };
-        let min = egui::pos2(track.left() + cell as f32 * (CELL + GAP), track.top());
-        painter.rect_filled(
-            Rect::from_min_size(min, egui::vec2(CELL, track.height())),
-            0.0,
-            fill,
-        );
-    }
-    response
-}
-
 /// True during the "on" half of a blink cycle; schedules the repaint for the next flip.
 pub fn blink(ui: &egui::Ui, period: f64) -> bool {
     let time = ui.input(|input| input.time);
@@ -917,13 +966,27 @@ pub fn panel_frame(ctx: &egui::Context, fill: Color32) -> egui::Frame {
     }
 }
 
+pub fn sidebar_decoration(ui: &egui::Ui) {
+    if Skin::of(ui.ctx()).finish == Finish::Gothic {
+        crate::app::scenery::moonveil::paint_bats(ui.painter());
+        gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
+        gothic::top_corners(
+            ui.painter(),
+            ui.clip_rect().shrink(5.0),
+            Palette::of(ui).metal,
+        );
+    } else {
+        panel_decoration(ui, 1.0);
+    }
+}
+
 /// Skin-specific panel decoration; call first inside the panel, before its content.
 /// `density` scales the skin's panel opacity, e.g. to keep text legible over a dark sky.
 pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     const INSET: f32 = 6.0;
     let ctx = ui.ctx();
     if Skin::of(ctx).finish == Finish::Gothic {
-        crate::app::scenery::midnight_neko::paint_bats(ui.painter());
+        crate::app::scenery::moonveil::paint_bats(ui.painter());
         gothic::pattern(ui.painter(), ui.clip_rect().shrink(5.0));
         gothic::corners(
             ui.painter(),
@@ -962,7 +1025,7 @@ pub fn paint_underlay(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
-        midnight_neko::paint_background(ctx, palette);
+        moonveil::paint_background(ctx, palette);
     } else if Skin::of(ctx).finish == Finish::Liquid {
         liquid_wallpaper::paint(ctx);
     } else if effects.wallpaper {
@@ -978,7 +1041,7 @@ pub fn paint_scenery(ui: &egui::Ui) {
     let effects = &Skin::of(ui.ctx()).effects;
     let palette = Palette::of(ui);
     if Skin::of(ui.ctx()).finish == Finish::Gothic {
-        midnight_neko::paint_scene(ui.painter(), Palette::of(ui));
+        moonveil::paint_scene(ui.painter(), Palette::of(ui));
         gothic::pattern(ui.painter(), ui.clip_rect());
     }
     if effects.grid {
@@ -991,7 +1054,7 @@ pub fn paint_overlays(ctx: &egui::Context) {
     let effects = &Skin::of(ctx).effects;
     let palette = Palette::of_ctx(ctx);
     if effects.hearts {
-        midnight_neko::paint_overlays(ctx, palette);
+        moonveil::paint_overlays(ctx, palette);
     }
     if effects.scanlines {
         paint_scanlines(ctx, palette);
@@ -1153,31 +1216,6 @@ pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn activity_track_keeps_its_size_when_idle_in_every_theme() {
-        for skin in skins::ALL {
-            for theme in [egui::Theme::Light, egui::Theme::Dark] {
-                let context = egui::Context::default();
-                style::install(&context, skin);
-                context.set_theme(theme);
-                let mut active_size = None;
-                let mut idle_size = None;
-                let _ = context.run_ui(egui::RawInput::default(), |ui| {
-                    active_size = Some(
-                        activity_track(ui, 80.0, Palette::of(ui).gold, true)
-                            .rect
-                            .size(),
-                    );
-                    idle_size = Some(
-                        activity_track(ui, 80.0, Palette::of(ui).gold, false)
-                            .rect
-                            .size(),
-                    );
-                });
-                assert_eq!(active_size, idle_size, "{} {theme:?}", skin.id);
-            }
-        }
-    }
     use super::*;
     use crate::app::theme::skins;
 

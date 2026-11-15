@@ -62,55 +62,56 @@ impl App {
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
                 pixel::paint_scenery(ui);
-                page_scroll_area(ui, |ui| {
-                    let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
-                    let (Some(job), Some(permissions)) = (job, permissions) else {
-                        add = welcome(ui, can_add);
-                        return;
-                    };
-                    job_tabs(ui, &mut self.backups_tab);
-                    let was_enabled = job.enabled;
-                    let previous = job.clone();
-                    let summary = summaries
-                        .get(&job.id)
-                        .filter(|summary| summary.target == job.target);
-                    action =
-                        job_editor(ui, job, &permissions, summary).map(|action| (job.id, action));
-                    if !permissions.busy {
-                        if let Err(error) = job.update_auto_destination(&previous, app_dir) {
-                            self.error =
-                                format!("Could not update automatic destination: {error:#}");
+                ui.push_id(("job_page", selected), |ui| {
+                    page_scroll_area(ui, |ui| {
+                        let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
+                        let (Some(job), Some(permissions)) = (job, permissions) else {
+                            add = welcome(ui, can_add);
+                            return;
+                        };
+                        job_tabs(ui, &mut self.backups_tab);
+                        let was_enabled = job.enabled;
+                        let previous = job.clone();
+                        let summary = summaries
+                            .get(&job.id)
+                            .filter(|summary| summary.target == job.target);
+                        action = ui
+                            .push_id(job.id, |ui| job_editor(ui, job, &permissions, summary))
+                            .inner
+                            .map(|action| (job.id, action));
+                        if !permissions.busy {
+                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                                self.error =
+                                    format!("Could not update automatic destination: {error:#}");
+                            }
                         }
-                    }
-                    if was_enabled != job.enabled {
-                        activation = Some((job.id, was_enabled));
-                    }
+                        if was_enabled != job.enabled {
+                            activation = Some((job.id, was_enabled));
+                        }
+                    });
                 });
             });
         if add {
             self.add_job();
-            crate::app::scenery::catgirl::trigger(
-                &ctx,
-                crate::app::scenery::catgirl::Action::NewJob,
-            );
+            crate::app::scenery::saya::trigger(&ctx, crate::app::scenery::saya::Action::NewJob);
         }
         if let Some((id, was_enabled)) = activation {
             self.job_activation_changed(id, was_enabled);
             if let Some(job) = self.job(id) {
                 let action = if job.enabled {
-                    crate::app::scenery::catgirl::Action::AutomaticEnabled
+                    crate::app::scenery::saya::Action::AutomaticEnabled
                 } else {
-                    crate::app::scenery::catgirl::Action::AutomaticDisabled
+                    crate::app::scenery::saya::Action::AutomaticDisabled
                 };
-                crate::app::scenery::catgirl::trigger(&ctx, action);
+                crate::app::scenery::saya::trigger(&ctx, action);
             }
         }
         if let Some((id, action)) = action {
             let reaction = match action {
-                JobAction::Check => crate::app::scenery::catgirl::Action::CheckNow,
-                JobAction::Remove => crate::app::scenery::catgirl::Action::RemoveJob,
+                JobAction::Check => crate::app::scenery::saya::Action::CheckNow,
+                JobAction::Remove => crate::app::scenery::saya::Action::RemoveJob,
             };
-            crate::app::scenery::catgirl::trigger(&ctx, reaction);
+            crate::app::scenery::saya::trigger(&ctx, reaction);
             self.apply(id, action);
         }
     }
@@ -137,7 +138,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         };
         ui.add_space(bob);
         if Skin::of(ui.ctx()).effects.hearts {
-            crate::app::scenery::catgirl::show_welcome(ui);
+            crate::app::scenery::saya::show_welcome(ui);
         } else {
             let symbol = if liquid { palette.dim } else { palette.hot };
             sprites::show(ui, Sprite::Floppy, 10.0, symbol);
@@ -146,7 +147,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         let wording = &Skin::of(ui.ctx()).wording;
         let title = if liquid { palette.ink } else { palette.gold };
         pixel::display_label(ui, wording.welcome_title, 24.0, title);
-        ui.add_space(14.0);
+        ui.add_space(8.0);
         let tagline = "Your folders. Safely backed up.";
         if liquid {
             // iOS empty states describe themselves in plain secondary text below the bold title.
@@ -167,7 +168,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         if liquid {
             return clicked;
         }
-        ui.add_space(14.0);
+        ui.add_space(8.0);
         let prompt = if pixel::blink(ui, 0.5) {
             wording.welcome_prompt
         } else {
@@ -188,7 +189,7 @@ fn job_editor(
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
     job_status(ui, job, permissions.activity);
-    ui.add_space(14.0);
+    ui.add_space(8.0);
     // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
     let unchanged = permissions.busy.then(|| job.clone());
     pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
@@ -239,13 +240,21 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
         |ui| {
             activation_button(ui, job, permissions.locked);
-            if job_action_button(
-                ui,
-                "Check now",
-                Sprite::Play,
-                Tone::Accent,
-                permissions.busy,
-            ) {
+            let can_check = !job.source.as_os_str().is_empty()
+                && !job.target.as_os_str().is_empty()
+                && job.has_runnable_schedule();
+            if ui
+                .add_enabled_ui(can_check, |ui| {
+                    job_action_button(
+                        ui,
+                        "Check now",
+                        Sprite::Play,
+                        Tone::Accent,
+                        permissions.busy,
+                    )
+                })
+                .inner
+            {
                 action = Some(JobAction::Check);
             }
         },
@@ -315,7 +324,7 @@ fn centered_identity(ui: &mut egui::Ui, job: &Job, rect: egui::Rect) {
         |ui| {
             if Skin::of(ui.ctx()).finish == crate::app::theme::style::Finish::Gothic {
                 let (rect, _) = ui.allocate_exact_size(icon_size, egui::Sense::hover());
-                crate::app::scenery::catgirl::paint_emblem(ui, rect);
+                crate::app::scenery::saya::paint_emblem(ui, rect);
             } else {
                 sprites::show(
                     ui,
@@ -399,12 +408,13 @@ fn schedule_key(job: &Job) -> ScheduleKey {
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
     let before = schedule_key(job);
+    scheduling_fields(ui, job, true);
+    ui.add_space(10.0);
     switch_row(
         ui,
         &mut job.check_on_enable,
         "Check immediately when enabled",
     );
-    scheduling_fields(ui, job, true);
     if schedule_key(job) != before {
         job.reschedule(Utc::now());
     }
@@ -426,6 +436,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
             ],
         );
     });
+    ui.add_space(8.0);
     match job.schedule {
         Schedule::Interval => interval_row(ui, job),
         Schedule::Daily => time_row(ui, job, show_next_check),
@@ -465,6 +476,10 @@ fn duration_field(ui: &mut egui::Ui, value: &mut u32, maximum: u32, label: &str)
     .changed()
 }
 
+fn next_check_frame(ctx: &egui::Context) -> egui::Frame {
+    style::well(ctx).inner_margin(egui::Margin::symmetric(6, 3))
+}
+
 fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     let readout_height = ui
         .painter()
@@ -475,12 +490,10 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         )
         .size()
         .y
-        + style::well(ui.ctx()).total_margin().sum().y;
-    let row_height =
-        ui.spacing()
-            .interact_size
-            .y
-            .max(if show_next_check { readout_height } else { 0.0 });
+        + next_check_frame(ui.ctx()).total_margin().sum().y;
+    let row_height = pixel::button_height(ui)
+        .max(ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0)
+        .max(if show_next_check { readout_height } else { 0.0 });
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), row_height),
         egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
@@ -505,16 +518,20 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
                 } else {
                     "Select at least one weekday".into()
                 };
-                style::well(ui.ctx())
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(next.to_uppercase())
-                                .font(style::label_font(ui.ctx()))
-                                .color(Palette::of(ui).good),
-                        );
-                    })
-                    .response
-                    .hint("Next check according to the current schedule");
+                let frame = next_check_frame(ui.ctx());
+                let color = Palette::of(ui).good;
+                let text = ui.painter().layout_no_wrap(
+                    next.to_uppercase(),
+                    style::label_font(ui.ctx()),
+                    color,
+                );
+                let margin = frame.total_margin();
+                let (rect, response) =
+                    ui.allocate_exact_size(text.size() + margin.sum(), egui::Sense::hover());
+                let content = egui::Rect::from_min_size(rect.min + margin.left_top(), text.size());
+                ui.painter().add(frame.paint(content));
+                ui.painter().galley(content.min, text, color);
+                response.hint("Next check according to the current schedule");
             }
         },
     );
@@ -619,26 +636,42 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     let last_backup = job
         .last_success
         .map_or_else(|| "–".to_owned(), |time| local_time(time, DATE_TIME));
-    ui.horizontal_wrapped(|ui| {
-        if let Some(activity) = activity {
-            ui.label(egui::RichText::new(activity).small().color(palette.gold));
-            ui.label(egui::RichText::new("·").small().color(palette.dim));
-        }
-        ui.label(
-            egui::RichText::new(format!("Last backup: {last_backup}"))
-                .small()
-                .color(palette.dim),
-        );
-        if !job.status.starts_with("Error") {
-            ui.label(
-                egui::RichText::new(format!("· {}", job.status))
-                    .small()
-                    .color(palette.dim),
-            );
+    let mut status = format!("Last backup: {last_backup}");
+    if let Some(activity) = activity {
+        status = format!("{activity} · {status}");
+    }
+    let error = job.status.starts_with("Error");
+    if !error {
+        status.push_str(&format!(" · {}", job.status));
+    }
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let width = ui.available_width();
+    let left = ui
+        .painter()
+        .layout(status, font.clone(), palette.dim, width);
+    let right = error.then(|| {
+        ui.painter()
+            .layout(job.status.clone(), font, palette.bad, width)
+    });
+    let wrap = right
+        .as_ref()
+        .is_some_and(|text| left.size().x + ui.spacing().item_spacing.x + text.size().x > width);
+    let gap = ui.spacing().item_spacing.y;
+    let height = right.as_ref().map_or(left.size().y, |text| {
+        if wrap {
+            left.size().y + gap + text.size().y
+        } else {
+            left.size().y.max(text.size().y)
         }
     });
-    if job.status.starts_with("Error") {
-        alert(ui, palette.bad, &job.status);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    ui.painter().galley(rect.min, left.clone(), palette.dim);
+    if let Some(text) = right {
+        let origin = egui::pos2(
+            rect.right() - text.size().x,
+            rect.top() + if wrap { left.size().y + gap } else { 0.0 },
+        );
+        ui.painter().galley(origin, text, palette.bad);
     }
 }
 
@@ -657,7 +690,7 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
             ],
         );
     });
-    ui.add_space(14.0);
+    ui.add_space(8.0);
 }
 
 #[cfg(test)]

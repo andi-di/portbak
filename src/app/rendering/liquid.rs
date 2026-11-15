@@ -9,7 +9,6 @@ use crate::app::rendering::shaders::{Effect, Recipe};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Palette};
 use eframe::egui::{self, Color32, CornerRadius, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
-use std::time::Duration;
 
 static LIQUID: Recipe = Recipe {
     name: "liquid",
@@ -40,7 +39,6 @@ const SWELL: f32 = 0.12;
 const SWELL_LIMIT: f32 = 5.0;
 /// Room glass needs above it for its shadow and swell when it opens a clipped scroll view.
 pub const HEADROOM: f32 = 12.0;
-const PROGRESS_FRAME: Duration = Duration::from_millis(30);
 /// How far into a scroll view its edge blurs content, and how far past it the blur fades out.
 const EDGE_REACH: f32 = 30.0;
 const EDGE_FADE: f32 = 10.0;
@@ -286,34 +284,6 @@ pub fn switch(painter: &egui::Painter, rect: Rect, on: f32, press: f32, enabled:
             Color32::WHITE.gamma_multiply(solid),
         );
     }
-}
-
-/// An indeterminate iOS progress capsule centered in `rect`, with a tinted bar gliding along it.
-pub fn progress(painter: &egui::Painter, rect: Rect, color: Color32, time: f64, active: bool) {
-    const HEIGHT: f32 = 6.0;
-    let ctx = painter.ctx();
-    let dark = ctx.global_style().visuals.dark_mode;
-    let track = Rect::from_center_size(rect.center(), Vec2::new(rect.width(), HEIGHT));
-    let fill = Color32::from_rgba_unmultiplied(0x78, 0x78, 0x80, if dark { 92 } else { 52 });
-    painter.rect_filled(track, corner(HEIGHT / 2.0), fill);
-    if !active {
-        return;
-    }
-    let phase = (time * 0.6).fract() as f32;
-    // The bar eases in and out as it glides, like UIKit's indeterminate bars.
-    let ease = phase * phase * (3.0 - 2.0 * phase);
-    let width = track.width() * 0.35;
-    let left = track.left() - width + (track.width() + width) * ease;
-    let bar = Rect::from_min_max(
-        Pos2::new(left.max(track.left()), track.top()),
-        Pos2::new((left + width).min(track.right()), track.bottom()),
-    );
-    if bar.width() > 0.0 {
-        painter.rect_filled(bar, corner(HEIGHT / 2.0), color);
-        let shine = Rect::from_min_size(bar.min, Vec2::new(bar.width(), HEIGHT * 0.4));
-        painter.rect_filled(shine, corner(HEIGHT / 2.0), Color32::from_white_alpha(70));
-    }
-    ctx.request_repaint_after(PROGRESS_FRAME);
 }
 
 /// The highlight behind a row or card on a glass pane. iOS never stacks glass on glass, so rows
