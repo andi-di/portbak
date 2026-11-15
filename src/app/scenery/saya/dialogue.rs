@@ -10,9 +10,9 @@ impl Expression {
                 "You could have come back sooner, Human. Not that I was waiting for you.",
             ],
             Self::Bored => &[
-                "Still here. Still keeping watch.",
-                "Even eternity has its slow afternoons.",
-                "A book, some strong tea... surely you can arrange that.",
+                "You bore me, Mortal. Surely you have something interesting to say.",
+                "Two hundred years, and I have never been this bored.",
+                "I expected very little entertainment from you. Yet here we are.",
                 "Have you finished? I have counted every rose outside.",
             ],
             Self::Celebrating => &[
