@@ -8,6 +8,7 @@ pub(super) fn duration(expression: Expression) -> Option<f64> {
         Expression::Love => Some(super::LOVE_HEART_SECONDS + super::LOVE_HEARTS[2].3),
         Expression::Celebrating => Some(2.4),
         Expression::Excited => Some(1.8),
+        Expression::Pouting => Some(1.4),
         _ => None,
     }
 }
@@ -17,6 +18,7 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect, expression: Expression, elapsed: 
         Expression::Love => super::paint_love_hearts(ui, rect, elapsed),
         Expression::Celebrating => confetti(ui, rect, elapsed as f32),
         Expression::Excited => excited(ui, rect, elapsed as f32),
+        Expression::Pouting => exhale(ui, rect, elapsed as f32),
         _ => {}
     }
 }
@@ -27,6 +29,59 @@ fn envelope(progress: f32) -> f32 {
     }
     // Floating-point sin(PI) can be negative; fractional powers must stay nonnegative.
     (std::f32::consts::PI * progress).sin().max(0.0).powf(0.7)
+}
+
+fn exhale(ui: &egui::Ui, rect: Rect, elapsed: f32) {
+    let progress = elapsed / 1.4;
+    if !(0.0..1.0).contains(&progress) {
+        return;
+    }
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(rect));
+    let strength = envelope(progress);
+    let scale = rect.width() / 512.0;
+    // Pouting faces left; the puff leaves her pursed lips at (202, 183).
+    let mouth = rect.min + Vec2::new(202.0, 183.0) * scale;
+    let travel = 1.0 - (1.0 - progress).powi(3);
+    let center = mouth + Vec2::new(-13.0 - travel * 42.0, -travel * 10.0) * scale;
+    let size = (5.0 + travel * 12.0) * scale;
+    let mut mesh = egui::Mesh::default();
+    let fill = Color32::from_rgb(240, 235, 246).gamma_multiply(strength * 0.88);
+    mesh.colored_vertex(center, fill);
+    let mut outline = Vec::with_capacity(48);
+    for index in 0..48 {
+        let angle = index as f32 * std::f32::consts::TAU / 48.0;
+        let lobe = 1.0 + 0.13 * (angle * 5.0 + 0.4).cos();
+        let point = center + Vec2::angled(angle) * Vec2::new(size * 1.25, size) * lobe;
+        outline.push(point);
+        mesh.colored_vertex(point, fill);
+        mesh.add_triangle(0, index + 1, (index + 1) % 48 + 1);
+    }
+    painter.add(mesh);
+    let ink = Color32::from_rgb(166, 153, 183).gamma_multiply(strength * 0.85);
+    painter.add(egui::Shape::closed_line(
+        outline,
+        egui::Stroke::new(scale.max(0.6), ink),
+    ));
+    // A coiling inner line gives the huff its drawn anime shape.
+    let curl = (0..24)
+        .map(|index| {
+            let t = index as f32 / 23.0;
+            let angle = -0.6 + t * std::f32::consts::TAU;
+            center + Vec2::angled(angle) * size * (0.65 - t * 0.48)
+        })
+        .collect();
+    painter.add(egui::Shape::line(
+        curl,
+        egui::Stroke::new(scale.max(0.6), ink),
+    ));
+    let trail = Color32::from_rgb(240, 235, 246).gamma_multiply(strength * (1.0 - progress) * 0.85);
+    painter.line_segment(
+        [
+            mouth + Vec2::new(-3.0, 0.0) * scale,
+            center + Vec2::new(size, size * 0.15),
+        ],
+        egui::Stroke::new((2.0 * scale).max(0.7), trail),
+    );
 }
 
 fn confetti(ui: &egui::Ui, rect: Rect, elapsed: f32) {

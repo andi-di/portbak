@@ -862,7 +862,10 @@ mod tests {
                 state.overlay_elapsed(10.2),
                 matches!(
                     expression,
-                    Expression::Love | Expression::Excited | Expression::Celebrating
+                    Expression::Love
+                        | Expression::Excited
+                        | Expression::Celebrating
+                        | Expression::Pouting
                 )
                 .then_some(10.2 - 10.0)
             );
