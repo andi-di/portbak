@@ -7,6 +7,7 @@ use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
 use crate::app::views::widgets::alert;
 use crate::app::App;
+use crate::model::ScheduleSettings;
 use crate::model::{Job, Theme};
 use chrono::Utc;
 use eframe::egui;
@@ -1521,7 +1522,10 @@ mod tests {
                                 name: "A job with a fairly long name".into(),
                                 source: "C:/Users/someone/Documents/Projects".into(),
                                 target: "C:/Backups/target".into(),
-                                schedule: crate::model::Schedule::Weekdays,
+                                timing: ScheduleSettings {
+                                    mode: crate::model::Schedule::Weekdays,
+                                    ..ScheduleSettings::default()
+                                },
                                 enabled: true,
                                 next_run: Some(Utc::now()),
                                 ..Job::default()

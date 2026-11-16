@@ -153,7 +153,7 @@ Each job is independent and has a persistent UUID. Jobs may share source folders
 - Automatic destinations always use the job name and follow job renames; move the existing destination with its backups, refuse collisions, and report failures.
 - Each job has an **Auto destination folder** checkbox. Checking it restores automatic destination updates without moving manual-folder contents.
 - Choosing or typing a manual destination unchecks **Auto destination folder**, including choosing the same folder. Older source-named automatic destinations migrate to job-name paths when opened for editing while idle, preserving backups. Ignore obsolete naming-choice fields.
-- Existing jobs retain their saved values when loading older configurations.
+- Use configuration format version 2 with grouped schedule settings. Reject unsupported format versions at startup; migration from older settings is not required.
 - Enable automatic backups only after both source and destination folders are chosen.
 
 | Setting | Behavior and default |

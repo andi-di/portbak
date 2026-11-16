@@ -1,3 +1,4 @@
+use crate::model::ScheduleSettings;
 pub(crate) mod platform;
 mod rendering;
 mod scenery;
@@ -753,12 +754,12 @@ mod tests {
         let first = app.config.jobs[0].clone();
         assert!(first.zip && first.auto_destination && first.rolling);
         app.config.job_defaults.zip = false;
-        app.config.job_defaults.interval_value = 15;
+        app.config.job_defaults.timing.interval_value = 15;
         app.add_job();
         assert!(app.config.jobs[0] == first);
         let second = &app.config.jobs[1];
         assert!(!second.zip);
-        assert_eq!(second.interval_value, 15);
+        assert_eq!(second.timing.interval_value, 15);
         assert_eq!(app.selected, Some(second.id));
         assert_ne!(first.id, second.id);
     }
@@ -832,7 +833,7 @@ mod tests {
             source: source.clone(),
             ..crate::model::JobDefaults::default().new_job()
         };
-        job.set_auto_destination(&original).unwrap();
+        crate::destinations::create_for(&mut job, &original).unwrap();
         engine::run(&job, &mpsc::channel().0).unwrap();
         let manual = Job {
             target: root.path().join("manual"),
@@ -1187,8 +1188,11 @@ mod tests {
     fn clearing_all_weekdays_disables_job_and_drops_pending_check() {
         let job = Job {
             enabled: true,
-            schedule: Schedule::Weekdays,
-            weekdays: [false; 7],
+            timing: ScheduleSettings {
+                mode: Schedule::Weekdays,
+                weekdays: [false; 7],
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
         let id = job.id;

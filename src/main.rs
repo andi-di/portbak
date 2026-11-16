@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
+mod destinations;
 mod engine;
 mod model;
 mod persistence;
@@ -13,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const CONFIG_VERSION: u32 = 1;
+const CONFIG_VERSION: u32 = 2;
 const MIN_WINDOW_SIZE: egui::Vec2 = egui::vec2(1024.0, 940.0);
 
 fn main() {

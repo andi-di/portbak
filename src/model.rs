@@ -1,42 +1,15 @@
-use chrono::{DateTime, Datelike, Duration, Local, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
+#[cfg(test)]
+use chrono::{Datelike, Duration, Local, TimeZone};
+
+mod schedule;
+use crate::destinations;
+pub use schedule::{IntervalUnit, Schedule, ScheduleSettings};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
 pub const MAX_JOB_NAME_LENGTH: usize = 50;
-
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Schedule {
-    Daily,
-    Weekdays,
-    Interval,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub enum IntervalUnit {
-    Seconds,
-    #[default]
-    Minutes,
-    Hours,
-}
-
-impl IntervalUnit {
-    pub fn maximum(self) -> u32 {
-        match self {
-            Self::Seconds => 31_536_000,
-            Self::Minutes => 525_600,
-            Self::Hours => 8_760,
-        }
-    }
-
-    fn seconds(self) -> i64 {
-        match self {
-            Self::Seconds => 1,
-            Self::Minutes => 60,
-            Self::Hours => 3_600,
-        }
-    }
-}
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -49,12 +22,7 @@ pub struct Job {
     pub zip: bool,
     pub auto_destination: bool,
     pub check_on_enable: bool,
-    pub schedule: Schedule,
-    pub hour: u32,
-    pub minute: u32,
-    pub weekdays: [bool; 7],
-    pub interval_value: u32,
-    pub interval_unit: IntervalUnit,
+    pub timing: ScheduleSettings,
     pub rolling: bool,
     pub count_protected: bool,
     pub max_count: Option<usize>,
@@ -75,12 +43,7 @@ impl Default for Job {
             zip: false,
             auto_destination: false,
             check_on_enable: false,
-            schedule: Schedule::Interval,
-            hour: 18,
-            minute: 0,
-            weekdays: [true; 7],
-            interval_value: 60,
-            interval_unit: IntervalUnit::Minutes,
+            timing: ScheduleSettings::default(),
             rolling: false,
             count_protected: false,
             max_count: None,
@@ -102,119 +65,8 @@ impl Job {
         }
     }
 
-    pub fn interval_seconds(&self) -> u32 {
-        self.interval_value.clamp(1, self.interval_unit.maximum())
-            * self.interval_unit.seconds() as u32
-    }
-
-    pub fn set_interval_seconds(&mut self, seconds: u32) {
-        self.interval_value = seconds.clamp(1, IntervalUnit::Seconds.maximum());
-        self.interval_unit = IntervalUnit::Seconds;
-    }
-
-    fn auto_destination_path(&self, app_dir: &std::path::Path) -> anyhow::Result<PathBuf> {
-        let source = std::fs::canonicalize(&self.source)?;
-        let name = &self.name;
-        let name: String = name
-            .chars()
-            .map(|c| {
-                if c.is_control() || "<>:\"/\\|?*".contains(c) {
-                    '_'
-                } else {
-                    c
-                }
-            })
-            .take(100)
-            .collect();
-        let name = name.trim().trim_end_matches('.');
-        let folder = if name.is_empty() {
-            self.id.to_string()
-        } else {
-            format!("{}-{name}", self.id)
-        };
-        let target = std::fs::canonicalize(app_dir)?.join("backups").join(folder);
-        anyhow::ensure!(
-            !target.starts_with(&source),
-            "Destination must be outside the source folder"
-        );
-        Ok(target)
-    }
-
-    pub fn set_auto_destination(&mut self, app_dir: &std::path::Path) -> anyhow::Result<()> {
-        let target = self.auto_destination_path(app_dir)?;
-        std::fs::create_dir_all(&target)?;
-        self.target = target;
-        Ok(())
-    }
-
-    pub fn update_auto_destination(
-        &mut self,
-        previous: &Job,
-        app_dir: &std::path::Path,
-    ) -> anyhow::Result<()> {
-        if self.target != previous.target {
-            self.auto_destination = false;
-        }
-        if !self.auto_destination || !self.source.is_dir() {
-            return Ok(());
-        }
-        if !previous.auto_destination || self.source != previous.source {
-            if let Err(error) = self.set_auto_destination(app_dir) {
-                self.auto_destination = previous.auto_destination;
-                return Err(error);
-            }
-            return Ok(());
-        }
-        let backups = std::fs::canonicalize(app_dir)?.join("backups");
-        let owned_name = self.target.file_name().is_some_and(|name| {
-            let name = name.to_string_lossy();
-            name == self.id.to_string() || name.starts_with(&format!("{}-", self.id))
-        });
-        if !self.target.as_os_str().is_empty()
-            && (self.target.parent() != Some(backups.as_path()) || !owned_name)
-        {
-            return Ok(());
-        }
-        let target = self.auto_destination_path(app_dir)?;
-        if target == self.target {
-            return Ok(());
-        }
-        if self.target.is_dir() {
-            anyhow::ensure!(!target.exists(), "Renamed destination already exists");
-            std::fs::rename(&self.target, &target)?;
-        } else {
-            std::fs::create_dir_all(&target)?;
-        }
-        self.target = target;
-        Ok(())
-    }
-
-    fn portable_destination(&self) -> Option<PathBuf> {
-        if !self.auto_destination {
-            return None;
-        }
-        let name = self.target.file_name()?;
-        let text = name.to_string_lossy();
-        let owned = text == self.id.to_string() || text.starts_with(&format!("{}-", self.id));
-        let parent = self.target.parent()?;
-        if owned
-            && (parent == std::path::Path::new("backups")
-                || (self.target.is_absolute()
-                    && parent.file_name() == Some(std::ffi::OsStr::new("backups"))))
-        {
-            Some(PathBuf::from("backups").join(name))
-        } else {
-            None
-        }
-    }
-
-    /// Weekday schedules need at least one selected day to ever run.
-    pub fn has_runnable_schedule(&self) -> bool {
-        self.schedule != Schedule::Weekdays || self.weekdays.contains(&true)
-    }
-
     pub fn reschedule(&mut self, now: DateTime<Utc>) {
-        self.next_run = self.enabled.then(|| self.next_after(now));
+        self.next_run = self.enabled.then(|| self.timing.next_after(now));
     }
 
     pub fn countdown(&self, now: DateTime<Utc>) -> Option<String> {
@@ -245,45 +97,9 @@ impl Job {
         }
         let due = self.next_run.is_some_and(|t| t <= now);
         if self.next_run.is_none() || due {
-            self.next_run = Some(self.next_after(now));
+            self.next_run = Some(self.timing.next_after(now));
         }
         due
-    }
-
-    pub fn next_after(&self, now: DateTime<Utc>) -> DateTime<Utc> {
-        self.next_after_in(now, &Local)
-    }
-
-    fn next_after_in<T: TimeZone>(&self, now: DateTime<Utc>, zone: &T) -> DateTime<Utc> {
-        if self.schedule == Schedule::Interval {
-            return now + Duration::seconds(i64::from(self.interval_seconds()));
-        }
-        let date = now.with_timezone(zone).date_naive();
-        for day in 0..9 {
-            let d = date + Duration::days(day);
-            if self.schedule == Schedule::Weekdays
-                && !self.weekdays[d.weekday().num_days_from_monday() as usize]
-            {
-                continue;
-            }
-            let naive = d.and_time(
-                NaiveTime::from_hms_opt(self.hour.min(23), self.minute.min(59), 0).unwrap(),
-            );
-            // A missing DST time is advanced to the first valid local minute.
-            for offset in 0..181 {
-                if let Some(t) = zone
-                    .from_local_datetime(&(naive + Duration::minutes(offset)))
-                    .earliest()
-                {
-                    let t = t.with_timezone(&Utc);
-                    if t > now {
-                        return t;
-                    }
-                    break;
-                }
-            }
-        }
-        now + Duration::days(1)
     }
 }
 
@@ -306,12 +122,7 @@ pub struct JobDefaults {
     pub auto_destination: bool,
     pub check_on_enable: bool,
     pub zip: bool,
-    pub schedule: Schedule,
-    pub hour: u32,
-    pub minute: u32,
-    pub weekdays: [bool; 7],
-    pub interval_value: u32,
-    pub interval_unit: IntervalUnit,
+    pub timing: ScheduleSettings,
     pub rolling: bool,
     pub count_protected: bool,
     pub count_enabled: bool,
@@ -326,12 +137,10 @@ impl Default for JobDefaults {
             auto_destination: true,
             check_on_enable: false,
             zip: true,
-            schedule: Schedule::Interval,
-            hour: 18,
-            minute: 0,
-            weekdays: [true; 7],
-            interval_value: 10,
-            interval_unit: IntervalUnit::Minutes,
+            timing: ScheduleSettings {
+                interval_value: 10,
+                ..ScheduleSettings::default()
+            },
             rolling: true,
             count_protected: false,
             count_enabled: true,
@@ -348,12 +157,7 @@ impl JobDefaults {
             auto_destination: self.auto_destination,
             check_on_enable: self.check_on_enable,
             zip: self.zip,
-            schedule: self.schedule,
-            hour: self.hour,
-            minute: self.minute,
-            weekdays: self.weekdays,
-            interval_value: self.interval_value,
-            interval_unit: self.interval_unit,
+            timing: self.timing.clone(),
             rolling: self.rolling,
             count_protected: self.count_protected,
             max_count: self.count_enabled.then_some(self.max_count),
@@ -363,12 +167,7 @@ impl JobDefaults {
     }
 
     pub fn update_schedule(&mut self, job: &Job) {
-        self.schedule = job.schedule;
-        self.hour = job.hour;
-        self.minute = job.minute;
-        self.weekdays = job.weekdays;
-        self.interval_value = job.interval_value;
-        self.interval_unit = job.interval_unit;
+        self.timing = job.timing.clone();
     }
 }
 
@@ -398,7 +197,7 @@ fn deserialize_skin<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result
 impl Default for Config {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 2,
             theme: Theme::System,
             skin: "modern".into(),
             job_defaults: JobDefaults::default(),
@@ -413,7 +212,7 @@ impl Config {
     pub fn for_storage(&self) -> Self {
         let mut saved = self.clone();
         for job in &mut saved.jobs {
-            if let Some(relative) = job.portable_destination() {
+            if let Some(relative) = destinations::portable_path(job) {
                 job.target = relative;
             }
         }
@@ -423,7 +222,7 @@ impl Config {
     pub fn resolve_destinations(&mut self, app_dir: &std::path::Path) {
         let app_dir = std::fs::canonicalize(app_dir).unwrap_or_else(|_| app_dir.to_path_buf());
         for job in &mut self.jobs {
-            if let Some(relative) = job.portable_destination() {
+            if let Some(relative) = destinations::portable_path(job) {
                 job.target = app_dir.join(relative);
             }
         }
@@ -503,7 +302,7 @@ mod tests {
         value["destination_name"] = serde_json::json!("SourceFolder");
         let mut job: Job = serde_json::from_value(value).unwrap();
         let previous = job.clone();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_eq!(
             job.target.file_name().unwrap(),
             format!("{}-Project", job.id).as_str()
@@ -533,7 +332,7 @@ mod tests {
         };
         let previous = job.clone();
         job.auto_destination = true;
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert!(job.auto_destination);
         assert_ne!(job.target, manual);
         assert_eq!(
@@ -542,15 +341,15 @@ mod tests {
         );
         let previous = job.clone();
         job.target = manual.clone();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert!(!job.auto_destination);
         let previous = job.clone();
         job.auto_destination = true;
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert!(job.auto_destination);
         let previous = job.clone();
         job.name = "Renamed again".into();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_eq!(
             job.target.file_name().unwrap(),
             format!("{}-Renamed again", job.id).as_str()
@@ -569,7 +368,7 @@ mod tests {
             source,
             ..JobDefaults::default().new_job()
         };
-        job.set_auto_destination(&app).unwrap();
+        crate::destinations::create_for(&mut job, &app).unwrap();
         assert_eq!(
             job.target.file_name().unwrap(),
             format!("{}-Project", job.id).as_str()
@@ -577,7 +376,7 @@ mod tests {
         std::fs::write(job.target.join("saved-backup"), "keep").unwrap();
         let previous = job.clone();
         job.name = "Renamed".into();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert!(!previous.target.exists());
         assert_eq!(
             std::fs::read_to_string(job.target.join("saved-backup")).unwrap(),
@@ -591,7 +390,7 @@ mod tests {
         assert_eq!(saved.target, job.target);
         let previous = job.clone();
         job.name.clear();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_eq!(job.target.file_name().unwrap(), job.id.to_string().as_str());
         assert_eq!(
             std::fs::read_to_string(job.target.join("saved-backup")).unwrap(),
@@ -600,12 +399,12 @@ mod tests {
         let previous = job.clone();
         job.target = root.path().join("manual");
         job.name = "Another name".into();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_eq!(job.target, root.path().join("manual"));
         assert!(!job.auto_destination);
         let previous = job.clone();
         job.name = "Still manual".into();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_eq!(job.target, previous.target);
     }
 
@@ -621,16 +420,16 @@ mod tests {
             source,
             ..JobDefaults::default().new_job()
         };
-        job.set_auto_destination(&app).unwrap();
+        crate::destinations::create_for(&mut job, &app).unwrap();
         let previous = job.clone();
         job.name = "a/b:*?".into();
-        let target = job.auto_destination_path(&app).unwrap();
+        let target = crate::destinations::automatic_path(&job, &app).unwrap();
         assert_eq!(
             target.file_name().unwrap(),
             format!("{}-a_b___", job.id).as_str()
         );
         std::fs::create_dir(&target).unwrap();
-        assert!(job.update_auto_destination(&previous, &app).is_err());
+        assert!(crate::destinations::update(&mut job, &previous, &app).is_err());
         assert_eq!(job.target, previous.target);
         assert!(previous.target.is_dir());
     }
@@ -638,17 +437,17 @@ mod tests {
     #[test]
     fn mixed_interval_duration_preserves_seconds_and_enforces_bounds() {
         let mut job = JobDefaults::default().new_job();
-        assert_eq!(job.interval_seconds(), 600);
-        job.set_interval_seconds(3600 + 2 * 60 + 3);
-        assert_eq!(job.interval_seconds(), 3723);
+        assert_eq!(job.timing.interval_seconds(), 600);
+        job.timing.set_interval_seconds(3600 + 2 * 60 + 3);
+        assert_eq!(job.timing.interval_seconds(), 3723);
         let now = Utc::now();
-        assert_eq!(job.next_after(now), now + Duration::seconds(3723));
+        assert_eq!(job.timing.next_after(now), now + Duration::seconds(3723));
         let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
-        assert_eq!(saved.interval_seconds(), 3723);
-        job.set_interval_seconds(0);
-        assert_eq!(job.interval_seconds(), 1);
-        job.set_interval_seconds(u32::MAX);
-        assert_eq!(job.interval_seconds(), 31_536_000);
+        assert_eq!(saved.timing.interval_seconds(), 3723);
+        job.timing.set_interval_seconds(0);
+        assert_eq!(job.timing.interval_seconds(), 1);
+        job.timing.set_interval_seconds(u32::MAX);
+        assert_eq!(job.timing.interval_seconds(), 31_536_000);
     }
 
     #[test]
@@ -657,14 +456,14 @@ mod tests {
         let existing = config.jobs[0].clone();
         let first = config.job_defaults.new_job();
         assert!(first.auto_destination && first.zip && first.rolling);
-        assert_eq!(first.schedule, Schedule::Interval);
-        assert_eq!(first.interval_value, 10);
-        assert_eq!(first.interval_unit, IntervalUnit::Minutes);
+        assert_eq!(first.timing.mode, Schedule::Interval);
+        assert_eq!(first.timing.interval_value, 10);
+        assert_eq!(first.timing.interval_unit, IntervalUnit::Minutes);
         assert_eq!(first.max_count, Some(20));
         assert_eq!(first.max_bytes, None);
         assert!(!first.enabled);
         config.job_defaults.zip = false;
-        config.job_defaults.interval_value = 25;
+        config.job_defaults.timing.interval_value = 25;
         config.job_defaults.count_enabled = false;
         config.job_defaults.max_count = 230;
         config.job_defaults.max_bytes = 20 * 1024 * 1024 * 1024;
@@ -672,7 +471,7 @@ mod tests {
         assert!(saved == config);
         let second = saved.job_defaults.new_job();
         assert!(!second.zip);
-        assert_eq!(second.interval_value, 25);
+        assert_eq!(second.timing.interval_value, 25);
         assert_eq!(second.max_count, None);
         assert_ne!(first.id, second.id);
         assert!(saved.jobs[0] == existing);
@@ -690,7 +489,7 @@ mod tests {
             source: source.clone(),
             ..JobDefaults::default().new_job()
         };
-        job.set_auto_destination(&app).unwrap();
+        crate::destinations::create_for(&mut job, &app).unwrap();
         let expected = std::fs::canonicalize(&app)
             .unwrap()
             .join("backups")
@@ -699,21 +498,21 @@ mod tests {
         assert!(expected.is_dir());
         let previous = job.clone();
         job.name = "Renamed job".into();
-        job.update_auto_destination(&previous, &app).unwrap();
+        crate::destinations::update(&mut job, &previous, &app).unwrap();
         assert_ne!(job.target, previous.target);
         job.target = root.path().join("manual");
         let saved: Job = serde_json::from_str(&serde_json::to_string(&job).unwrap()).unwrap();
         assert_eq!(saved.target, job.target);
         job.source = app.clone();
-        assert!(job.set_auto_destination(&app).is_err());
+        assert!(crate::destinations::create_for(&mut job, &app).is_err());
     }
 
     #[test]
     fn default_job_is_disabled_interval() {
         let job = Job::default();
         assert!(!job.enabled);
-        assert_eq!(job.schedule, Schedule::Interval);
-        assert_eq!(job.interval_value, 60);
+        assert_eq!(job.timing.mode, Schedule::Interval);
+        assert_eq!(job.timing.interval_value, 60);
         assert!(job.next_run.is_none());
     }
 
@@ -773,12 +572,15 @@ mod tests {
     #[test]
     fn interval_is_future() {
         let j = Job {
-            schedule: Schedule::Interval,
-            interval_value: 5,
+            timing: ScheduleSettings {
+                mode: Schedule::Interval,
+                interval_value: 5,
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
         let n = Utc::now();
-        assert_eq!(j.next_after(n), n + Duration::minutes(5));
+        assert_eq!(j.timing.next_after(n), n + Duration::minutes(5));
     }
 
     #[test]
@@ -790,15 +592,18 @@ mod tests {
             (IntervalUnit::Hours, 18_000),
         ] {
             let job = Job {
-                interval_value: 5,
-                interval_unit: unit,
+                timing: ScheduleSettings {
+                    interval_value: 5,
+                    interval_unit: unit,
+                    ..ScheduleSettings::default()
+                },
                 enabled: true,
                 ..Job::default()
             };
             let data = serde_json::to_vec(&job).unwrap();
             let mut saved: Job = serde_json::from_slice(&data).unwrap();
-            assert_eq!(saved.interval_unit, unit);
-            assert_eq!(saved.interval_value, 5);
+            assert_eq!(saved.timing.interval_unit, unit);
+            assert_eq!(saved.timing.interval_value, 5);
             saved.reschedule(now);
             assert_eq!(saved.next_run, Some(now + Duration::seconds(seconds)));
             assert!(!saved.take_due(now + Duration::seconds(seconds) - Duration::milliseconds(1)));
@@ -810,43 +615,55 @@ mod tests {
     fn interval_bounds_and_unit_changes() {
         let now = Utc::now();
         let mut job = Job {
-            interval_value: 60,
+            timing: ScheduleSettings {
+                interval_value: 60,
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
-        job.interval_unit = IntervalUnit::Hours;
-        assert_eq!(job.interval_value, 60);
-        assert_eq!(job.next_after(now), now + Duration::hours(60));
+        job.timing.interval_unit = IntervalUnit::Hours;
+        assert_eq!(job.timing.interval_value, 60);
+        assert_eq!(job.timing.next_after(now), now + Duration::hours(60));
         for unit in [
             IntervalUnit::Seconds,
             IntervalUnit::Minutes,
             IntervalUnit::Hours,
         ] {
-            job.interval_unit = unit;
-            job.interval_value = 0;
-            assert_eq!(job.next_after(now), now + Duration::seconds(unit.seconds()));
-            job.interval_value = u32::MAX;
-            assert_eq!(job.next_after(now), now + Duration::days(365));
+            job.timing.interval_unit = unit;
+            job.timing.interval_value = 0;
+            assert_eq!(
+                job.timing.next_after(now),
+                now + Duration::seconds(unit.seconds())
+            );
+            job.timing.interval_value = u32::MAX;
+            assert_eq!(job.timing.next_after(now), now + Duration::days(365));
         }
     }
 
     #[test]
     fn calendar_is_future() {
         let j = Job {
-            schedule: Schedule::Daily,
+            timing: ScheduleSettings {
+                mode: Schedule::Daily,
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
         let n = Utc::now();
-        assert!(j.next_after(n) > n);
+        assert!(j.timing.next_after(n) > n);
     }
 
     #[test]
     fn weekday_selection() {
         let j = Job {
-            schedule: Schedule::Weekdays,
-            weekdays: [true, false, false, false, false, false, false],
+            timing: ScheduleSettings {
+                mode: Schedule::Weekdays,
+                weekdays: [true, false, false, false, false, false, false],
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
-        let t = j.next_after(Utc::now());
+        let t = j.timing.next_after(Utc::now());
         assert_eq!(t.with_timezone(&Local).weekday(), chrono::Weekday::Mon);
     }
 
@@ -929,37 +746,43 @@ mod tests {
     #[test]
     fn weekday_schedule_needs_a_selected_day() {
         let mut job = Job {
-            schedule: Schedule::Weekdays,
-            weekdays: [false; 7],
+            timing: ScheduleSettings {
+                mode: Schedule::Weekdays,
+                weekdays: [false; 7],
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
-        assert!(!job.has_runnable_schedule());
-        job.weekdays[6] = true;
-        assert!(job.has_runnable_schedule());
-        job.weekdays = [false; 7];
-        job.schedule = Schedule::Daily;
-        assert!(job.has_runnable_schedule());
+        assert!(!job.timing.has_runnable_schedule());
+        job.timing.weekdays[6] = true;
+        assert!(job.timing.has_runnable_schedule());
+        job.timing.weekdays = [false; 7];
+        job.timing.mode = Schedule::Daily;
+        assert!(job.timing.has_runnable_schedule());
     }
 
     #[test]
     fn dst_missing_hour_is_advanced_and_repeated_hour_runs_once() {
         let zone = chrono_tz::Europe::Berlin;
         let j = Job {
-            schedule: Schedule::Daily,
-            hour: 2,
-            minute: 30,
+            timing: ScheduleSettings {
+                mode: Schedule::Daily,
+                hour: 2,
+                minute: 30,
+                ..ScheduleSettings::default()
+            },
             ..Job::default()
         };
         let before = Utc.with_ymd_and_hms(2026, 3, 29, 0, 0, 0).unwrap();
         assert_eq!(
-            j.next_after_in(before, &zone),
+            j.timing.next_after_in(before, &zone),
             Utc.with_ymd_and_hms(2026, 3, 29, 1, 0, 0).unwrap()
         );
         let before = Utc.with_ymd_and_hms(2026, 10, 25, 0, 0, 0).unwrap();
-        let first = j.next_after_in(before, &zone);
+        let first = j.timing.next_after_in(before, &zone);
         assert_eq!(first, Utc.with_ymd_and_hms(2026, 10, 25, 0, 30, 0).unwrap());
         assert_eq!(
-            j.next_after_in(first, &zone),
+            j.timing.next_after_in(first, &zone),
             Utc.with_ymd_and_hms(2026, 10, 26, 1, 30, 0).unwrap()
         );
     }

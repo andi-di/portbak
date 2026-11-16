@@ -6,7 +6,8 @@ use crate::app::views::widgets::{
     retention_warnings, switch_row, switch_row_with, DATE_TIME,
 };
 use crate::app::{App, CachedHistory};
-use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
+use crate::model::ScheduleSettings;
+use crate::model::{Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
 use uuid::Uuid;
@@ -17,7 +18,7 @@ const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /// Everything that decides when a job runs; a change restarts its schedule.
-type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
+type ScheduleKey = (bool, ScheduleSettings);
 
 #[derive(Clone, Copy)]
 enum JobAction {
@@ -80,7 +81,8 @@ impl App {
                             .inner
                             .map(|action| (job.id, action));
                         if !permissions.busy {
-                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                            if let Err(error) = crate::destinations::update(job, &previous, app_dir)
+                            {
                                 self.error =
                                     format!("Could not update automatic destination: {error:#}");
                             }
@@ -204,7 +206,7 @@ fn job_editor(
     if let Some(unchanged) = unchanged {
         *job = unchanged;
         // Edits are discarded, but a job without a runnable schedule must still stop.
-        if job.enabled && !job.has_runnable_schedule() {
+        if job.enabled && !job.timing.has_runnable_schedule() {
             job.enabled = false;
             job.reschedule(Utc::now());
         }
@@ -242,7 +244,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
             activation_button(ui, job, permissions.locked);
             let can_check = !job.source.as_os_str().is_empty()
                 && !job.target.as_os_str().is_empty()
-                && job.has_runnable_schedule();
+                && job.timing.has_runnable_schedule();
             if ui
                 .add_enabled_ui(can_check, |ui| {
                     job_action_button(
@@ -351,12 +353,13 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
         .tone(tone)
         .min_size(egui::vec2(52.0, 52.0));
     let folders_chosen = !job.source.as_os_str().is_empty() && !job.target.as_os_str().is_empty();
-    let can_toggle = (job.enabled || (folders_chosen && job.has_runnable_schedule())) && !locked;
+    let can_toggle =
+        (job.enabled || (folders_chosen && job.timing.has_runnable_schedule())) && !locked;
     let tooltip = if locked {
         "Automatic backups cannot be changed during restore or while the Backups tab is open"
     } else if !job.enabled && !folders_chosen {
         "Choose source and destination folders to enable automatic backups"
-    } else if !job.enabled && !job.has_runnable_schedule() {
+    } else if !job.enabled && !job.timing.has_runnable_schedule() {
         "Select at least one weekday to enable automatic backups"
     } else {
         label
@@ -395,15 +398,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
 }
 
 fn schedule_key(job: &Job) -> ScheduleKey {
-    (
-        job.enabled,
-        job.schedule,
-        job.hour,
-        job.minute,
-        job.weekdays,
-        job.interval_value,
-        job.interval_unit,
-    )
+    (job.enabled, job.timing.clone())
 }
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
@@ -428,7 +423,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
         pixel::segmented(
             ui,
-            &mut job.schedule,
+            &mut job.timing.mode,
             &[
                 (Schedule::Interval, "Interval", Sprite::Interval),
                 (Schedule::Daily, "Daily", Sprite::Daily),
@@ -437,7 +432,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         );
     });
     ui.add_space(8.0);
-    match job.schedule {
+    match job.timing.mode {
         Schedule::Interval => interval_row(ui, job),
         Schedule::Daily => time_row(ui, job, show_next_check),
         Schedule::Weekdays => {
@@ -448,7 +443,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
 }
 
 fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
-    let total = job.interval_seconds();
+    let total = job.timing.interval_seconds();
     let mut hours = total / 3600;
     let mut minutes = total / 60 % 60;
     let mut seconds = total % 60;
@@ -461,7 +456,8 @@ fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
         changed |= duration_field(ui, &mut seconds, 59, "Seconds");
         ui.label("(hh:mm:ss)");
         if changed {
-            job.set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
+            job.timing
+                .set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
         }
     });
 }
@@ -500,21 +496,21 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         |ui| {
             ui.label("Local time");
             ui.add(
-                egui::DragValue::new(&mut job.hour)
+                egui::DragValue::new(&mut job.timing.hour)
                     .range(0..=23)
                     .min_decimals(0),
             );
             ui.label(":");
             ui.add(
-                egui::DragValue::new(&mut job.minute)
+                egui::DragValue::new(&mut job.timing.minute)
                     .range(0..=59)
                     .min_decimals(0)
                     .custom_formatter(|value, _| format!("{:02}", value as u32)),
             );
             if show_next_check {
                 ui.add_space(12.0);
-                let next = if job.has_runnable_schedule() {
-                    local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
+                let next = if job.timing.has_runnable_schedule() {
+                    local_time(job.timing.next_after(Utc::now()), "%d.%m.%Y %H:%M")
                 } else {
                     "Select at least one weekday".into()
                 };
@@ -539,7 +535,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
 
 fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
     centered_row(ui, |ui| {
-        for (selected, label) in job.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
+        for (selected, label) in job.timing.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
             let day = PixelButton::new(label)
                 .selected(*selected)
                 .min_size(egui::vec2(58.0, 0.0));
@@ -548,7 +544,7 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
             }
         }
     });
-    if !job.has_runnable_schedule() {
+    if !job.timing.has_runnable_schedule() {
         alert(ui, Palette::of(ui).bad, "Select at least one weekday");
         job.enabled = false;
     }
@@ -705,8 +701,11 @@ mod tests {
                 style::install(&ctx, skin);
                 ctx.set_theme(theme);
                 let mut job = Job {
-                    schedule: Schedule::Daily,
-                    minute: 5,
+                    timing: ScheduleSettings {
+                        mode: Schedule::Daily,
+                        minute: 5,
+                        ..ScheduleSettings::default()
+                    },
                     ..Job::default()
                 };
                 for _ in 0..3 {
