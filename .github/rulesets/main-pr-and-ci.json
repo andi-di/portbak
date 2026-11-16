@@ -29,6 +29,10 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
+            "context": "Validate release labels",
+            "integration_id": 15368
+          },
+          {
             "context": "build (ubuntu-22.04)",
             "integration_id": 15368
           },

@@ -11,8 +11,10 @@ The default bump is **minor** (`0.1.0` → `0.2.0`). Set one PR label to overrid
 | `release:minor` | Increment minor and reset patch; same as the default |
 | `release:major` | Increment major and reset minor and patch |
 
-Conflicting or unknown `release:` labels fail validation. Labels are read from
-the merged PR when its main-branch push is processed. `Cargo.toml` supplies the baseline before the first tag and the
+Conflicting or unknown `release:` labels fail validation in a separate required
+check; label changes do not restart platform builds. Release version selection
+reads labels from the merged PR when its main-branch push is processed.
+`Cargo.toml` supplies the baseline before the first tag and the
 version for local development builds. Release builds receive their allocated
 version through `PORTBAK_RELEASE_VERSION`; no bot commits are made to `main`.
 Application versions do not change the settings or backup metadata format versions.
