@@ -94,7 +94,10 @@ fn load_config(path: &Path) -> anyhow::Result<Config> {
     };
     anyhow::ensure!(
         config.version == CONFIG_VERSION,
-        "Unknown configuration version"
+        "Unsupported settings format {} in {} (this app requires {}). Move or convert this settings file before restarting; it has not been overwritten.",
+        config.version,
+        path.display(),
+        CONFIG_VERSION
     );
     persistence::save(path, &config.for_storage())?;
     Ok(config)
@@ -110,7 +113,9 @@ mod tests {
         let path = directory.path().join("portbak.json");
         let original = br#"{"version":1,"jobs":[]}"#;
         std::fs::write(&path, original).unwrap();
-        assert!(load_config(&path).is_err());
+        let error = load_config(&path).err().unwrap().to_string();
+        assert!(error.contains("Unsupported settings format 1"));
+        assert!(error.contains(path.to_string_lossy().as_ref()));
         assert_eq!(std::fs::read(&path).unwrap(), original);
     }
 
