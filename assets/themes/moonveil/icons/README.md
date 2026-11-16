@@ -1,11 +1,7 @@
 # Saya interface icons
 
 Each function has its own transparent PNG; do not combine icons into a sprite
-sheet. Generation prompts and masters live locally under
-`agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
-The archive emblem and shield-shaped job controls are in `v3/`.
-The current Saya job heads, masters, previews and prompts live in
-`agent-local/refinements/characters/saya/pixel-head/job-icons-v6/`.
+sheet.
 
 ## Resolution and size
 

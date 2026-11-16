@@ -13,7 +13,7 @@ Theme assets:
 
 All use transparent backgrounds and preserve their proportions. Expressions are
 individual 512 × 512 PNGs. The welcome figure is static and has no click reaction.
-Prompts are stored alongside assets; refinement masters remain in agent-local.
+Available generation prompts are stored alongside their assets.
 
 Scenery remains behind controls. Bats avoid the pointer and scatter on clicks;
 one approaches at a distance. Flying bats deform one consistent sprite smoothly
