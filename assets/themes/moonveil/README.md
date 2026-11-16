@@ -1,31 +1,39 @@
 # Moonveil artwork
 
-Theme assets:
+## Asset overview
 
 - `saya-full-body.png`: static pixel-art welcome figure.
 - `saya-emblem.png`: Kurobane family crest beside the application and job names.
 - `expressions/`: registered pixel busts for the sidebar; click to show a
   non-neutral expression without immediate repeats. Hovering holds the
   expression; it resets after the pointer has been away for three seconds.
-- `scenery/`: moonlit rose garden, bat flight/perching sprites, petal and crescent.
-- `icons/`: individually generated Saya-inspired interface icons and prompts.
-  See its README for the shared resolution and visible-size rules.
+- [Scenery](scenery/README.md): moonlit rose garden, bat flight/perching sprites,
+  petal and crescent.
+- [Interface icons](icons/README.md): individually generated Saya-inspired icons,
+  with shared resolution and visible-size rules.
 
 All use transparent backgrounds and preserve their proportions. Expressions are
 individual 512 × 512 PNGs. The welcome figure is static and has no click reaction.
-Available generation prompts are stored alongside their assets.
+
+## Scenery
 
 Scenery remains behind controls. Bats avoid the pointer and scatter on clicks;
 one approaches at a distance. Flying bats deform one consistent sprite smoothly
 and mirror with direction. Three petal shapes tumble and vary in size; petals,
 crescents and silver sparks form a bounded trail. All effects stay enabled.
 
+Scenery textures are prepared at a maximum edge of 1024 pixels. Castle flicker uses
+`castle.png` plus the transparent `castle-windows.png` mask and 16-pixel cell list
+in `castle-windows.json`. Regenerate derived scenery with
+`python tools/prepare_moonveil_assets.py` (requires Pillow).
+
 ## Saya dialogue budget
 
 Keep each dialogue line to **120 Unicode characters maximum**, including spaces
 and punctuation. The unified companion panel has one outer frame around a square
 portrait, plain letterbox and caret strip. A single divider separates the portrait
-from the letterbox; the portrait and outer frame stay undecorated. The strip contains only a centered caret.
+from the letterbox; the portrait and outer frame stay undecorated. The strip
+contains only a centered caret.
 
 The letterbox stays 60 logical pixels tall, with 46 pixels available for text and
 7 pixels of top and bottom padding. This fits three lines at the normal font size.
@@ -38,15 +46,13 @@ brightness modes at 300, 350, and 460 logical-pixel sidebar widths. Run
 `cargo test --locked dialogue_budget` after editing dialogue. Both the character
 budget and rendered bounds must pass; never resize the box for individual lines.
 
+### Panel animation
+
 Minimizing and maximizing use a 240 ms eased slide and fade. The caret strip
 stays fixed at the bottom, while the job list smoothly gains or gives up space.
 The animation can reverse without jumping. Saya starts expanded on every launch.
 
-
-Scenery textures are prepared at a maximum edge of 1024 pixels. Castle flicker uses
-`castle.png` plus the transparent `castle-windows.png` mask and 16-pixel cell list
-in `castle-windows.json`. Regenerate derived scenery with
-`python tools/prepare_moonveil_assets.py` (requires Pillow).
+## Expression catalog
 
 The expression catalog in `src/app/scenery/saya/expressions.rs` is the source of
 truth for the enum, gallery, preloader and non-neutral click pool. Add variants
@@ -54,34 +60,19 @@ alphabetically, their artwork, dialogue and overlay, then refine page/action poo
 The gallery derives its count and grid from that catalog; it has no fixed capacity.
 Hold the header emblem for two seconds to open it.
 
-Excited uses the transparent `overlays/excited-sparkles.png` sprite. Eye glints are
-anchored to pupil centers in the 512px expression artwork; update those anchors
-when replacing that portrait. Overlays play once and are clipped to the portrait.
+### Expression overlays
 
-Love uses the transparent `overlays/love-hearts.png` ruby-heart cluster, rising
-and fading in three staggered bursts with its original one-shot timing.
+Overlays play once and are clipped to the portrait. Sprite paths below are
+relative to `overlays/`.
 
-Celebrating renders 64 folded metallic confetti pieces in one shared mesh. Its
-2.4-second shower falls from the top with staggered arrivals, flutter and shaded folds;
-no additional texture or persistent particle simulation is needed.
-
-Pouting uses the compact custom `overlays/pouting-exhale.png` anime huff sprite,
-with its open neck anchored beside her lips.
-
-Flirty uses the burgundy `overlays/flirty-kiss.png` lipstick imprint as a
-foreground camera-kiss stamp.
-
-Cute uses `overlays/cute-paw.png`, a shaded black-and-pink paw stamp fitted over
-her raised right hand; cheek whiskers are aligned relative to her nose.
-
-Fed uses `overlays/fed-blood.png` for organic crimson rivulets and wet highlights,
-animated downward from the top with different flow rates across the image.
-
-Hurt uses `overlays/hurt-scratches.png`, a detailed crimson claw decal revealed
-diagonally across the portrait before fading.
-
-Cute's curved ink whiskers come from `overlays/cute-whiskers.png`; the two
-clusters are fitted independently around her nose.
-
-Question uses `overlays/question-lines.png` for tapered manga emphasis rays above
-and below her touching fingertips.
+| Expression | Sprite | Appearance and animation |
+| --- | --- | --- |
+| Celebrating | Procedural mesh | 64 folded metallic confetti pieces fall from the top over 2.4 seconds, with staggered arrivals, flutter and shaded folds. No additional texture or persistent particle simulation is needed. |
+| Cute | `cute-paw.png`, `cute-whiskers.png` | A shaded black-and-pink paw stamp fits over her raised right hand. Two curved ink whisker clusters are fitted independently around her nose. |
+| Excited | `excited-sparkles.png` | Transparent sparkles with eye glints anchored to pupil centers in the 512 × 512 expression artwork. Update the anchors when replacing the portrait. |
+| Fed | `fed-blood.png` | Organic crimson rivulets and wet highlights flow downward from the top at different rates across the image. |
+| Flirty | `flirty-kiss.png` | A burgundy lipstick imprint appears as a foreground camera-kiss stamp. |
+| Hurt | `hurt-scratches.png` | A detailed crimson claw decal is revealed diagonally across the portrait before fading. |
+| Love | `love-hearts.png` | A transparent ruby-heart cluster rises and fades in three staggered bursts with its original one-shot timing. |
+| Pouting | `pouting-exhale.png` | A compact anime huff sprite has its open neck anchored beside her lips. |
+| Question | `question-lines.png` | Tapered manga emphasis rays appear above and below her touching fingertips. |
