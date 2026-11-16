@@ -23,11 +23,6 @@ runs:
     - uses: Swatinem/rust-cache@v2
     - shell: bash
       run: node --test .github/scripts/release.test.cjs
-    - if: github.event_name == 'pull_request'
-      shell: bash
-      env:
-        RELEASE_LABELS: ${{ toJSON(github.event.pull_request.labels) }}
-      run: node -e "require('./.github/scripts/release.cjs').bumpVersion('0.1.0', JSON.parse(process.env.RELEASE_LABELS).map(label => label.name))"
     - shell: bash
       run: python -B -m unittest discover -s .github/scripts -p 'test_*.py'
     - shell: bash
