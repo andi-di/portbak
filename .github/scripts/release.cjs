@@ -60,7 +60,11 @@ async function releaseByTag(github, repo, tag) {
     return (await github.rest.repos.getReleaseByTag({ ...repo, tag })).data;
   } catch (error) {
     if (error.status !== 404) throw error;
-    return null;
+    // The tag endpoint returns published releases; authenticated listings also include drafts.
+    const releases = await github.paginate(github.rest.repos.listReleases, { ...repo, per_page: 100 });
+    const matches = releases.filter(release => release.tag_name === tag);
+    if (matches.length > 1) throw new Error(`Multiple releases reserve ${tag}`);
+    return matches[0] ?? null;
   }
 }
 

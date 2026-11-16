@@ -25,9 +25,10 @@ class FakeGitHub {
   rest = {
     repos: {
       listTags() {},
+      listReleases() {},
       listReleaseAssets() {},
       getReleaseByTag: async ({ tag }) => {
-        const data = this.releases.find(release => release.tag_name === tag);
+        const data = this.releases.find(release => release.tag_name === tag && !release.draft);
         if (!data) throw Object.assign(new Error('Missing'), { status: 404 });
         return { data };
       },
@@ -65,6 +66,7 @@ class FakeGitHub {
   };
   paginate = async (method) => {
     if (method === this.rest.repos.listTags) return this.tags;
+    if (method === this.rest.repos.listReleases) return this.releases;
     if (method === this.rest.repos.listReleaseAssets) return this.assets;
     throw new Error('Unexpected pagination');
   };
