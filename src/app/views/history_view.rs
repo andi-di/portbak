@@ -24,7 +24,7 @@ struct HistoryResponse {
 impl App {
     pub(in crate::app) fn show_backups_tab(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        let Some(id) = self.selected else {
+        let Some(id) = self.page.selected_job() else {
             return;
         };
         let destination_missing = self
@@ -45,7 +45,7 @@ impl App {
                                 .as_ref()
                                 .is_some_and(|history| history.saving),
                             |ui| {
-                                super::editor::job_tabs(ui, &mut self.backups_tab);
+                                super::editor::job_tabs(ui, &mut self.page);
                             },
                         );
                         // Restores start here, so their progress and result show here too.
@@ -114,9 +114,9 @@ impl App {
     }
 
     pub(in crate::app) fn close_inactive_history(&mut self) {
-        let visible = self.backups_tab && !self.settings_open;
+        let visible = self.page.is_backups() && !self.page.is_settings();
         if self.backup_history.as_ref().is_some_and(|history| {
-            !history.saving && (!visible || self.selected != Some(history.job.id))
+            !history.saving && (!visible || self.page.selected_job() != Some(history.job.id))
         }) {
             self.backup_history = None;
         }

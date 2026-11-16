@@ -1,3 +1,4 @@
+use crate::app::navigation::Page;
 use crate::app::rendering::controls::{self, Button, Hint, Tone};
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
@@ -32,7 +33,7 @@ impl eframe::App for App {
         }
         self.ensure_skin(ctx);
         self.tick(ctx);
-        if let Some(id) = self.selected {
+        if let Some(id) = self.page.selected_job() {
             self.ensure_summary(id, ctx);
         }
         ctx.set_theme(theme_preference(self.config.theme));
@@ -55,9 +56,7 @@ impl eframe::App for App {
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
         {
             crate::app::scenery::saya::close_gallery(&ctx);
-            self.selected = None;
-            self.settings_open = false;
-            self.backups_tab = false;
+            self.page = Page::Home;
         }
         self.show_header(ui);
         self.show_footer(ui);
@@ -68,11 +67,9 @@ impl eframe::App for App {
         if crate::app::scenery::saya::gallery_open(&ctx) {
             crate::app::scenery::saya::show_gallery(ui);
             if !crate::app::scenery::saya::gallery_open(&ctx) {
-                self.selected = None;
-                self.settings_open = false;
-                self.backups_tab = false;
+                self.page = Page::Home;
             }
-        } else if self.settings_open {
+        } else if self.page.is_settings() {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
@@ -91,13 +88,13 @@ impl eframe::App for App {
 impl App {
     fn saya_page(&self) -> crate::app::scenery::saya::Page {
         use crate::app::scenery::saya::Page;
-        if self.settings_open {
+        if self.page.is_settings() {
             match self.settings_tab {
                 super::settings_view::SettingsTab::Jobs => Page::SettingsJobs,
                 super::settings_view::SettingsTab::Theme => Page::SettingsTheme,
             }
-        } else if let Some(id) = self.selected {
-            if self.backups_tab {
+        } else if let Some(id) = self.page.selected_job() {
+            if self.page.is_backups() {
                 Page::Backups(id)
             } else {
                 Page::JobSettings(id)
@@ -125,18 +122,6 @@ impl App {
         if !style::installed(ctx).is_some_and(|skin| skin.id == wanted.id) {
             style::install(ctx, wanted);
         }
-    }
-
-    fn toggle_settings(&mut self) {
-        self.settings_open = !self.settings_open;
-        self.selected = None;
-        self.backups_tab = false;
-    }
-
-    fn toggle_job(&mut self, id: uuid::Uuid) {
-        self.selected = (self.selected != Some(id)).then_some(id);
-        self.settings_open = false;
-        self.backups_tab = false;
     }
 
     fn show_header(&mut self, ui: &mut egui::Ui) {
@@ -184,9 +169,7 @@ impl App {
                     );
                     if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
                         crate::app::scenery::saya::close_gallery(&ctx);
-                        self.selected = None;
-                        self.settings_open = false;
-                        self.backups_tab = false;
+                        self.page = Page::Home;
                     }
                     let dark = self.config.theme == Theme::Dark;
                     let (label, sprite) = if dark {
@@ -228,7 +211,7 @@ impl App {
                                 let settings = Button::new("Settings")
                                     .icon_only()
                                     .sprite(Sprite::Gear)
-                                    .selected(self.settings_open);
+                                    .selected(self.page.is_settings());
                                 if ui.add(settings).hint("Settings").clicked() {
                                     crate::app::scenery::saya::close_gallery(&ctx);
                                     self.toggle_settings();
@@ -482,7 +465,7 @@ impl App {
 
     fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
         let palette = Palette::of(ui);
-        let selected = self.selected == Some(job.id);
+        let selected = self.page.selected_job() == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
         let card_id = ui.id().with(job.id);
         // The card's hover is only known after its contents, so wake the icon from last frame's.
@@ -935,22 +918,22 @@ mod tests {
             std::path::PathBuf::new(),
             tempfile::tempfile().unwrap(),
         );
-        app.selected = Some(app.config.jobs[0].id);
-        app.backups_tab = true;
+        app.page = Page::JobSettings(app.config.jobs[0].id);
+        app.page = Page::Backups(app.config.jobs[0].id);
         app.toggle_settings();
-        assert!(app.settings_open);
-        assert!(app.selected.is_none());
-        assert!(!app.backups_tab);
+        assert!(app.page.is_settings());
+        assert!(app.page.selected_job().is_none());
+        assert!(!app.page.is_backups());
         app.toggle_settings();
-        assert!(!app.settings_open);
-        assert!(app.selected.is_none());
+        assert!(!app.page.is_settings());
+        assert!(app.page.selected_job().is_none());
         app.toggle_settings();
         let id = app.config.jobs[0].id;
         app.toggle_job(id);
-        assert_eq!(app.selected, Some(id));
-        assert!(!app.settings_open);
+        assert_eq!(app.page.selected_job(), Some(id));
+        assert!(!app.page.is_settings());
         app.toggle_job(id);
-        assert!(app.selected.is_none());
+        assert!(app.page.selected_job().is_none());
     }
 
     #[test]
@@ -1109,7 +1092,7 @@ mod tests {
                 tempfile::tempfile().unwrap(),
             );
             for selection in [None, Some(0), Some(0), Some(1), None, Some(1)] {
-                app.selected = selection.map(|index| app.config.jobs[index].id);
+                app.page = Page::for_job(selection.map(|index| app.config.jobs[index].id));
                 let output = ctx.run_ui(
                     egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(
@@ -1549,8 +1532,10 @@ mod tests {
                             app.settings_tab = SettingsTab::Theme;
                         }
                     } else {
-                        app.selected = Some(app.config.jobs[0].id);
-                        app.backups_tab = view == "backups";
+                        app.page = Page::JobSettings(app.config.jobs[0].id);
+                        if view == "backups" {
+                            app.page = Page::Backups(app.config.jobs[0].id);
+                        }
                     }
                     let mut overflow = Vec::new();
                     // Later frames settle sizes measured in earlier ones.
@@ -1563,7 +1548,7 @@ mod tests {
                             app.show_header(ui);
                             app.show_footer(ui);
                             app.show_job_list(ui);
-                            if app.settings_open {
+                            if app.page.is_settings() {
                                 app.show_settings(ui);
                             } else {
                                 app.show_job_editor(ui);

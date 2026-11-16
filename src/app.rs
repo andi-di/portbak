@@ -1,9 +1,11 @@
 use crate::model::ScheduleSettings;
+mod navigation;
 pub(crate) mod platform;
 mod rendering;
 mod scenery;
 mod theme;
 mod views;
+use navigation::Page;
 
 use crate::engine::{self, history::Backup, Outcome};
 use crate::model::{Config, Job, Record};
@@ -117,7 +119,7 @@ enum Operation {
 pub struct App {
     config: Config,
     path: PathBuf,
-    selected: Option<Uuid>,
+    page: Page,
     queue: VecDeque<Uuid>,
     active: Option<Uuid>,
     restoring: bool,
@@ -125,8 +127,6 @@ pub struct App {
     /// The job and label of the operation that just finished, held with the footer activity.
     recent_activity: Option<(Uuid, &'static str)>,
     backup_history: Option<BackupHistory>,
-    backups_tab: bool,
-    settings_open: bool,
     settings_tab: views::settings_view::SettingsTab,
     history_cache: HashMap<Uuid, CachedHistory>,
     history_requests: HashMap<Uuid, PendingSummary>,
@@ -147,7 +147,7 @@ impl App {
         }
         let (tx, rx) = mpsc::channel();
         Self {
-            selected: None,
+            page: Page::default(),
             config,
             path,
             queue: VecDeque::new(),
@@ -156,8 +156,6 @@ impl App {
             activity_until: None,
             recent_activity: None,
             backup_history: None,
-            backups_tab: false,
-            settings_open: false,
             settings_tab: views::settings_view::SettingsTab::default(),
             history_cache: HashMap::new(),
             history_requests: HashMap::new(),
@@ -248,9 +246,7 @@ impl App {
             return;
         }
         let job = self.config.job_defaults.new_job();
-        self.selected = Some(job.id);
-        self.settings_open = false;
-        self.backups_tab = false;
+        self.page = Page::JobSettings(job.id);
         self.backup_history = None;
         self.config.jobs.push(job);
     }
@@ -260,11 +256,12 @@ impl App {
         self.history_requests.remove(&id);
         let index = self.config.jobs.iter().position(|job| job.id == id);
         self.config.jobs.retain(|job| job.id != id);
-        if self.selected == Some(id) {
-            self.selected = index
-                .and_then(|index| self.config.jobs.get(index.saturating_sub(1)))
-                .map(|job| job.id);
-            self.backups_tab = false;
+        if self.page.selected_job() == Some(id) {
+            self.page = Page::for_job(
+                index
+                    .and_then(|index| self.config.jobs.get(index.saturating_sub(1)))
+                    .map(|job| job.id),
+            );
         }
     }
 
@@ -716,7 +713,7 @@ mod tests {
             ..Config::default()
         };
         let app = app_with(config, PathBuf::new());
-        assert!(app.selected.is_none());
+        assert!(app.page.selected_job().is_none());
     }
 
     #[test]
@@ -730,21 +727,21 @@ mod tests {
             },
             PathBuf::new(),
         );
-        app.selected = Some(ids[2]);
+        app.page = Page::JobSettings(ids[2]);
         app.remove_job(ids[2]);
-        assert_eq!(app.selected, Some(ids[1]));
+        assert_eq!(app.page.selected_job(), Some(ids[1]));
         app.remove_job(ids[3]);
-        assert_eq!(app.selected, Some(ids[1]));
+        assert_eq!(app.page.selected_job(), Some(ids[1]));
         app.remove_job(ids[1]);
-        assert_eq!(app.selected, Some(ids[0]));
+        assert_eq!(app.page.selected_job(), Some(ids[0]));
         app.remove_job(ids[0]);
-        assert_eq!(app.selected, None);
+        assert_eq!(app.page.selected_job(), None);
         let first = Job::default();
         let second = Job::default();
-        app.selected = Some(first.id);
+        app.page = Page::JobSettings(first.id);
         app.config.jobs = vec![first.clone(), second.clone()];
         app.remove_job(first.id);
-        assert_eq!(app.selected, Some(second.id));
+        assert_eq!(app.page.selected_job(), Some(second.id));
     }
 
     #[test]
@@ -760,7 +757,7 @@ mod tests {
         let second = &app.config.jobs[1];
         assert!(!second.zip);
         assert_eq!(second.timing.interval_value, 15);
-        assert_eq!(app.selected, Some(second.id));
+        assert_eq!(app.page.selected_job(), Some(second.id));
         assert_ne!(first.id, second.id);
     }
 
@@ -770,7 +767,7 @@ mod tests {
         config.job_defaults.check_on_enable = true;
         let mut app = app_with(config, PathBuf::new());
         app.add_job();
-        let id = app.selected.unwrap();
+        let id = app.page.selected_job().unwrap();
         app.config.job_defaults.check_on_enable = false;
         let job = app.job_mut(id).unwrap();
         assert!(job.check_on_enable);
@@ -795,7 +792,7 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
         let mut app = app_with(config, PathBuf::new());
         app.add_job();
-        let id = app.selected.unwrap();
+        let id = app.page.selected_job().unwrap();
         let job = app.job_mut(id).unwrap();
         job.enabled = true;
         job.reschedule(Utc::now());
@@ -950,7 +947,7 @@ mod tests {
     fn browsing_history_runs_due_backup_without_input_and_reloads_versions() {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
-        app.backups_tab = true;
+        app.page = Page::Backups(app.config.jobs[0].id);
         let job = app.config.jobs[0].clone();
         std::fs::write(job.source.join("file"), "changed").unwrap();
         let context = egui::Context::default();
@@ -1021,14 +1018,14 @@ mod tests {
     fn new_job_leaves_backups_and_preserves_existing_job() {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
-        app.backups_tab = true;
+        app.page = Page::Backups(app.config.jobs[0].id);
         let original = app.config.jobs[0].clone();
         assert!(app.can_add_job());
         app.add_job();
         assert_eq!(app.config.jobs.len(), 2);
         assert!(app.config.jobs[0] == original);
-        assert_eq!(app.selected, Some(app.config.jobs[1].id));
-        assert!(!app.backups_tab);
+        assert_eq!(app.page.selected_job(), Some(app.config.jobs[1].id));
+        assert!(!app.page.is_backups());
         assert!(app.backup_history.is_none());
         assert!(!app.scheduling_paused());
     }
@@ -1066,7 +1063,7 @@ mod tests {
         select_restore(&mut app, &name);
         let request = dialog(&app).request;
         app.backup_history.as_mut().unwrap().saving = true;
-        app.selected = None;
+        app.page = Page::Home;
         app.close_inactive_history();
         assert!(app.backup_history.is_some());
         app.protection_saved(request, &name, true, Ok(()));
@@ -1201,7 +1198,7 @@ mod tests {
             ..Config::default()
         };
         let mut app = app_with(config, PathBuf::new());
-        app.selected = Some(id);
+        app.page = Page::JobSettings(id);
         app.enqueue(id);
         let context = egui::Context::default();
         let _ = context.run_ui(egui::RawInput::default(), |ui| {

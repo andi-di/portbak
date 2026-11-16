@@ -1,3 +1,4 @@
+use crate::app::navigation::Page;
 use crate::app::rendering::controls::{self, Button, Hint, Tone};
 
 use crate::app::rendering::sprites::{self, Sprite};
@@ -39,18 +40,18 @@ struct Permissions {
 
 impl App {
     pub(in crate::app) fn show_job_editor(&mut self, ui: &mut egui::Ui) {
-        if self.backups_tab && self.selected.is_some() {
+        if self.page.is_backups() && self.page.selected_job().is_some() {
             self.show_backups_tab(ui);
             return;
         }
         let ctx = ui.ctx().clone();
-        let permissions = self.selected.map(|id| Permissions {
+        let permissions = self.page.selected_job().map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
             activity: self.activity_label(id).filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
-        let selected = self.selected;
+        let selected = self.page.selected_job();
         let summaries = &self.history_cache;
         let app_dir = self
             .path
@@ -71,7 +72,7 @@ impl App {
                             add = welcome(ui, can_add);
                             return;
                         };
-                        job_tabs(ui, &mut self.backups_tab);
+                        job_tabs(ui, &mut self.page);
                         let was_enabled = job.enabled;
                         let previous = job.clone();
                         let summary = summaries
@@ -672,7 +673,10 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     }
 }
 
-pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
+pub(super) fn job_tabs(ui: &mut egui::Ui, page: &mut Page) {
+    let Some(id) = page.selected_job() else {
+        return;
+    };
     // The tabs open the page's scroll view, which would clip their shadow and swell.
     if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
         ui.add_space(crate::app::rendering::liquid::HEADROOM);
@@ -680,10 +684,10 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
     ui.horizontal_wrapped(|ui| {
         controls::segmented(
             ui,
-            backups,
+            page,
             &[
-                (false, "Job settings", Sprite::JobSettings),
-                (true, "Backups", Sprite::Chest),
+                (Page::JobSettings(id), "Job settings", Sprite::JobSettings),
+                (Page::Backups(id), "Backups", Sprite::Chest),
             ],
         );
     });
