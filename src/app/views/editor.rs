@@ -1,4 +1,5 @@
-use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
+use crate::app::rendering::controls::{self, Button, Hint, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
@@ -62,7 +63,7 @@ impl App {
         egui::CentralPanel::default()
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
-                pixel::paint_scenery(ui);
+                crate::app::scenery::layers::paint_scenery(ui);
                 ui.push_id(("job_page", selected), |ui| {
                     page_scroll_area(ui, |ui| {
                         let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
@@ -133,7 +134,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let liquid = Skin::of(ui.ctx()).finish == style::Finish::Liquid;
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || pixel::blink(ui, 0.6) {
+        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || controls::blink(ui, 0.6) {
             0.0
         } else {
             6.0
@@ -148,7 +149,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
         let title = if liquid { palette.ink } else { palette.gold };
-        pixel::display_label(ui, wording.welcome_title, 24.0, title);
+        controls::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(8.0);
         let tagline = "Your folders. Safely backed up.";
         if liquid {
@@ -162,7 +163,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
                 .color(palette.dim),
         );
         ui.add_space(22.0);
-        let start = PixelButton::new("New job")
+        let start = Button::new("New job")
             .sprite(Sprite::Plus)
             .tone(Tone::Accent)
             .min_size(egui::vec2(240.0, 52.0));
@@ -171,12 +172,12 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
             return clicked;
         }
         ui.add_space(8.0);
-        let prompt = if pixel::blink(ui, 0.5) {
+        let prompt = if controls::blink(ui, 0.5) {
             wording.welcome_prompt
         } else {
             " "
         };
-        pixel::display_label(ui, prompt, 10.0, palette.hot);
+        controls::display_label(ui, prompt, 10.0, palette.hot);
         clicked
     })
     .inner
@@ -194,13 +195,13 @@ fn job_editor(
     ui.add_space(8.0);
     // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
     let unchanged = permissions.busy.then(|| job.clone());
-    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+    controls::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
         folder_settings(ui, job, permissions.busy)
     });
-    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+    controls::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
         schedule_settings(ui, job)
     });
-    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+    controls::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         retention_settings(ui, job, summary)
     });
     if let Some(unchanged) = unchanged {
@@ -291,7 +292,7 @@ fn job_action_button(
     tone: Tone,
     busy: bool,
 ) -> bool {
-    let button = PixelButton::new(label)
+    let button = Button::new(label)
         .icon_only()
         .sprite(sprite)
         .tone(tone)
@@ -347,7 +348,7 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     } else {
         ("Enable automatic backups", Tone::Good)
     };
-    let button = PixelButton::new(label)
+    let button = Button::new(label)
         .icon_only()
         .sprite(Sprite::Power)
         .tone(tone)
@@ -421,7 +422,7 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
-        pixel::segmented(
+        controls::segmented(
             ui,
             &mut job.timing.mode,
             &[
@@ -487,7 +488,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         .size()
         .y
         + next_check_frame(ui.ctx()).total_margin().sum().y;
-    let row_height = pixel::button_height(ui)
+    let row_height = controls::button_height(ui)
         .max(ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0)
         .max(if show_next_check { readout_height } else { 0.0 });
     ui.allocate_ui_with_layout(
@@ -536,7 +537,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
 fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
     centered_row(ui, |ui| {
         for (selected, label) in job.timing.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
-            let day = PixelButton::new(label)
+            let day = Button::new(label)
                 .selected(*selected)
                 .min_size(egui::vec2(58.0, 0.0));
             if ui.add(day).clicked() {
@@ -677,7 +678,7 @@ pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
         ui.add_space(crate::app::rendering::liquid::HEADROOM);
     }
     ui.horizontal_wrapped(|ui| {
-        pixel::segmented(
+        controls::segmented(
             ui,
             backups,
             &[

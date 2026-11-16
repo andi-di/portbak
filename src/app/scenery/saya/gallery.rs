@@ -1,5 +1,6 @@
 use super::{expressions::Expression, state_id, SayaCompanion};
-use crate::app::rendering::pixel::{self, PixelButton};
+use crate::app::rendering::controls::{self, Button};
+
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Rect, Vec2};
 use std::time::Duration;
@@ -154,7 +155,7 @@ pub fn show(ui: &mut egui::Ui) {
                 .inner_margin(egui::Margin::same(crate::app::views::widgets::PAGE_PADDING)),
         )
         .show_inside(ui, |ui| {
-            pixel::paint_scenery(ui);
+            crate::app::scenery::layers::paint_scenery(ui);
             ui.horizontal(|ui| {
                 ui.heading("Saya’s Looking Glass");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -190,7 +191,7 @@ pub fn show(ui: &mut egui::Ui) {
 
 fn close_button(ui: &mut egui::Ui) -> egui::Response {
     let response = ui
-        .add(PixelButton::new("").compact().min_size(Vec2::splat(36.0)))
+        .add(Button::new("").compact().min_size(Vec2::splat(36.0)))
         .on_hover_text("Close gallery (Esc)");
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close gallery"));
@@ -328,7 +329,7 @@ fn grid(ui: &mut egui::Ui, gallery: &mut Gallery, height: f32) {
                                         egui::StrokeKind::Inside,
                                     );
                                 }
-                                pixel::subtle_highlight(ui, &response, rect, palette.metal);
+                                controls::subtle_highlight(ui, &response, rect, palette.metal);
                             }
                             if response.gained_focus() {
                                 response.scroll_to_me(Some(egui::Align::Center));

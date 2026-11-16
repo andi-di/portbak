@@ -1,5 +1,6 @@
+use crate::app::rendering::controls::{self, Button, Checkbox, Hint, Tone};
 use crate::app::rendering::liquid::{self, Frost};
-use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
@@ -34,7 +35,7 @@ impl App {
         egui::CentralPanel::default()
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
-                pixel::paint_scenery(ui);
+                crate::app::scenery::layers::paint_scenery(ui);
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
                     .show(ui, |ui| {
@@ -209,8 +210,8 @@ fn restore_dialog(
 }
 
 fn restore_buttons(ui: &mut egui::Ui, can_restore: bool) -> (egui::Response, egui::Response) {
-    let cancel = PixelButton::new("Cancel");
-    let restore = PixelButton::new("Restore")
+    let cancel = Button::new("Cancel");
+    let restore = Button::new("Restore")
         .sprite(Sprite::Rewind)
         .tone(Tone::Danger);
     let height = cancel.size(ui).y.max(restore.size(ui).y);
@@ -240,7 +241,11 @@ fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
         ui.add(egui::Label::new(format!("Selected backup: {name}")).wrap());
     }
     egui::Frame::new()
-        .fill(pixel::mix(palette.bad, palette.surface, 0.8))
+        .fill(crate::app::rendering::primitives::mix(
+            palette.bad,
+            palette.surface,
+            0.8,
+        ))
         .stroke(egui::Stroke::new(2.0_f32, palette.bad))
         .corner_radius(style::control_radius(ui.ctx()))
         .inner_margin(egui::Margin::same(10))
@@ -433,7 +438,7 @@ fn backup_row<R>(
             .inner
         });
     let id = ui.id().with(&backup.record.name);
-    pixel::tooltip(
+    controls::tooltip(
         ui,
         size,
         id.with("size"),
@@ -464,10 +469,10 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup) -> egui::Rect {
                 )
                 .rect;
             if !backup.available {
-                pixel::badge(ui, "Unavailable", palette.bad);
+                controls::badge(ui, "Unavailable", palette.bad);
             }
             if record.protected {
-                pixel::badge(ui, "Protected", palette.good);
+                controls::badge(ui, "Protected", palette.good);
             }
         });
         ui.add(egui::Label::new(egui::RichText::new(&record.name).small().color(dim)).wrap());
@@ -485,7 +490,7 @@ fn backup_controls(
     let mut restore = None;
     let mut reveal = None;
     let change = backup_row(ui, backup, |ui| {
-        let trash = PixelButton::new("Delete backup")
+        let trash = Button::new("Delete backup")
             .icon_only()
             .sprite(Sprite::Trash)
             .tone(Tone::Danger);
@@ -497,7 +502,7 @@ fn backup_controls(
         {
             delete = Some(backup.record.name.clone());
         }
-        let button = PixelButton::new("Restore backup")
+        let button = Button::new("Restore backup")
             .icon_only()
             .sprite(Sprite::Rewind)
             .tone(Tone::Danger);
@@ -507,7 +512,7 @@ fn backup_controls(
             .clicked() {
                 restore = Some(backup.record.name.clone());
             }
-        let open = PixelButton::new("Open backup location")
+        let open = Button::new("Open backup location")
             .icon_only()
             .sprite(Sprite::Monitor)
             .tone(Tone::Plain);
@@ -521,7 +526,7 @@ fn backup_controls(
         }
         let mut protected = backup.record.protected;
         let enabled = !saving && (backup.available || protected);
-        let checkbox = PixelCheckbox::new(&mut protected, "Locked");
+        let checkbox = Checkbox::new(&mut protected, "Locked");
         ui.add_enabled(enabled, checkbox)
             .hint("Protect from retention deletion")
             .changed()

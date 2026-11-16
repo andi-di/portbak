@@ -5,7 +5,7 @@
 
 use crate::app::rendering::glass;
 use crate::app::rendering::glyphs::{polar, Pen, Point};
-use crate::app::rendering::pixel::{mix, readable_on, shaded_fan, shaded_polygon};
+use crate::app::rendering::primitives::{mix, readable_on, shaded_fan, shaded_polygon};
 use crate::app::rendering::sprites::Sprite;
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Shape, Vec2};

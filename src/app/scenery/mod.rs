@@ -2,6 +2,7 @@ pub(super) mod aquarium;
 pub(super) mod aurora;
 pub(super) mod bubbles;
 pub(super) mod fishes;
+pub(super) mod layers;
 pub(super) mod liquid_wallpaper;
 pub(super) mod moonveil;
 pub(super) mod saya;

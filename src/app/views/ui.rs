@@ -1,7 +1,8 @@
+use crate::app::rendering::controls::{self, Button, Hint, Tone};
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
 use crate::app::rendering::ornaments;
-use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
@@ -45,7 +46,7 @@ impl eframe::App for App {
             }
             crate::app::scenery::saya::preload(&ctx);
         }
-        pixel::paint_underlay(&ctx);
+        crate::app::scenery::layers::paint_underlay(&ctx);
         let before = self.config.clone();
         if !self
             .backup_history
@@ -83,7 +84,7 @@ impl eframe::App for App {
         if !crate::app::scenery::saya::gallery_open(&ctx) {
             crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
         }
-        pixel::paint_overlays(&ctx);
+        crate::app::scenery::layers::paint_overlays(&ctx);
     }
 }
 
@@ -152,7 +153,7 @@ impl App {
                 bottom: 0,
             }
         };
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(margin);
+        let frame = controls::panel_frame(&ctx, palette.surface).inner_margin(margin);
         egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
@@ -160,7 +161,7 @@ impl App {
                 // Liquid glass keeps the top bar clear: only its buttons are glass.
                 let liquid = Skin::of(ui.ctx()).finish == Finish::Liquid;
                 if !liquid {
-                    pixel::panel_decoration(ui, 1.9);
+                    controls::panel_decoration(ui, 1.9);
                 }
                 ui.horizontal(|ui| {
                     let brand = ui.horizontal(|ui| {
@@ -175,7 +176,7 @@ impl App {
                         )
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .on_hover_text("Start screen");
-                    pixel::subtle_highlight(
+                    controls::subtle_highlight(
                         ui,
                         &home,
                         brand.response.rect.expand(if gothic { 2.0 } else { 3.0 }),
@@ -193,8 +194,8 @@ impl App {
                     } else {
                         ("Dark", Sprite::Moon)
                     };
-                    let mode_size = PixelButton::new(label).sprite(sprite).icon_only().size(ui);
-                    let settings_size = PixelButton::new("Settings")
+                    let mode_size = Button::new(label).sprite(sprite).icon_only().size(ui);
+                    let settings_size = Button::new("Settings")
                         .sprite(Sprite::Gear)
                         .icon_only()
                         .size(ui);
@@ -208,7 +209,7 @@ impl App {
                             egui::Layout::left_to_right(egui::Align::Center),
                             |ui| {
                                 if ui
-                                    .add(PixelButton::new(label).sprite(sprite).icon_only())
+                                    .add(Button::new(label).sprite(sprite).icon_only())
                                     .hint(format!("Switch to {label} mode"))
                                     .clicked()
                                 {
@@ -224,7 +225,7 @@ impl App {
                                         },
                                     );
                                 }
-                                let settings = PixelButton::new("Settings")
+                                let settings = Button::new("Settings")
                                     .icon_only()
                                     .sprite(Sprite::Gear)
                                     .selected(self.settings_open);
@@ -264,7 +265,7 @@ impl App {
                     egui::pos2(clip.right(), top + 16.0),
                 );
                 ui.allocate_rect(band, egui::Sense::hover());
-                pixel::stripes(ui.painter(), band, palette);
+                controls::stripes(ui.painter(), band, palette);
                 let rule = egui::Rect::from_min_max(
                     egui::pos2(clip.left(), band.bottom()),
                     egui::pos2(clip.right(), band.bottom() + 3.0),
@@ -282,13 +283,13 @@ impl App {
         } else {
             18
         };
-        let frame = pixel::panel_frame(&ctx, palette.sunken)
+        let frame = controls::panel_frame(&ctx, palette.sunken)
             .inner_margin(egui::Margin::symmetric(side, 10));
         egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.0);
+                controls::panel_decoration(ui, 1.0);
                 if !matches!(Skin::of(ui.ctx()).finish, Finish::Glass | Finish::Liquid) {
                     let clip = ui.clip_rect();
                     let rule =
@@ -296,7 +297,12 @@ impl App {
                     ui.painter().rect_filled(rule, 0.0, palette.outline);
                 }
                 ui.horizontal(|ui| {
-                    pixel::display_label(ui, Skin::of(ui.ctx()).wording.ready, 10.0, palette.good);
+                    controls::display_label(
+                        ui,
+                        Skin::of(ui.ctx()).wording.ready,
+                        10.0,
+                        palette.good,
+                    );
                     ui.label(
                         egui::RichText::new("Scheduling runs while the app is open")
                             .color(palette.dim),
@@ -326,7 +332,7 @@ impl App {
                                     );
                                     return;
                                 }
-                                pixel::led(
+                                controls::led(
                                     ui,
                                     if active { palette.gold } else { palette.dim },
                                     active,
@@ -359,7 +365,7 @@ impl App {
         } else {
             0
         };
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
+        let frame = controls::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
             left: 16 + inset,
             right: 14 + inset,
             top: 16 + inset / 2,
@@ -379,10 +385,10 @@ impl App {
             .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::sidebar_decoration(ui);
+                controls::sidebar_decoration(ui);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    pixel::display_label(
+                    controls::display_label(
                         ui,
                         "JOBS",
                         16.0,
@@ -394,11 +400,11 @@ impl App {
                         ui.label(egui::RichText::new(count).color(palette.dim));
                     } else {
                         let color = style::decorative_color(ui.ctx(), palette.gold);
-                        pixel::badge(ui, &count, color);
+                        controls::badge(ui, &count, color);
                     }
                 });
                 ui.add_space(10.0);
-                let new_job = PixelButton::new("New job")
+                let new_job = Button::new("New job")
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
@@ -584,7 +590,7 @@ impl App {
                     .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
-        let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
+        let response = controls::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
         let glass_hover = ui.ctx().animate_bool_with_time(
             card_id.with("glass_hover"),
             response.hovered(),
@@ -594,7 +600,7 @@ impl App {
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
-        pixel::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
+        controls::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
         ui.add_space(CARD_SHADOW);
         response.clicked()
     }
@@ -654,7 +660,7 @@ fn logo(ui: &mut egui::Ui) {
         Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
         _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
-    if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
+    if skin.finish == Finish::Pixel && controls::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [
             (egui::vec2(-2.0, -6.0), egui::vec2(4.0, 12.0)),
@@ -681,7 +687,7 @@ fn logo(ui: &mut egui::Ui) {
     }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
-        pixel::display_label(
+        controls::display_label(
             ui,
             "PORTBAK",
             if skin.finish == Finish::Modern {
@@ -724,7 +730,9 @@ fn card_shapes(
     let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);
     let fill = match (selected, hovered) {
         (true, _) => palette.raised,
-        (false, true) => pixel::mix(palette.surface, palette.raised, 0.6),
+        (false, true) => {
+            crate::app::rendering::primitives::mix(palette.surface, palette.raised, 0.6)
+        }
         (false, false) => palette.surface,
     };
     let border = if selected {
@@ -882,12 +890,12 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    pixel::paint_underlay(&ctx);
+                    crate::app::scenery::layers::paint_underlay(&ctx);
                     app.show_header(ui);
                     app.show_footer(ui);
                     app.show_job_list(ui);
                     app.show_job_editor(ui);
-                    pixel::paint_overlays(&ctx);
+                    crate::app::scenery::layers::paint_overlays(&ctx);
                 },
             );
             upload_bytes += output

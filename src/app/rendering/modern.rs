@@ -204,7 +204,6 @@ pub fn foreground(fill: Color32) -> Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::rendering::pixel;
     use crate::app::theme::skins;
     use crate::app::theme::style;
 
@@ -232,8 +231,8 @@ mod tests {
             for base in [palette.accent, palette.good, palette.gold, palette.bad] {
                 for fill in [
                     base,
-                    pixel::mix(base, Color32::WHITE, 0.18),
-                    pixel::mix(base, Color32::BLACK, 0.12),
+                    crate::app::rendering::primitives::mix(base, Color32::WHITE, 0.18),
+                    crate::app::rendering::primitives::mix(base, Color32::BLACK, 0.12),
                 ] {
                     assert!(contrast(fill, foreground(fill)) >= 4.5, "{fill:?}");
                 }

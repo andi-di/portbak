@@ -2,9 +2,10 @@
 //! by night), drifting clouds, light swooshes, a spinning glass globe, rolling hills and a glassy
 //! sea whose waves toss up droplets; plus the glass title bars.
 
+use crate::app::rendering::controls::halo;
 use crate::app::rendering::glass;
 use crate::app::rendering::ornaments::{fading_rule, noise};
-use crate::app::rendering::pixel::{halo, mix, shaded_polygon};
+use crate::app::rendering::primitives::{mix, shaded_polygon};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::scenery::aquarium;
 use crate::app::scenery::bubbles;

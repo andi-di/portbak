@@ -1,6 +1,7 @@
+use crate::app::rendering::controls::{self, Hint};
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
-use crate::app::rendering::pixel::{self, Hint};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, metrics, Finish, Palette, Skin};
@@ -25,7 +26,7 @@ impl App {
         egui::CentralPanel::default()
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
-                pixel::paint_scenery(ui);
+                crate::app::scenery::layers::paint_scenery(ui);
                 page_scroll_area(ui, |ui| {
                     settings_page(ui, &mut self.config, &mut self.settings_tab);
                 });
@@ -38,16 +39,16 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
     ui.horizontal(|ui| {
         // Liquid glass opens with an iOS large title instead of an icon beside the name.
         if Skin::of(ui.ctx()).finish == Finish::Liquid {
-            pixel::display_label(ui, "SETTINGS", 26.0, palette.ink);
+            controls::display_label(ui, "SETTINGS", 26.0, palette.ink);
             return;
         }
         sprites::show(ui, Sprite::Gear, 4.0, palette.metal);
         ui.add_space(6.0);
-        pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
+        controls::display_label(ui, "SETTINGS", 16.0, palette.ink);
     });
     ui.add_space(8.0);
     ui.horizontal_wrapped(|ui| {
-        pixel::segmented(
+        controls::segmented(
             ui,
             tab,
             &[
@@ -60,7 +61,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
     match tab {
         SettingsTab::Jobs => job_defaults(ui, &mut config.job_defaults),
         SettingsTab::Theme => {
-            pixel::section(ui, "Theme", Sprite::Theme, palette.hot, |ui| {
+            controls::section(ui, "Theme", Sprite::Theme, palette.hot, |ui| {
                 caption(ui, "Look");
                 for candidate in skins::ALL {
                     skin_card(ui, candidate, &mut config.skin);
@@ -79,7 +80,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
     } else {
         ui.label(note);
     }
-    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+    controls::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
         switch_row(
             ui,
             &mut defaults.auto_destination,
@@ -87,7 +88,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
         );
         switch_row(ui, &mut defaults.zip, "Compress as ZIP");
     });
-    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+    controls::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
         let mut job = defaults.new_job();
         super::editor::schedule_controls(ui, &mut job);
         defaults.update_schedule(&job);
@@ -98,7 +99,7 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
             "Check immediately when enabled",
         );
     });
-    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+    controls::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         switch_row(ui, &mut defaults.rolling, "Enable rolling retention");
         ui.add_enabled_ui(defaults.rolling, |ui| {
             let counting = defaults.count_enabled;
@@ -141,7 +142,7 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
                 ui.label(egui::RichText::new(candidate.name).heading().color(ink));
                 if selected {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        pixel::badge(ui, "Active", palette.good);
+                        controls::badge(ui, "Active", palette.good);
                     });
                 }
             });
@@ -150,10 +151,13 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
             swatches(ui, &candidate.light);
         });
     let rect = frame.response.rect;
-    let response =
-        pixel::pointing_hand(ui.interact(rect, ui.id().with(candidate.id), egui::Sense::click()));
+    let response = controls::pointing_hand(ui.interact(
+        rect,
+        ui.id().with(candidate.id),
+        egui::Sense::click(),
+    ));
     if response.has_focus() {
-        pixel::subtle_highlight(
+        controls::subtle_highlight(
             ui,
             &response,
             rect.shrink(3.0),

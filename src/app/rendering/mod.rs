@@ -1,3 +1,4 @@
+pub(super) mod controls;
 pub(super) mod frost;
 pub(super) mod glass;
 pub(super) mod glossy;
@@ -6,7 +7,7 @@ pub(super) mod gothic;
 pub(super) mod liquid;
 pub(super) mod modern;
 pub(super) mod ornaments;
-pub(super) mod pixel;
+pub(super) mod primitives;
 pub(super) mod refraction;
 pub(super) mod shaders;
 pub(super) mod sprites;

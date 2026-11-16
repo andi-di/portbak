@@ -1,10 +1,11 @@
-//! Retro widgets and decorations painted from plain rectangles: bevels, hard shadows, LEDs.
+//! Shared controls and surfaces, painted using the active skin.
 
+use super::primitives::{bevel, luma, mix, readable_on};
 use crate::app::rendering::glass::{self, Glaze};
 use crate::app::rendering::gothic;
 use crate::app::rendering::liquid::{self, Frost, Lens};
 use crate::app::rendering::sprites::{self, Sprite};
-use crate::app::scenery::{aurora, liquid_wallpaper, moonveil};
+use crate::app::scenery::aurora;
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin, TitleBar};
 use eframe::egui::{
     self, Color32, Pos2, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, Vec2, Widget,
@@ -101,7 +102,7 @@ pub struct FaceLook {
 }
 
 /// A chunky beveled push button; `selected` renders it latched down like a toggle key.
-pub struct PixelButton {
+pub struct Button {
     label: String,
     sprite: Option<Sprite>,
     icon_only: bool,
@@ -111,7 +112,7 @@ pub struct PixelButton {
     min_size: Vec2,
 }
 
-impl PixelButton {
+impl Button {
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
@@ -176,7 +177,7 @@ struct ButtonGeometry {
     margin: Vec2,
 }
 
-impl PixelButton {
+impl Button {
     pub fn size(&self, ui: &egui::Ui) -> Vec2 {
         let scale = self.icon_scale(ui);
         let geometry = self.geometry(ui, scale);
@@ -251,7 +252,7 @@ impl PixelButton {
     }
 }
 
-impl Widget for PixelButton {
+impl Widget for Button {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
@@ -453,14 +454,14 @@ fn pixel_face(
 }
 
 /// A check box drawn in the skin's style; the label wraps beside it.
-pub struct PixelCheckbox<'a> {
+pub struct Checkbox<'a> {
     checked: &'a mut bool,
     label: String,
     /// Whether the label is painted; an unlabeled box still names itself to assistive tools.
     labeled: bool,
 }
 
-impl<'a> PixelCheckbox<'a> {
+impl<'a> Checkbox<'a> {
     pub fn new(checked: &'a mut bool, label: impl Into<String>) -> Self {
         Self {
             checked,
@@ -478,7 +479,7 @@ impl<'a> PixelCheckbox<'a> {
     }
 }
 
-impl Widget for PixelCheckbox<'_> {
+impl Widget for Checkbox<'_> {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let m = style::metrics(ui.ctx());
         let palette = Palette::of(ui);
@@ -629,7 +630,7 @@ pub fn choice<T: PartialEq>(
     label: &str,
     sprite: Option<Sprite>,
 ) -> Response {
-    let mut button = PixelButton::new(label).selected(*current == value);
+    let mut button = Button::new(label).selected(*current == value);
     if let Some(sprite) = sprite {
         button = button.sprite(sprite);
     }
@@ -664,7 +665,7 @@ pub fn segmented<T: PartialEq + Copy>(
     }
 }
 
-/// Total height of a `PixelButton` with a single text line, including its shadow.
+/// Total height of a `Button` with a single text line, including its shadow.
 pub fn button_height(ui: &egui::Ui) -> f32 {
     let m = style::metrics(ui.ctx());
     let content = match Skin::of(ui.ctx()).finish {
@@ -1020,81 +1021,6 @@ pub fn panel_decoration(ui: &egui::Ui, density: f32) {
     ui.painter().extend(glass::pane(ctx, rect, radius, &glaze));
 }
 
-/// The skin's backdrop behind every panel; call before showing any panel.
-pub fn paint_underlay(ctx: &egui::Context) {
-    let effects = &Skin::of(ctx).effects;
-    let palette = Palette::of_ctx(ctx);
-    if effects.hearts {
-        moonveil::paint_background(ctx, palette);
-    } else if Skin::of(ctx).finish == Finish::Liquid {
-        liquid_wallpaper::paint(ctx);
-    } else if effects.wallpaper {
-        aurora::paint_wallpaper(ctx, palette);
-    }
-    if effects.bubbles {
-        aurora::paint_bubbles(ctx, palette);
-    }
-}
-
-/// The skin's decorations behind a central panel's content; call before adding the content.
-pub fn paint_scenery(ui: &egui::Ui) {
-    let effects = &Skin::of(ui.ctx()).effects;
-    let palette = Palette::of(ui);
-    if Skin::of(ui.ctx()).finish == Finish::Gothic {
-        moonveil::paint_scene(ui.painter(), Palette::of(ui));
-        gothic::pattern(ui.painter(), ui.clip_rect());
-    }
-    if effects.grid {
-        paint_grid(ui.painter(), ui.clip_rect(), palette);
-    }
-}
-
-/// The skin's screen-wide overlays; call after everything else has been laid out.
-pub fn paint_overlays(ctx: &egui::Context) {
-    let effects = &Skin::of(ctx).effects;
-    let palette = Palette::of_ctx(ctx);
-    if effects.hearts {
-        moonveil::paint_overlays(ctx, palette);
-    }
-    if effects.scanlines {
-        paint_scanlines(ctx, palette);
-    }
-}
-
-/// A faint graph-paper grid behind the content.
-fn paint_grid(painter: &egui::Painter, rect: Rect, palette: &Palette) {
-    const STEP: f32 = 24.0;
-    let stroke = Stroke::new(1.0_f32, palette.grid);
-    let mut x = rect.left() - rect.left() % STEP;
-    while x < rect.right() {
-        painter.vline(x, rect.y_range(), stroke);
-        x += STEP;
-    }
-    let mut y = rect.top() - rect.top() % STEP;
-    while y < rect.bottom() {
-        painter.hline(rect.x_range(), y, stroke);
-        y += STEP;
-    }
-}
-
-/// CRT scanlines over everything; painted only, so input passes straight through.
-fn paint_scanlines(ctx: &egui::Context, palette: &Palette) {
-    const PITCH: f32 = 3.0;
-    let layer = egui::LayerId::new(egui::Order::Debug, egui::Id::new("scanlines"));
-    let screen = ctx.content_rect();
-    let mut mesh = egui::Mesh::default();
-    let mut y = screen.top();
-    while y < screen.bottom() {
-        let line = Rect::from_min_max(
-            egui::pos2(screen.left(), y),
-            egui::pos2(screen.right(), y + 1.0),
-        );
-        mesh.add_colored_rect(line, palette.scanline);
-        y += PITCH;
-    }
-    ctx.layer_painter(layer).add(mesh);
-}
-
 /// A tooltip with `text` while the pointer rests on `rect`. Its hover zone is registered when
 /// this is called, so call it after a clickable card or row laid over the same spot, which would
 /// otherwise take the hover; the zone senses no clicks, so the card stays clickable.
@@ -1150,100 +1076,10 @@ impl Hint for Response {
     }
 }
 
-/// Light top-left and dark bottom-right edges; swapped when the surface is pressed in.
-fn bevel(painter: &egui::Painter, rect: Rect, fill: Color32, inset: bool, edge: f32) {
-    let light = mix(fill, Color32::WHITE, 0.35);
-    let dark = mix(fill, Color32::BLACK, 0.3);
-    let (top_left, bottom_right) = if inset { (dark, light) } else { (light, dark) };
-    let top = Rect::from_min_size(rect.min, egui::vec2(rect.width(), edge));
-    let left = Rect::from_min_size(rect.min, egui::vec2(edge, rect.height()));
-    let bottom = Rect::from_min_max(Pos2::new(rect.left(), rect.bottom() - edge), rect.max);
-    let right = Rect::from_min_max(Pos2::new(rect.right() - edge, rect.top()), rect.max);
-    painter.rect_filled(top, 0.0, top_left);
-    painter.rect_filled(left, 0.0, top_left);
-    painter.rect_filled(bottom, 0.0, bottom_right);
-    painter.rect_filled(right, 0.0, bottom_right);
-}
-
-/// Dark ink on light fills, paper on dark ones.
-pub fn readable_on(fill: Color32, palette: &Palette) -> Color32 {
-    if luma(fill) > 140.0 {
-        Color32::from_rgb(0x1a, 0x10, 0x2a)
-    } else {
-        palette.paper
-    }
-}
-
-/// Perceived brightness of an opaque color from 0 to 255.
-fn luma(color: Color32) -> f32 {
-    0.299 * color.r() as f32 + 0.587 * color.g() as f32 + 0.114 * color.b() as f32
-}
-
-/// A convex polygon filled with a color picked per corner, e.g. for gradients.
-pub fn shaded_polygon(points: &[Pos2], shade: impl Fn(Pos2) -> Color32) -> egui::Shape {
-    let sum = points
-        .iter()
-        .fold(Vec2::ZERO, |sum, point| sum + point.to_vec2());
-    let center = (sum / points.len().max(1) as f32).to_pos2();
-    shaded_fan(center, points, shade)
-}
-
-/// Like `shaded_polygon`, fanning out from `center`, which must lie inside the polygon.
-pub fn shaded_fan(center: Pos2, points: &[Pos2], shade: impl Fn(Pos2) -> Color32) -> egui::Shape {
-    let mut mesh = egui::Mesh::default();
-    if points.len() < 3 {
-        return mesh.into();
-    }
-    mesh.colored_vertex(center, shade(center));
-    for point in points {
-        mesh.colored_vertex(*point, shade(*point));
-    }
-    let count = points.len() as u32;
-    for index in 0..count {
-        mesh.add_triangle(0, index + 1, (index + 1) % count + 1);
-    }
-    mesh.into()
-}
-
-pub fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
-    let blend = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * amount).round() as u8;
-    Color32::from_rgb(
-        blend(from.r(), to.r()),
-        blend(from.g(), to.g()),
-        blend(from.b(), to.b()),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::app::theme::skins;
-
-    #[test]
-    fn text_on_fills_stays_readable_in_both_palettes() {
-        for palette in skins::ALL
-            .iter()
-            .filter(|skin| skin.finish != Finish::Modern)
-            .flat_map(|skin| [&skin.dark, &skin.light])
-        {
-            let luminance = |color: Color32| {
-                let linear = |channel: u8| {
-                    let value = channel as f32 / 255.0;
-                    if value <= 0.04045 {
-                        value / 12.92
-                    } else {
-                        ((value + 0.055) / 1.055).powf(2.4)
-                    }
-                };
-                0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
-            };
-            let fill = luminance(palette.gold);
-            let text = luminance(readable_on(palette.gold, palette));
-            assert!((fill.max(text) + 0.05) / (fill.min(text) + 0.05) >= 4.5);
-            assert_eq!(readable_on(palette.outline, palette), palette.paper);
-            assert_eq!(readable_on(palette.bad, palette), palette.paper);
-        }
-    }
 
     #[test]
     fn buttons_stay_within_their_minimum_footprint_in_every_skin() {
@@ -1261,9 +1097,7 @@ mod tests {
             let _ = context.run_ui(egui::RawInput::default(), |ui| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     let size = egui::vec2(260.0, 52.0);
-                    let button = PixelButton::new("New job")
-                        .sprite(Sprite::Plus)
-                        .min_size(size);
+                    let button = Button::new("New job").sprite(Sprite::Plus).min_size(size);
                     assert_eq!(ui.add(button).rect.size(), size, "skin {}", skin.id);
                 });
             });
@@ -1318,7 +1152,7 @@ mod tests {
         let mut current = 1;
         let _ = context.run_ui(egui::RawInput::default(), |ui| {
             egui::CentralPanel::default().show_inside(ui, |ui| {
-                assert!(!ui.add(PixelCheckbox::new(&mut checked, "Label")).changed());
+                assert!(!ui.add(Checkbox::new(&mut checked, "Label")).changed());
                 assert!(!choice(ui, &mut current, 2, "Two", None).changed());
             });
         });

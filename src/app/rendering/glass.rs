@@ -1,8 +1,9 @@
 //! Aero glass faces: clear panes with screen-fixed reflections and sweeping shimmers, glossy gel
 //! buttons, glass tiles, orb lamps and a shining progress bar.
 
+use crate::app::rendering::controls::FaceLook;
 use crate::app::rendering::frost;
-use crate::app::rendering::pixel::{mix, shaded_fan, shaded_polygon, FaceLook};
+use crate::app::rendering::primitives::{mix, shaded_fan, shaded_polygon};
 use crate::app::theme::style::{self, Palette, Skin};
 use eframe::egui::{self, Color32, CornerRadius, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
 use std::f32::consts::{FRAC_PI_2, PI, TAU};

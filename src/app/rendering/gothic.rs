@@ -1,6 +1,6 @@
 //! Matte surfaces, fine silver ornaments and restrained crimson focus accents.
 
-use crate::app::rendering::pixel::mix;
+use crate::app::rendering::primitives::mix;
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, StrokeKind, Vec2};

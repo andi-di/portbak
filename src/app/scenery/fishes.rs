@@ -3,7 +3,7 @@
 //! they tilt, flip and squash as they swim.
 
 use crate::app::rendering::glass;
-use crate::app::rendering::pixel::{mix, shaded_polygon};
+use crate::app::rendering::primitives::{mix, shaded_polygon};
 use crate::app::scenery::wildlife::edge_on;
 use eframe::egui::{self, Color32, Pos2, Shape, Stroke, Vec2};
 use std::f32::consts::TAU;

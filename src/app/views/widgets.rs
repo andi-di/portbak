@@ -1,5 +1,6 @@
+use crate::app::rendering::controls::{self, Button, Checkbox, Hint};
 use crate::app::rendering::liquid;
-use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette};
 use crate::engine;
@@ -57,7 +58,7 @@ pub fn centered_row<R>(
 ) -> egui::InnerResponse<R> {
     let height = (ui.text_style_height(&egui::TextStyle::Heading)
         + ui.spacing().button_padding.y * 2.0)
-        .max(pixel::button_height(ui));
+        .max(controls::button_height(ui));
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), height),
         egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
@@ -83,14 +84,14 @@ pub fn switch_row_with(
         egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
         |ui| {
             if style::Skin::of(ui.ctx()).finish != style::Finish::Liquid {
-                let response = ui.add(PixelCheckbox::new(checked, label));
+                let response = ui.add(Checkbox::new(checked, label));
                 extras(ui);
                 return response;
             }
             ui.label(label);
             extras(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add(PixelCheckbox::new(checked, label).unlabeled())
+                ui.add(Checkbox::new(checked, label).unlabeled())
             })
             .inner
         },
@@ -156,10 +157,10 @@ pub fn path_picker(ui: &mut egui::Ui, label: &str, path: &mut PathBuf, read_only
     }
     caption(ui, label);
     centered_row(ui, |ui| {
-        let choose = PixelButton::new("Choose folder …")
+        let choose = Button::new("Choose folder …")
             .sprite(Sprite::Folder)
             .icon_only();
-        let open = PixelButton::new("Open folder in file manager")
+        let open = Button::new("Open folder in file manager")
             .sprite(Sprite::Monitor)
             .icon_only();
         let controls_width =
