@@ -12,10 +12,14 @@ The default bump is **minor** (`0.1.0` → `0.2.0`). Set one PR label to overrid
 | `release:major` | Increment major and reset minor and patch |
 
 Conflicting or unknown `release:` labels fail validation. Labels are read from
-the merge event. `Cargo.toml` supplies the baseline before the first tag and the
+the merged PR when its main-branch push is processed. `Cargo.toml` supplies the baseline before the first tag and the
 version for local development builds. Release builds receive their allocated
 version through `PORTBAK_RELEASE_VERSION`; no bot commits are made to `main`.
 Application versions do not change the settings or backup metadata format versions.
+
+The workflow uses pushes to `main` and verifies the associated merged PR;
+direct pushes without a matching merged PR do not release. It does not use
+`pull_request_target` or require an exception to its execution policy.
 
 The release workflow reserves a version tag on the exact merged commit and an
 unpublished draft, then validates and builds both platforms. Only after both
