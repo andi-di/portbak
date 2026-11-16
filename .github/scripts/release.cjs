@@ -55,6 +55,23 @@ function mergedPullRequest(context) {
   return pr;
 }
 
+async function releaseContext(github, context) {
+  if (context.eventName !== 'push') return context;
+  if (context.ref !== 'refs/heads/main' || context.payload.deleted || !/^[a-f0-9]{40}$/.test(context.sha)) {
+    throw new Error('Releases require a live push to main');
+  }
+  const pulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+    ...context.repo, commit_sha: context.sha, per_page: 100,
+  });
+  const matches = pulls.filter(pr => pr.merged_at && pr.base.ref === 'main'
+    && pr.merge_commit_sha === context.sha);
+  if (matches.length > 1) throw new Error('Multiple merged PRs match the pushed commit');
+  if (!matches.length) return null;
+  return { ...context, payload: {
+    action: 'closed', pull_request: { ...matches[0], merged: true },
+  } };
+}
+
 async function releaseByTag(github, repo, tag) {
   try {
     return (await github.rest.repos.getReleaseByTag({ ...repo, tag })).data;
@@ -69,6 +86,12 @@ async function releaseByTag(github, repo, tag) {
 }
 
 async function prepareRelease({ github, context, core }, baseline) {
+  context = await releaseContext(github, context);
+  if (!context) {
+    core.setOutput('published', 'true');
+    core.info?.('No merged PR introduced this commit; skipping release.');
+    return { published: 'true' };
+  }
   const pr = mergedPullRequest(context);
   const repo = context.repo;
   const labels = pr.labels.map(label => label.name);
@@ -118,6 +141,8 @@ function releaseFiles(directory, version) {
 }
 
 async function publishRelease({ github, context }, { version, directory }) {
+  context = await releaseContext(github, context);
+  if (!context) throw new Error('No merged PR introduced this commit');
   const pr = mergedPullRequest(context);
   const tag = `v${version}`;
   parseVersion(version);

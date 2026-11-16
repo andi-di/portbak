@@ -20,12 +20,14 @@ class FakeGitHub {
   tags = [];
   releases = [];
   assets = [];
+  pulls = [];
   writes = [];
   failUpload = '';
   rest = {
     repos: {
       listTags() {},
       listReleases() {},
+      listPullRequestsAssociatedWithCommit() {},
       listReleaseAssets() {},
       getReleaseByTag: async ({ tag }) => {
         const data = this.releases.find(release => release.tag_name === tag && !release.draft);
@@ -67,6 +69,7 @@ class FakeGitHub {
   paginate = async (method) => {
     if (method === this.rest.repos.listTags) return this.tags;
     if (method === this.rest.repos.listReleases) return this.releases;
+    if (method === this.rest.repos.listPullRequestsAssociatedWithCommit) return this.pulls;
     if (method === this.rest.repos.listReleaseAssets) return this.assets;
     throw new Error('Unexpected pagination');
   };
@@ -220,4 +223,48 @@ test('unexpected draft assets block publication without deleting anything', asyn
     { version: '0.2.0', directory: archives(t) }), /Unexpected draft assets/);
   assert.deepEqual(github.writes, []);
   assert.equal(github.releases[0].draft, true);
+});
+
+function pushContext(sha = SHA) {
+  return { repo: context().repo, eventName: 'push', ref: 'refs/heads/main', sha,
+    payload: { deleted: false } };
+}
+
+test('a main push releases the exact merged PR and its major override', async () => {
+  const github = new FakeGitHub();
+  github.pulls = [{ ...context(SHA, ['release:major']).payload.pull_request,
+    merged_at: '2026-11-16T20:22:21Z' }];
+  const result = await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
+  assert.equal(result.version, '1.0.0');
+  assert.equal(result.sha, SHA);
+});
+
+test('direct pushes, open PRs, other branches, and older merge commits do not release', async () => {
+  const pr = { ...context().payload.pull_request, merged_at: '2026-11-16T20:22:21Z' };
+  for (const pulls of [[], [{ ...pr, merged_at: null }], [{ ...pr, base: { ref: 'feature' } }],
+    [{ ...pr, merge_commit_sha: 'b'.repeat(40) }]]) {
+    const github = new FakeGitHub();
+    github.pulls = pulls;
+    const result = await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
+    assert.equal(result.published, 'true');
+    assert.deepEqual(github.writes, []);
+  }
+});
+
+test('deleted or non-main push refs cannot reserve versions', async () => {
+  for (const change of [{ ref: 'refs/heads/feature' }, { payload: { deleted: true } }]) {
+    const github = new FakeGitHub();
+    await assert.rejects(prepareRelease({ github, context: { ...pushContext(), ...change }, core },
+      '0.1.0'), /live push to main/);
+    assert.deepEqual(github.writes, []);
+  }
+});
+
+test('push-based publication discovers the reserved draft and publishes both builds', async (t) => {
+  const github = new FakeGitHub();
+  github.pulls = [{ ...context().payload.pull_request, merged_at: '2026-11-16T20:22:21Z' }];
+  await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
+  await publishRelease({ github, context: pushContext() }, { version: '0.2.0', directory: archives(t) });
+  assert.equal(github.releases[0].draft, false);
+  assert.equal(github.assets.length, 3);
 });
