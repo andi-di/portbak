@@ -1,11 +1,6 @@
 # Saya interface icons
 
-Each function has its own transparent PNG; do not combine icons into a sprite
-sheet. Generation prompts and masters live locally under
-`agent-local/refinements/characters/saya/ui-icons/`, outside runtime assets.
-The archive emblem and shield-shaped job controls are in `v3/`.
-The current Saya job heads, masters, previews and prompts live in
-`agent-local/refinements/characters/saya/pixel-head/job-icons-v6/`.
+Each function has its own transparent PNG; do not combine icons into a sprite sheet.
 
 ## Resolution and size
 
@@ -22,44 +17,69 @@ The current Saya job heads, masters, previews and prompts live in
   measuring bounds; preserve intentional internal transparent gaps.
 - Keep the same canvas and occupied-area rule for replacements and new icons.
   Check readability at 24, 32, and 48 pixels before use.
-- Utility and job action icons render at 32 logical pixels. New job uses 40.
-  Job status heads render at 72 logical pixels. The Kurobane family emblem
-  renders at 48 logical pixels in the app header and 80 beside the job name.
+
+### Rendered sizes
+
+| Element | Size in logical pixels |
+| --- | --- |
+| Utility and job action icons | 32 |
+| New job icon | 40 |
+| Job status heads | 72 |
+| Kurobane family emblem in the app header | 48 |
+| Kurobane family emblem beside the job name | 80 |
+
+## Theme variants and contrast
+
 - Generate each functional silhouette individually. Derive the `dark/` (white)
   and `light/` (black) base masks from the same alpha mask so their
   geometry stays identical. The renderer adds a shallow inset silver bevel and
-  broad diagonal metallic reflections and stepped facets: light silver for dark surfaces, dark silver for light
-  surfaces. Clamp shading toward the readable foreground wherever needed to
-  preserve 4.5:1 contrast. Keep Saya status heads in their original colors.
+  broad diagonal metallic reflections and stepped facets: light silver for dark
+  surfaces, dark silver for light surfaces. Clamp shading toward the readable
+  foreground wherever needed to preserve 4.5:1 contrast. Keep Saya status heads
+  in their original colors.
   Buttons select the variant from their actual fill,
   including hover and pressed states; standalone icons follow the theme mode.
-- Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
-  Readability at 24 pixels takes priority over decorative detail. No fine
-  engraving, interior gems, ribbons, gradients or multiple nested symbols.
-- Job heads retain Saya's character colors. Open eyes, small fangs visible
-  beneath closed lips, and a play badge indicate automatic backups are enabled.
-  Closed eyes and a pause badge indicate automatic backups are disabled.
-  Use the same artwork and reference colors in both modes, with no white or silver
-  outer contour. Favor broad faces and clear eyes. Keep status necks short and
-  tapered, with clear separation between chin and black choker, plus the same
-  red ruby in a silver mount on every head. Render the 23-pixel play/pause
-  badges separately so their symbols remain crisp at list size.
 - Utility controls show their frame only on hover, keyboard focus or selection.
 - Validate enabled button text and icon contrast at 4.5:1 or higher across both
   palettes and normal, hovered and pressed states. Checkboxes use the same
   filled-surface variant selection with a broad checkmark.
 
+## Job status heads
+
+Job heads retain Saya's character colors:
+
+- **Enabled:** open eyes, small fangs visible beneath closed lips, and a play badge.
+- **Disabled:** closed eyes and a pause badge.
+
+Use the same artwork and reference colors in both modes, with no white or silver
+outer contour. Favor broad faces and clear eyes. Keep status necks short and
+tapered, with clear separation between chin and black choker, plus the same
+red ruby in a silver mount on every head. Render the 23-pixel play/pause
+badges separately so their symbols remain crisp at list size.
+
 ## Visual direction
 
-Saya's plum-black (`#35252C`, `#2C1D23`), burgundy (`#671D36`), shaded silver
-(`#B5ABAB`), ivory (`#F1D0CA`), crimson (`#6B0F1F`), and moss green (`#48613B`).
+### Palette
+
+| Color | Hex |
+| --- | --- |
+| Plum-black | `#35252C`, `#2C1D23` |
+| Burgundy | `#671D36` |
+| Shaded silver | `#B5ABAB` |
+| Ivory | `#F1D0CA` |
+| Crimson | `#6B0F1F` |
+| Moss green | `#48613B` |
+
+### Shape and detail
+
 Keep character colors in the Saya heads and surrounding controls. Functional
 icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.
 
-The close cross uses smooth vector geometry in `sources/close.svg`, with rounded
-14-pixel source strokes. Regenerate its PNG pair on Windows with
-`powershell.exe -NoProfile -File tools/render_moonveil_vectors.ps1`.
+Use a coarse 32-pixel design grid, thick strokes and broad transparent gaps.
+Readability at 24 pixels takes priority over decorative detail. No fine
+engraving, interior gems, ribbons, gradients or multiple nested symbols.
+
 The restore arrow is generated from the other functional icons as style references,
 using the same coarse pixel grid and silhouette weight. The warning icon uses a
 filled triangle and exclamation cutout. Preserve the standard canvas, padding and
