@@ -62,4 +62,4 @@ cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 ```
 
-See [SPECIFICATION.md](SPECIFICATION.md) for detailed behavior and limitations, and [AGENTS.md](AGENTS.md) for contribution rules.
+See [AGENTS.md](AGENTS.md) for contribution rules.

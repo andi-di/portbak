@@ -1,9 +1,8 @@
 # AGENTS.md
 
 `portbak` — portable desktop backup app for Linux x86-64 and Windows 10/11 x86-64.
-The stack, dependencies, commands, and build/platform facts live in `Cargo.toml` and `README.md`; the
-observable behavior contract is `SPECIFICATION.md`; open tasks live locally in the ignored `todos/` directory. Don't restate any of
-them here.
+The stack, dependencies, commands, and build/platform facts live in `Cargo.toml` and `README.md`.
+Tests cover detailed behavior; open tasks live locally in the ignored `todos/` directory. Don't restate them here.
 
 ## Rules
 
@@ -15,5 +14,4 @@ them here.
 - Keep comments short and concise — one or two lines explaining the why or a non-obvious constraint, never a restatement of what the code already says.
 - Keep this file short and durable-facts-only. Open tasks belong in the local `todos/` directory; never add task lists or history here, or anything that goes stale with the next refactor.
 - Keep `README.md` current whenever a change requires it but keep it free from implementation details, only include information that could be relevant to the user.
-- Keep the `SPECIFICATION.md` bullet points short and concisive, add sub bullet points for more comnplex topics and update the file when observable behavior changes.
 - Before creating the final PR: run `cargo fmt`, `cargo test --locked`, and `cargo clippy --locked --all-targets -- -D warnings`.
