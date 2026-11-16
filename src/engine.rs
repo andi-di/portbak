@@ -408,7 +408,10 @@ mod tests {
         let p = t.path().join("config");
         save(&p, &crate::model::Config::default()).unwrap();
         save(&p, &crate::model::Config::default()).unwrap();
-        assert_eq!(load::<crate::model::Config>(&p).unwrap().version, 1);
+        assert_eq!(
+            load::<crate::model::Config>(&p).unwrap().version,
+            crate::model::CONFIG_VERSION
+        );
     }
 
     #[test]
