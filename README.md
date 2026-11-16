@@ -2,13 +2,11 @@
 
 Portable desktop backups for Linux x86-64 and Windows 10/11 x86-64. No installer, server, or account required.
 
-| Modern | Retro |
-| :---: | :---: |
-| [![Modern](assets/screenshots/modern-dark.png)](assets/screenshots/modern-dark.png) | [![Retro](assets/screenshots/retro-dark.png)](assets/screenshots/retro-dark.png) |
-| **Liquid Glass** | **Frutiger Aero** |
-| [![Liquid Glass](assets/screenshots/liquid-glass-dark.png)](assets/screenshots/liquid-glass-dark.png) | [![Frutiger Aero](assets/screenshots/frutiger-aero-dark.png)](assets/screenshots/frutiger-aero-dark.png) |
-| **Moonveil** | |
-| [![Moonveil](assets/screenshots/moonveil-dark.png)](assets/screenshots/moonveil-dark.png) | |
+[![Modern](assets/screenshots/modern-dark.png)](assets/screenshots/modern-dark.png)
+
+| Retro | Liquid Glass | Frutiger Aero | Moonveil |
+| :---: | :---: | :---: | :---: |
+| [![Retro](assets/screenshots/retro-dark.png)](assets/screenshots/retro-dark.png) | [![Liquid Glass](assets/screenshots/liquid-glass-dark.png)](assets/screenshots/liquid-glass-dark.png) | [![Frutiger Aero](assets/screenshots/frutiger-aero-dark.png)](assets/screenshots/frutiger-aero-dark.png) | [![Moonveil](assets/screenshots/moonveil-dark.png)](assets/screenshots/moonveil-dark.png) |
 
 - Full folder or ZIP backups, created only when source contents change.
 - Manual checks or automatic interval, daily, and weekday schedules.
@@ -16,6 +14,8 @@ Portable desktop backups for Linux x86-64 and Windows 10/11 x86-64. No installer
 - Built-in restore and five looks with light and dark modes.
 
 ## Getting started
+
+Download the executable for your platform from [GitHub Releases](https://github.com/andi-di/portbak/releases/latest). To upgrade, close the app and replace its executable; keep your settings and backups.
 
 1. Put the executable in a **writable folder** and launch it. On Linux, run `chmod +x portbak` if needed.
 2. Select **New job**, choose a source folder, and use the automatic destination or choose your own.
