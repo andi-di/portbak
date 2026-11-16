@@ -2,7 +2,13 @@
 
 Portable desktop backups for Linux x86-64 and Windows 10/11 x86-64. No installer, server, or account required.
 
-![portbak in Retro Dark](assets/screenshots/retro-dark.png)
+| Modern | Retro |
+| :---: | :---: |
+| [![Modern](assets/screenshots/modern-dark.png)](assets/screenshots/modern-dark.png) | [![Retro](assets/screenshots/retro-dark.png)](assets/screenshots/retro-dark.png) |
+| **Liquid Glass** | **Frutiger Aero** |
+| [![Liquid Glass](assets/screenshots/liquid-glass-dark.png)](assets/screenshots/liquid-glass-dark.png) | [![Frutiger Aero](assets/screenshots/frutiger-aero-dark.png)](assets/screenshots/frutiger-aero-dark.png) |
+| **Moonveil** | |
+| [![Moonveil](assets/screenshots/moonveil-dark.png)](assets/screenshots/moonveil-dark.png) | |
 
 - Full folder or ZIP backups, created only when source contents change.
 - Manual checks or automatic interval, daily, and weekday schedules.
