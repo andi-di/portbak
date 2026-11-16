@@ -157,3 +157,5 @@ LLVM-MinGW tools must be in PATH. The Windows CI workflow uses MSVC with a stati
 
 Opening Settings leaves the selected job. Close Settings to return to the main
 screen, or click a job to open it. Click the selected job again to deselect it.
+
+- In the Backups tab, the trash button permanently deletes an unlocked version immediately, without confirmation, including the newest or last version. Unlock protected versions first. Missing versions are removed from history.

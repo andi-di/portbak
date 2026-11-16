@@ -392,6 +392,7 @@ When rebuilding from this document, implement the complete behavior and acceptan
 
 - Open the app with no backup job selected; select a job only on explicit user action.
 
+- In the Backups tab, the trash button permanently deletes an unlocked version immediately, without confirmation, including the newest or last version. Unlock protected versions first. Missing versions are removed from history.
 - Clicking the app name or icon, or pressing Esc, returns to the start screen. Esc dismisses an open restore confirmation first.
 - Removing the selected job selects its preceding neighbor, or the next job when removing the first. Removing the last job returns to the start screen.
 - Check now is disabled until source and destination are selected and the schedule is runnable.
