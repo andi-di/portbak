@@ -29,6 +29,10 @@ succeed does it attach the Linux archive, Windows archive, and `SHA256SUMS` and
 publish the normal release. Build jobs have read-only repository access; version
 reservation and publication jobs require `contents: write`.
 
+The Build and test workflow runs for PRs and manual requests. After a merge,
+the release workflow performs the checks and builds both platforms, avoiding
+a duplicate Build and test run on `main`.
+
 If a build or upload fails, rerun the failed workflow jobs in GitHub Actions.
 The reserved version stays associated with its merge commit, even if newer PRs
 release first. Incomplete draft uploads can be replaced on retry. Published
