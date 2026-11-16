@@ -15,7 +15,7 @@ Portable desktop backups for Linux x86-64 and Windows 10/11 x86-64. No installer
 
 ## Getting started
 
-Download the executable for your platform from [GitHub Releases](https://github.com/andi-di/portbak/releases/latest). To upgrade, close the app and replace its executable; keep your settings and backups.
+Download and extract the archive for your platform from [GitHub Releases](https://github.com/andi-di/portbak/releases/latest). To upgrade, close the app and replace its executable; keep your settings and backups.
 
 1. Put the executable in a **writable folder** and launch it. On Linux, run `chmod +x portbak` if needed.
 2. Select **New job**, choose a source folder, and use the automatic destination or choose your own.
