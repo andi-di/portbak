@@ -46,6 +46,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
         ui.add_space(6.0);
         controls::display_label(ui, "SETTINGS", 16.0, palette.ink);
     });
+    ui.label(egui::RichText::new(concat!("Version ", env!("PORTBAK_VERSION"))).color(palette.dim));
     ui.add_space(8.0);
     ui.horizontal_wrapped(|ui| {
         controls::segmented(
