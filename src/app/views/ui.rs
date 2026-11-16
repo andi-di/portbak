@@ -38,13 +38,39 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        if self.config.skin == "moonveil" {
+            if !crate::app::scenery::moonveil::decorations_visible(&ctx) {
+                return;
+            }
+            crate::app::scenery::saya::preload(&ctx);
+        }
         pixel::paint_underlay(&ctx);
         let before = self.config.clone();
+        if !self
+            .backup_history
+            .as_ref()
+            .is_some_and(|history| history.confirming_restore)
+            && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+        {
+            crate::app::scenery::saya::close_gallery(&ctx);
+            self.selected = None;
+            self.settings_open = false;
+            self.backups_tab = false;
+        }
         self.show_header(ui);
         self.show_footer(ui);
-        self.show_job_list(ui);
+        if !crate::app::scenery::saya::gallery_open(&ctx) {
+            self.show_job_list(ui);
+        }
         self.close_inactive_history();
-        if self.settings_open {
+        if crate::app::scenery::saya::gallery_open(&ctx) {
+            crate::app::scenery::saya::show_gallery(ui);
+            if !crate::app::scenery::saya::gallery_open(&ctx) {
+                self.selected = None;
+                self.settings_open = false;
+                self.backups_tab = false;
+            }
+        } else if self.settings_open {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
@@ -53,11 +79,32 @@ impl eframe::App for App {
         if self.config != before {
             self.dirty = true;
         }
+        if !crate::app::scenery::saya::gallery_open(&ctx) {
+            crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
+        }
         pixel::paint_overlays(&ctx);
     }
 }
 
 impl App {
+    fn saya_page(&self) -> crate::app::scenery::saya::Page {
+        use crate::app::scenery::saya::Page;
+        if self.settings_open {
+            match self.settings_tab {
+                super::settings_view::SettingsTab::Jobs => Page::SettingsJobs,
+                super::settings_view::SettingsTab::Theme => Page::SettingsTheme,
+            }
+        } else if let Some(id) = self.selected {
+            if self.backups_tab {
+                Page::Backups(id)
+            } else {
+                Page::JobSettings(id)
+            }
+        } else {
+            Page::StartScreen
+        }
+    }
+
     fn initialize_theme(&mut self, ctx: &egui::Context) {
         if self.config.theme == Theme::System {
             self.config.theme =
@@ -93,12 +140,18 @@ impl App {
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
-            left: 20,
-            right: 20,
-            top: 14,
-            bottom: 0,
-        });
+        let gothic = Skin::of(&ctx).finish == Finish::Gothic;
+        let margin = if gothic {
+            egui::Margin::symmetric(24, 17)
+        } else {
+            egui::Margin {
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: 0,
+            }
+        };
+        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(margin);
         egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
@@ -109,45 +162,82 @@ impl App {
                     pixel::panel_decoration(ui, 1.9);
                 }
                 ui.horizontal(|ui| {
-                    logo(ui);
+                    let brand = ui.horizontal(|ui| {
+                        logo(ui);
+                        ui.allocate_space(egui::vec2(10.0, 0.0));
+                    });
+                    let home = ui
+                        .interact(
+                            brand.response.rect,
+                            ui.id().with("home"),
+                            egui::Sense::click(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .on_hover_text("Start screen");
+                    pixel::subtle_highlight(
+                        ui,
+                        &home,
+                        brand.response.rect.expand(if gothic { 2.0 } else { 3.0 }),
+                        palette.ink,
+                    );
+                    if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
+                        crate::app::scenery::saya::close_gallery(&ctx);
+                        self.selected = None;
+                        self.settings_open = false;
+                        self.backups_tab = false;
+                    }
+                    let dark = self.config.theme == Theme::Dark;
+                    let (label, sprite) = if dark {
+                        ("Light", Sprite::Sun)
+                    } else {
+                        ("Dark", Sprite::Moon)
+                    };
+                    let mode_size = PixelButton::new(label).sprite(sprite).icon_only().size(ui);
+                    let settings_size = PixelButton::new("Settings")
+                        .sprite(Sprite::Gear)
+                        .icon_only()
+                        .size(ui);
+                    let toolbar_size = egui::vec2(
+                        mode_size.x + ui.spacing().item_spacing.x + settings_size.x,
+                        mode_size.y.max(settings_size.y),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let settings = PixelButton::new("Settings")
-                            .icon_only()
-                            .sprite(Sprite::Gear)
-                            .selected(self.settings_open);
-                        if ui.add(settings).hint("Settings").clicked() {
-                            self.toggle_settings();
-                            if self.settings_open {
-                                crate::app::scenery::catgirl::trigger(
-                                    ui.ctx(),
-                                    crate::app::scenery::catgirl::Action::Settings,
-                                );
-                            }
-                        }
-                        let dark = self.config.theme == Theme::Dark;
-                        let (label, sprite) = if dark {
-                            ("Light", Sprite::Sun)
-                        } else {
-                            ("Dark", Sprite::Moon)
-                        };
-                        if ui
-                            .add(PixelButton::new(label).sprite(sprite).icon_only())
-                            .hint(format!("Switch to {label} mode"))
-                            .clicked()
-                        {
-                            self.config.theme = if dark { Theme::Light } else { Theme::Dark };
-                            ctx.set_theme(theme_preference(self.config.theme));
-                            crate::app::scenery::catgirl::trigger(
-                                &ctx,
-                                if dark {
-                                    crate::app::scenery::catgirl::Action::LightMode
-                                } else {
-                                    crate::app::scenery::catgirl::Action::DarkMode
-                                },
-                            );
-                        }
+                        ui.allocate_ui_with_layout(
+                            toolbar_size,
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                if ui
+                                    .add(PixelButton::new(label).sprite(sprite).icon_only())
+                                    .hint(format!("Switch to {label} mode"))
+                                    .clicked()
+                                {
+                                    self.config.theme =
+                                        if dark { Theme::Light } else { Theme::Dark };
+                                    ctx.set_theme(theme_preference(self.config.theme));
+                                    crate::app::scenery::saya::trigger(
+                                        &ctx,
+                                        if dark {
+                                            crate::app::scenery::saya::Action::LightMode
+                                        } else {
+                                            crate::app::scenery::saya::Action::DarkMode
+                                        },
+                                    );
+                                }
+                                let settings = PixelButton::new("Settings")
+                                    .icon_only()
+                                    .sprite(Sprite::Gear)
+                                    .selected(self.settings_open);
+                                if ui.add(settings).hint("Settings").clicked() {
+                                    crate::app::scenery::saya::close_gallery(&ctx);
+                                    self.toggle_settings();
+                                }
+                            },
+                        );
                     });
                 });
+                if gothic {
+                    return;
+                }
                 ui.add_space(12.0);
                 let clip = ui.clip_rect();
                 let top = ui.cursor().top();
@@ -211,8 +301,12 @@ impl App {
                             .color(palette.dim),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let (rect, response) =
-                            ui.allocate_exact_size(egui::vec2(112.0, 24.0), egui::Sense::hover());
+                        let size = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                            egui::vec2(48.0, 32.0)
+                        } else {
+                            egui::vec2(28.0, 28.0)
+                        };
+                        let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
                         let recent = self
                             .activity_until
                             .is_some_and(|until| until > std::time::Instant::now());
@@ -236,7 +330,6 @@ impl App {
                                     if active { palette.gold } else { palette.dim },
                                     active,
                                 );
-                                pixel::activity_track(ui, 80.0, palette.gold, active);
                             },
                         );
                         if active {
@@ -271,13 +364,21 @@ impl App {
             top: 16 + inset / 2,
             bottom: 8 + inset,
         });
+        let frame = if Skin::of(&ctx).finish == Finish::Gothic {
+            frame.stroke(egui::Stroke::NONE)
+        } else {
+            frame
+        };
         let panel = egui::Panel::left("jobs")
-            .show_separator_line(Skin::of(&ctx).finish != Finish::Liquid)
-            .default_size(clamp_sidebar_width(self.config.sidebar_width))
-            .size_range(SIDEBAR_WIDTH)
+            .show_separator_line(!matches!(
+                Skin::of(&ctx).finish,
+                Finish::Liquid | Finish::Gothic
+            ))
+            .resizable(false)
+            .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.0);
+                pixel::sidebar_decoration(ui);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
                     pixel::display_label(
@@ -300,28 +401,35 @@ impl App {
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
+                let new_job = if Skin::of(ui.ctx()).finish == Finish::Gothic {
+                    new_job.compact()
+                } else {
+                    new_job
+                };
                 if ui.add_enabled(self.can_add_job(), new_job).clicked() {
+                    crate::app::scenery::saya::close_gallery(ui.ctx());
                     self.add_job();
-                    crate::app::scenery::catgirl::trigger(
+                    crate::app::scenery::saya::trigger(
                         ui.ctx(),
-                        crate::app::scenery::catgirl::Action::NewJob,
+                        crate::app::scenery::saya::Action::NewJob,
                     );
                 }
                 ui.add_space(12.0);
-                let show_mascot = Skin::of(ui.ctx()).effects.hearts
-                    && (!self.config.jobs.is_empty() || self.settings_open);
+                let show_mascot = Skin::of(ui.ctx()).effects.hearts;
                 let list_height = if show_mascot {
                     (ui.available_height()
                         - ui.spacing().item_spacing.y
-                        - crate::app::scenery::catgirl::reserved_height(ui))
+                        - crate::app::scenery::saya::reserved_height(ui))
                     .max(0.0)
                 } else {
                     ui.available_height()
                 };
                 let mut clicked = None;
                 egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
                     .max_height(list_height)
                     .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
                         for job in &self.config.jobs {
                             if self.job_card(ui, job) {
                                 clicked = Some(job.id);
@@ -329,28 +437,40 @@ impl App {
                         }
                     });
                 if let Some(id) = clicked {
+                    crate::app::scenery::saya::close_gallery(ui.ctx());
                     self.toggle_job(id);
-                    crate::app::scenery::catgirl::trigger(
-                        ui.ctx(),
-                        crate::app::scenery::catgirl::Action::SelectJob,
-                    );
                 }
                 if show_mascot {
-                    ui.vertical_centered(crate::app::scenery::catgirl::show);
+                    ui.vertical_centered(crate::app::scenery::saya::show_sidebar);
                 }
             });
-        if ctx
-            .read_response(egui::Id::new("jobs").with("__resize"))
-            .is_some_and(|response| response.dragged())
-        {
-            self.config.sidebar_width = clamp_sidebar_width(panel.response.rect.width());
+        let edge = panel.response.rect;
+        let divider_x = edge.right()
+            - if Skin::of(&ctx).finish == Finish::Gothic {
+                5.0
+            } else {
+                0.0
+            };
+        let grab = egui::Rect::from_center_size(
+            egui::pos2(divider_x, edge.center().y),
+            egui::vec2(10.0, edge.height()),
+        );
+        let resize = ui
+            .interact(grab, egui::Id::new("jobs_resize"), egui::Sense::drag())
+            .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+        if resize.dragged() {
+            self.config.sidebar_width =
+                clamp_sidebar_width(self.config.sidebar_width + resize.drag_delta().x);
         }
     }
 
     /// Draws the job as a cartridge-like card; returns whether it was clicked.
     fn job_card(&self, ui: &mut egui::Ui, job: &Job) -> bool {
-        ui.push_id(job.id, |ui| self.job_card_contents(ui, job))
-            .inner
+        ui.scope_builder(
+            egui::UiBuilder::new().id(egui::Id::new(("job_card", job.id))),
+            |ui| self.job_card_contents(ui, job),
+        )
+        .inner
     }
 
     fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
@@ -473,6 +593,7 @@ impl App {
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
+        pixel::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
         ui.add_space(CARD_SHADOW);
         response.clicked()
     }
@@ -528,7 +649,7 @@ fn logo(ui: &mut egui::Ui) {
     let palette = Palette::of(ui);
     let skin = Skin::of(ui.ctx());
     let mascot = match skin.finish {
-        Finish::Gothic => crate::app::scenery::catgirl::show_header(ui),
+        Finish::Gothic => crate::app::scenery::saya::show_header(ui),
         Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
         _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
@@ -543,6 +664,20 @@ fn logo(ui: &mut egui::Ui) {
         }
     }
     ui.add_space(6.0);
+    if skin.finish == Finish::Gothic {
+        let font = style::face_font(ui.ctx(), 24.0 * skin.typography.display_scale);
+        let galley = ui
+            .painter()
+            .layout_no_wrap("PORTBAK".into(), font, palette.gold);
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(galley.size().x, mascot.rect.height()),
+            egui::Sense::hover(),
+        );
+        // Center the visible letters, rather than the font's ascent/descent space.
+        let origin = rect.center() - galley.mesh_bounds.center().to_vec2();
+        ui.painter().galley(origin, galley, palette.gold);
+        return;
+    }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         pixel::display_label(
@@ -638,6 +773,146 @@ fn theme_preference(theme: Theme) -> egui::ThemePreference {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn moonveil_header_centers_title_and_keeps_hover_clear_of_ornaments() {
+        let ctx = egui::Context::default();
+        let mut app = App::new(
+            Config {
+                skin: "moonveil".into(),
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.ensure_skin(&ctx);
+        for frame in 0..3 {
+            let mut bottom = 0.0;
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(frame as f64 * 0.1),
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 960.0),
+                    )),
+                    events: vec![egui::Event::PointerMoved(egui::pos2(140.0, 50.0))],
+                    ..Default::default()
+                },
+                |ui| {
+                    app.show_header(ui);
+                    bottom = ui.available_rect_before_wrap().top();
+                },
+            );
+            if frame == 2 {
+                let texture = ctx
+                    .data_mut(|data| {
+                        data.get_temp::<Result<egui::TextureHandle, String>>(egui::Id::new((
+                            "saya_artwork",
+                            "family-emblem",
+                        )))
+                    })
+                    .unwrap()
+                    .unwrap();
+                let emblem = output
+                    .shapes
+                    .iter()
+                    .find_map(|shape| match &shape.shape {
+                        egui::Shape::Mesh(mesh) if mesh.texture_id == texture.id() => {
+                            Some(mesh.calc_bounds())
+                        }
+                        _ => None,
+                    })
+                    .unwrap();
+                let title = output.shapes.iter().find(|shape| matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == "PORTBAK")).unwrap().shape.visual_bounding_rect();
+                assert!((title.center().y - emblem.center().y).abs() <= 1.0);
+                assert!(
+                    (emblem.center().y - bottom * 0.5).abs() <= 1.0,
+                    "{emblem:?} / {bottom}"
+                );
+                let hover = output
+                    .shapes
+                    .iter()
+                    .find_map(|shape| match &shape.shape {
+                        egui::Shape::Rect(rect)
+                            if rect.stroke.width == 1.0
+                                && rect.rect.width() > 200.0
+                                && rect.rect.width() < 600.0
+                                && rect.rect.height() > 50.0 =>
+                        {
+                            Some(rect.rect)
+                        }
+                        _ => None,
+                    })
+                    .expect("brand hover frame");
+                assert!((22.0..=26.0).contains(&hover.left()) && hover.top() >= 16.0);
+                assert!(bottom - hover.bottom() >= 16.0);
+                assert!(bottom <= 86.0, "header should remain compact: {bottom}");
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "manual release-mode CPU rendering profile"]
+    fn profile_moonveil() {
+        let ctx = egui::Context::default();
+        let mut app = App::new(
+            Config {
+                skin: "moonveil".into(),
+                jobs: vec![Job::default()],
+                ..Config::default()
+            },
+            std::path::PathBuf::new(),
+            tempfile::tempfile().unwrap(),
+        );
+        app.ensure_skin(&ctx);
+        ctx.set_theme(egui::Theme::Dark);
+        let mut samples = Vec::new();
+        let mut startup_max = 0.0_f64;
+        let mut upload_bytes = 0;
+        let mut batches = 0;
+        for frame in 0..360 {
+            let started = std::time::Instant::now();
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(frame as f64 * 0.05),
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 960.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    pixel::paint_underlay(&ctx);
+                    app.show_header(ui);
+                    app.show_footer(ui);
+                    app.show_job_list(ui);
+                    app.show_job_editor(ui);
+                    pixel::paint_overlays(&ctx);
+                },
+            );
+            upload_bytes += output
+                .textures_delta
+                .set
+                .iter()
+                .map(|(_, delta)| {
+                    let size = delta.image.size();
+                    size[0] * size[1] * 4
+                })
+                .sum::<usize>();
+            let primitives = ctx.tessellate(output.shapes, output.pixels_per_point);
+            let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+            if frame < 240 {
+                startup_max = startup_max.max(elapsed);
+            } else {
+                samples.push(elapsed);
+                batches += primitives.len();
+            }
+        }
+        samples.sort_by(f64::total_cmp);
+        println!("MOONVEIL_PROFILE mean_ms={:.3} p95_ms={:.3} startup_max_ms={startup_max:.3} uploads_mib={:.2} batches={:.1}",
+            samples.iter().sum::<f64>() / samples.len() as f64, samples[samples.len() * 95 / 100],
+            upload_bytes as f64 / (1024.0 * 1024.0), batches as f64 / samples.len() as f64);
+    }
+
     use super::*;
     use crate::model::Config;
 
@@ -811,6 +1086,133 @@ mod tests {
     }
 
     #[test]
+    fn opening_and_switching_jobs_does_not_emit_id_warnings() {
+        for skin in skins::ALL {
+            let ctx = egui::Context::default();
+            style::install(&ctx, skin);
+            let mut app = App::new(
+                Config {
+                    skin: skin.id.into(),
+                    jobs: vec![Job::default(), Job::default()],
+                    ..Config::default()
+                },
+                std::path::PathBuf::new(),
+                tempfile::tempfile().unwrap(),
+            );
+            for selection in [None, Some(0), Some(0), Some(1), None, Some(1)] {
+                app.selected = selection.map(|index| app.config.jobs[index].id);
+                let output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            crate::MIN_WINDOW_SIZE,
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        app.show_header(ui);
+                        app.show_footer(ui);
+                        app.show_job_list(ui);
+                        app.show_job_editor(ui);
+                    },
+                );
+                for shape in output.shapes {
+                    if let egui::Shape::Text(text) = shape.shape {
+                        assert!(
+                            !text.galley.text().contains("ID ")
+                                && !text.galley.text().contains("Double use"),
+                            "{}: {}",
+                            skin.id,
+                            text.galley.text()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn saya_strip_stays_at_the_bottom_when_collapsed_and_expanded() {
+        for sidebar_width in [300.0, 460.0] {
+            let ctx = egui::Context::default();
+            let mut app = App::new(
+                Config {
+                    skin: "moonveil".into(),
+                    sidebar_width,
+                    ..Config::default()
+                },
+                std::path::PathBuf::new(),
+                tempfile::tempfile().unwrap(),
+            );
+            app.ensure_skin(&ctx);
+            let mut position = None;
+            let mut events = Vec::new();
+            let strip_id = egui::Id::new("saya_strip").with("saya_toggle");
+            for frame in 0..12 {
+                let output = ctx.run_ui(
+                    egui::RawInput {
+                        time: Some(frame as f64 * 0.3),
+                        events: std::mem::take(&mut events),
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            crate::MIN_WINDOW_SIZE,
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        app.show_header(ui);
+                        app.show_footer(ui);
+                        app.show_job_list(ui);
+                    },
+                );
+                let strip = ctx
+                    .read_response(strip_id)
+                    .expect("Saya's strip is always available")
+                    .rect;
+                if frame >= 2 {
+                    if let Some(previous) = position {
+                        assert_eq!(strip, previous, "frame={frame}");
+                    } else {
+                        position = Some(strip);
+                    }
+                }
+                let has_portrait = output.shapes.iter().any(|shape| match &shape.shape {
+                    egui::Shape::Mesh(mesh) => {
+                        let rect = mesh.calc_bounds();
+                        rect.width() > 250.0 && (rect.width() - rect.height()).abs() < 0.1
+                    }
+                    _ => false,
+                });
+                if frame == 2 || frame == 11 {
+                    assert!(has_portrait);
+                }
+                if frame == 7 {
+                    assert!(!has_portrait);
+                }
+                let center = strip.center();
+                events = match frame {
+                    2 | 7 => vec![
+                        egui::Event::PointerMoved(center),
+                        egui::Event::PointerButton {
+                            pos: center,
+                            button: egui::PointerButton::Primary,
+                            pressed: true,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    3 | 8 => vec![egui::Event::PointerButton {
+                        pos: center,
+                        button: egui::PointerButton::Primary,
+                        pressed: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    _ => vec![],
+                };
+            }
+        }
+    }
+
+    #[test]
     fn initial_system_appearance_is_saved_and_ignores_later_os_changes() {
         for system in [egui::Theme::Light, egui::Theme::Dark] {
             let directory = tempfile::tempdir().unwrap();
@@ -860,6 +1262,7 @@ mod tests {
             for with_job in [false, true] {
                 let mut config = Config {
                     skin: skin.id.into(),
+                    sidebar_width: 350.0,
                     ..Config::default()
                 };
                 if with_job {
@@ -918,83 +1321,92 @@ mod tests {
 
     #[test]
     fn dragged_sidebar_width_survives_frames_and_restart() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("config.json");
-        let mut app = App::new(
-            Config::default(),
-            path.clone(),
-            tempfile::tempfile().unwrap(),
-        );
-        let ctx = egui::Context::default();
-        app.ensure_skin(&ctx);
-        let frame = |app: &mut App, ctx: &egui::Context, events| {
-            let input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(
-                    egui::Pos2::ZERO,
-                    egui::vec2(1100.0, 960.0),
-                )),
-                events,
-                ..Default::default()
+        for skin in ["modern", "moonveil"] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("config.json");
+            let mut app = App::new(
+                Config {
+                    skin: skin.into(),
+                    ..Config::default()
+                },
+                path.clone(),
+                tempfile::tempfile().unwrap(),
+            );
+            let ctx = egui::Context::default();
+            app.ensure_skin(&ctx);
+            let frame = |app: &mut App, ctx: &egui::Context, events| {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1100.0, 960.0),
+                    )),
+                    events,
+                    ..Default::default()
+                };
+                let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
             };
-            let _ = ctx.run_ui(input, |ui| app.show_job_list(ui));
-        };
-        frame(&mut app, &ctx, vec![]);
-        let start = egui::pos2(300.0, 300.0);
-        let end = egui::pos2(390.0, 300.0);
-        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
-        frame(
-            &mut app,
-            &ctx,
-            vec![egui::Event::PointerButton {
-                pos: start,
-                button: egui::PointerButton::Primary,
-                pressed: true,
-                modifiers: egui::Modifiers::NONE,
-            }],
-        );
-        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(end)]);
-        frame(
-            &mut app,
-            &ctx,
-            vec![egui::Event::PointerButton {
-                pos: end,
-                button: egui::PointerButton::Primary,
-                pressed: false,
-                modifiers: egui::Modifiers::NONE,
-            }],
-        );
-        assert!(
-            (app.config.sidebar_width - 390.0).abs() < 1.0,
-            "width: {}",
-            app.config.sidebar_width
-        );
-        for _ in 0..5 {
             frame(&mut app, &ctx, vec![]);
-            let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+            frame(&mut app, &ctx, vec![]);
+            let inset = if skin == "moonveil" { 5.0 } else { 0.0 };
+            let start = egui::pos2(300.0 - inset, 300.0);
+            let end = egui::pos2(390.0 - inset, 300.0);
+            let handle = ctx.read_response(egui::Id::new("jobs_resize")).unwrap();
+            assert!((handle.rect.center().x - start.x).abs() < 1.0);
+            frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start)]);
+            frame(
+                &mut app,
+                &ctx,
+                vec![egui::Event::PointerButton {
+                    pos: start,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            frame(&mut app, &ctx, vec![egui::Event::PointerMoved(end)]);
+            frame(
+                &mut app,
+                &ctx,
+                vec![egui::Event::PointerButton {
+                    pos: end,
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            assert!(
+                (app.config.sidebar_width - 390.0).abs() < 1.0,
+                "width: {}",
+                app.config.sidebar_width
+            );
+            for _ in 0..5 {
+                frame(&mut app, &ctx, vec![]);
+                let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+                    .unwrap()
+                    .rect
+                    .width();
+                assert!((width - 390.0).abs() < 1.0, "width: {width}");
+            }
+            assert!(app.persist());
+            let config: Config = crate::engine::load(&path).unwrap();
+            let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
+            let new_ctx = egui::Context::default();
+            restarted.ensure_skin(&new_ctx);
+            frame(&mut restarted, &new_ctx, vec![]);
+            let width = egui::containers::panel::PanelState::load(&new_ctx, egui::Id::new("jobs"))
                 .unwrap()
                 .rect
                 .width();
-            assert!((width - 390.0).abs() < 1.0, "width: {width}");
+            assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
         }
-        assert!(app.persist());
-        let config: Config = crate::engine::load(&path).unwrap();
-        let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
-        let new_ctx = egui::Context::default();
-        restarted.ensure_skin(&new_ctx);
-        frame(&mut restarted, &new_ctx, vec![]);
-        let width = egui::containers::panel::PanelState::load(&new_ctx, egui::Id::new("jobs"))
-            .unwrap()
-            .rect
-            .width();
-        assert!((width - 390.0).abs() < 1.0, "width after restart: {width}");
     }
 
     #[test]
-    fn midnight_neko_portrait_fits_at_minimum_window_size_with_wide_sidebar() {
+    fn moonveil_portrait_fits_at_minimum_window_size_with_wide_sidebar() {
         let ctx = egui::Context::default();
         let mut app = App::new(
             Config {
-                skin: "midnight-neko".into(),
+                skin: "moonveil".into(),
                 sidebar_width: *SIDEBAR_WIDTH.end(),
                 jobs: (0..8).map(|_| Job::default()).collect(),
                 ..Config::default()
@@ -1023,14 +1435,25 @@ mod tests {
                     return None;
                 };
                 let rect = mesh.calc_bounds();
-                (rect.left() < 10.0 && rect.width() > 450.0 && rect.width() == rect.height())
+                (rect.left() < 10.0 && rect.width() > 440.0 && rect.width() == rect.height())
                     .then_some((rect, clipped.clip_rect))
             });
             let (rect, clip) = portrait.expect("full-width square portrait");
             assert!(clip.contains_rect(rect), "{rect:?} outside {clip:?}");
+            let strip = ctx
+                .read_response(egui::Id::new("saya_strip").with("saya_toggle"))
+                .expect("bottom strip")
+                .rect;
             assert!(
-                rect.bottom() + 100.0 <= clip.bottom(),
-                "{rect:?} in {clip:?}"
+                rect.bottom() + 60.0 <= strip.top() + 0.1,
+                "portrait={rect:?}, strip={strip:?}"
+            );
+            let panel = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("jobs"))
+                .unwrap()
+                .rect;
+            assert!(
+                panel.contains_rect(strip),
+                "panel={panel:?}, strip={strip:?}"
             );
         }
     }

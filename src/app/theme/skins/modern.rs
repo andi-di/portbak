@@ -48,7 +48,7 @@ pub static MODERN: Skin = Skin {
         mascot: Sprite::Shield,
         tagline: "",
         welcome_title: "Your backups start here",
-        welcome_prompt: "Create your first backup job",
+        welcome_prompt: "Create a backup job",
         ready: "Ready",
     },
 };

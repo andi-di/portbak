@@ -11,14 +11,14 @@ macro_rules! asset {
             $name,
             if $dark {
                 include_bytes!(concat!(
-                    "../../../assets/themes/midnight-neko/icons/dark/",
+                    "../../../assets/themes/moonveil/icons/dark/",
                     $name,
                     ".png"
                 ))
                 .as_slice()
             } else {
                 include_bytes!(concat!(
-                    "../../../assets/themes/midnight-neko/icons/light/",
+                    "../../../assets/themes/moonveil/icons/light/",
                     $name,
                     ".png"
                 ))
@@ -53,6 +53,12 @@ pub fn foreground(fill: Color32) -> Color32 {
 pub fn icon_on(painter: &egui::Painter, rect: Rect, sprite: Sprite, fill: Color32) {
     let dark = foreground(fill) == Color32::WHITE;
     let (name, bytes) = icon_asset(sprite, dark);
+    paint_icon(painter, rect, name, bytes, dark, fill);
+}
+
+pub fn close_icon(painter: &egui::Painter, rect: Rect, fill: Color32) {
+    let dark = foreground(fill) == Color32::WHITE;
+    let (name, bytes) = asset!("close", dark);
     paint_icon(painter, rect, name, bytes, dark, fill);
 }
 
@@ -235,6 +241,14 @@ fn icon_asset(sprite: Sprite, dark: bool) -> (&'static str, &'static [u8]) {
 }
 
 pub fn corners(painter: &egui::Painter, rect: Rect, color: Color32) {
+    frame_corners(painter, rect, color, true);
+}
+
+pub fn top_corners(painter: &egui::Painter, rect: Rect, color: Color32) {
+    frame_corners(painter, rect, color, false);
+}
+
+fn frame_corners(painter: &egui::Painter, rect: Rect, color: Color32, bottom: bool) {
     painter.rect_stroke(
         rect,
         3,
@@ -248,6 +262,9 @@ pub fn corners(painter: &egui::Painter, rect: Rect, color: Color32) {
         (rect.left_bottom(), Vec2::new(1.0, -1.0)),
         (rect.right_bottom(), Vec2::new(-1.0, -1.0)),
     ] {
+        if !bottom && direction.y < 0.0 {
+            continue;
+        }
         let start = corner + direction * 4.0;
         painter.add(egui::Shape::line(
             vec![
@@ -360,56 +377,129 @@ pub fn lamp(painter: &egui::Painter, rect: Rect, color: Color32) {
 pub fn activity(painter: &egui::Painter, rect: Rect, active: bool) {
     let palette = Palette::of_ctx(painter.ctx());
     let time = painter.ctx().input(|input| input.time) as f32;
-    let center = egui::pos2(rect.left() + 13.0, rect.center().y);
-    let silver = if active {
-        palette.metal
+    let center = rect.center();
+    let pulse = if active {
+        0.65 + 0.35 * (time * 3.6).sin()
     } else {
-        mix(palette.metal, palette.sunken, 0.4)
+        0.0
     };
-    let arc: Vec<_> = (0..25)
+    let silver = mix(palette.metal, palette.paper, 0.25);
+    let ruby = if active {
+        mix(palette.accent, palette.hot, 0.55 + pulse * 0.35)
+    } else {
+        mix(palette.accent, palette.sunken, 0.4)
+    };
+    for radius in (7..=14).rev() {
+        painter.circle_filled(
+            center,
+            radius as f32,
+            ruby.gamma_multiply(if active { 0.025 + pulse * 0.025 } else { 0.012 }),
+        );
+    }
+    activity_setting(painter, center, silver, palette.outline);
+    // A silver crescent cradles the stone without painting over the scenery.
+    let moon: Vec<_> = (0..=28)
         .map(|step| {
-            let angle = 0.65 + step as f32 / 24.0 * 5.0;
-            center + Vec2::angled(angle) * 9.0
+            let angle = 0.8 + step as f32 / 28.0 * 4.7;
+            center + Vec2::angled(angle) * 11.0
         })
         .collect();
-    painter.add(egui::Shape::line(arc, Stroke::new(1.6_f32, silver)));
-    let pulse = if active {
-        0.35 + 0.2 * (time * 4.0).sin()
-    } else {
-        0.05
-    };
-    diamond(
-        painter,
-        center,
-        5.0,
-        mix(palette.accent, palette.hot, pulse),
-    );
+    painter.add(egui::Shape::line(moon, Stroke::new(1.4_f32, silver)));
+    diamond(painter, center, 8.0, palette.outline);
+    diamond(painter, center, 6.5, ruby);
+    for (points, tint) in [
+        (
+            [
+                egui::vec2(0.0, -6.5),
+                egui::vec2(0.0, 0.0),
+                egui::vec2(-6.5, 0.0),
+            ],
+            mix(ruby, palette.paper, 0.38),
+        ),
+        (
+            [
+                egui::vec2(0.0, -6.5),
+                egui::vec2(6.5, 0.0),
+                egui::vec2(0.0, 0.0),
+            ],
+            mix(ruby, palette.hot, 0.35),
+        ),
+        (
+            [
+                egui::vec2(0.0, 0.0),
+                egui::vec2(6.5, 0.0),
+                egui::vec2(0.0, 6.5),
+            ],
+            mix(ruby, palette.outline, 0.35),
+        ),
+    ] {
+        painter.add(egui::Shape::convex_polygon(
+            points.into_iter().map(|offset| center + offset).collect(),
+            tint,
+            Stroke::NONE,
+        ));
+    }
     painter.line_segment(
-        [center - egui::vec2(2.0, 2.0), center - egui::vec2(0.0, 3.5)],
+        [
+            center + egui::vec2(-3.5, -0.5),
+            center + egui::vec2(-0.5, -4.5),
+        ],
         Stroke::new(1.0_f32, palette.paper),
     );
-    let start = egui::pos2(rect.left() + 28.0, rect.center().y);
-    let end = egui::pos2(rect.right() - 3.0, rect.center().y);
-    painter.line_segment([start, end], Stroke::new(0.8_f32, palette.outline));
-    for index in 0..5 {
-        diamond(painter, start.lerp(end, index as f32 / 4.0), 1.8, silver);
-    }
+    diamond(painter, center + egui::vec2(0.0, 13.0), 1.8, silver);
     if active {
-        let orbit = center + Vec2::angled(time * 2.3) * 9.0;
-        diamond(painter, orbit, 2.2, palette.paper);
-        diamond(
-            painter,
-            start.lerp(end, (time * 0.45).fract()),
-            3.0,
-            palette.hot,
-        );
+        for index in 0..3 {
+            let angle = time * 1.8 + index as f32 * std::f32::consts::TAU / 3.0;
+            let spark = center + egui::vec2(angle.cos() * 17.0, angle.sin() * 11.5);
+            diamond(
+                painter,
+                spark,
+                1.3 + pulse * 0.5,
+                palette.paper.gamma_multiply(0.85),
+            );
+        }
         painter
             .ctx()
-            .request_repaint_after(std::time::Duration::from_millis(50));
+            .request_repaint_after(std::time::Duration::from_millis(33));
     }
 }
 
-pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool, enabled: bool) {
+fn activity_setting(painter: &egui::Painter, center: Pos2, silver: Color32, outline: Color32) {
+    for side in [-1.0, 1.0] {
+        let at = |x: f32, y: f32| center + egui::vec2(x * side, y);
+        let wing = vec![
+            at(6.0, -3.0),
+            at(13.0, -8.0),
+            at(21.0, -9.0),
+            at(18.0, -3.0),
+            at(20.0, 1.0),
+            at(14.0, -1.0),
+            at(11.0, 4.0),
+            at(8.0, 1.0),
+        ];
+        painter.add(egui::Shape::closed_line(wing, Stroke::new(1.1_f32, silver)));
+        painter.line_segment(
+            [at(8.0, -2.0), at(18.0, -6.0)],
+            Stroke::new(0.7_f32, silver.gamma_multiply(0.6)),
+        );
+        diamond(painter, at(12.0, -7.0), 1.5, silver);
+    }
+    painter.line_segment(
+        [center - Vec2::Y * 13.0, center - Vec2::Y * 8.0],
+        Stroke::new(1.0_f32, silver),
+    );
+    diamond(painter, center - Vec2::Y * 12.0, 2.5, outline);
+    diamond(painter, center - Vec2::Y * 12.0, 1.4, silver);
+}
+
+pub fn control(
+    painter: &egui::Painter,
+    rect: Rect,
+    fill: Color32,
+    focused: bool,
+    enabled: bool,
+    accent_details: bool,
+) {
     let palette = Palette::of_ctx(painter.ctx());
     painter.rect_filled(rect, 3, fill);
     painter.rect_stroke(
@@ -418,7 +508,7 @@ pub fn control(painter: &egui::Painter, rect: Rect, fill: Color32, focused: bool
         Stroke::new(1.0_f32, palette.outline),
         StrokeKind::Inside,
     );
-    if enabled && fill == palette.accent && rect.width() > 50.0 {
+    if accent_details && enabled && fill == palette.accent && rect.width() > 50.0 {
         diamond(
             painter,
             egui::pos2(rect.left() + 5.0, rect.center().y),
@@ -525,16 +615,23 @@ mod tests {
         }
     }
 
+    fn functional_assets(dark: bool) -> Vec<(&'static str, &'static [u8])> {
+        Sprite::ALL
+            .into_iter()
+            .map(|sprite| icon_asset(sprite, dark))
+            .chain(std::iter::once(asset!("close", dark)))
+            .collect()
+    }
+
     #[test]
     fn icon_variants_match_geometry_and_contrast_control_surfaces() {
-        let skin = crate::app::theme::skins::find("midnight-neko");
-        for sprite in Sprite::ALL {
-            let light = image::load_from_memory(icon_asset(sprite, false).1)
-                .unwrap()
-                .to_rgba8();
-            let dark = image::load_from_memory(icon_asset(sprite, true).1)
-                .unwrap()
-                .to_rgba8();
+        let skin = crate::app::theme::skins::find("moonveil");
+        for ((name, light_bytes), (_, dark_bytes)) in functional_assets(false)
+            .into_iter()
+            .zip(functional_assets(true))
+        {
+            let light = image::load_from_memory(light_bytes).unwrap().to_rgba8();
+            let dark = image::load_from_memory(dark_bytes).unwrap().to_rgba8();
             assert_eq!(light.dimensions(), dark.dimensions());
             assert!(light.pixels().zip(dark.pixels()).all(|(a, b)| a[3] == b[3]));
             for palette in [&skin.light, &skin.dark] {
@@ -560,7 +657,7 @@ mod tests {
                         silver_finish(&mut image, ink == Color32::WHITE, fill);
                         for pixel in image.pixels().filter(|pixel| pixel[3] != 0) {
                             let color = Color32::from_rgb(pixel[0], pixel[1], pixel[2]);
-                            assert!(contrast(fill, color) >= 4.5, "{sprite:?} / {fill:?}");
+                            assert!(contrast(fill, color) >= 4.5, "{name} / {fill:?}");
                         }
                         assert!(contrast(fill, ink) >= 4.5);
                     }
@@ -572,9 +669,8 @@ mod tests {
     #[test]
     fn icons_share_resolution_padding_and_visible_extent() {
         let mut names = std::collections::HashSet::new();
-        for sprite in Sprite::ALL {
-            let (name, bytes) = icon_asset(sprite, true);
-            assert!(names.insert(name), "duplicate icon for {sprite:?}");
+        for (name, bytes) in functional_assets(true) {
+            assert!(names.insert(name), "duplicate icon: {name}");
             let image = image::load_from_memory(bytes).unwrap().to_rgba8();
             assert_eq!(image.dimensions(), (128, 128), "{name}");
             let mut bounds = (128, 128, 0, 0);

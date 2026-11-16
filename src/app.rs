@@ -256,8 +256,14 @@ impl App {
     fn remove_job(&mut self, id: Uuid) {
         self.history_cache.remove(&id);
         self.history_requests.remove(&id);
+        let index = self.config.jobs.iter().position(|job| job.id == id);
         self.config.jobs.retain(|job| job.id != id);
-        self.selected = self.config.jobs.first().map(|job| job.id);
+        if self.selected == Some(id) {
+            self.selected = index
+                .and_then(|index| self.config.jobs.get(index.saturating_sub(1)))
+                .map(|job| job.id);
+            self.backups_tab = false;
+        }
     }
 
     fn enqueue(&mut self, id: Uuid) {
@@ -512,7 +518,7 @@ impl App {
                         .as_ref()
                         .is_some_and(|history| history.request == request)
                 {
-                    scenery::catgirl::trigger(ctx, scenery::catgirl::Action::ProtectionEnabled);
+                    scenery::saya::trigger(ctx, scenery::saya::Action::ProtectionEnabled);
                 }
                 self.protection_saved(request, &name, protected, result);
             }
@@ -526,10 +532,10 @@ impl App {
     }
 
     fn finish_operation(&mut self, id: Uuid, result: Result<Outcome, String>, ctx: &egui::Context) {
-        use scenery::catgirl::{self, Action};
+        use scenery::saya::{self, Action};
         match &result {
-            Err(_) => catgirl::trigger(ctx, Action::Failed),
-            Ok(_) if self.restoring => catgirl::trigger(ctx, Action::RestoreCompleted),
+            Err(_) => saya::trigger(ctx, Action::Failed),
+            Ok(_) if self.restoring => saya::trigger(ctx, Action::RestoreCompleted),
             Ok(_) => {}
         }
         if let Some(job) = self.job_mut(id) {
@@ -709,6 +715,34 @@ mod tests {
         };
         let app = app_with(config, PathBuf::new());
         assert!(app.selected.is_none());
+    }
+
+    #[test]
+    fn removing_jobs_selects_neighbors_and_preserves_other_selection() {
+        let jobs: Vec<_> = (0..4).map(|_| Job::default()).collect();
+        let ids: Vec<_> = jobs.iter().map(|job| job.id).collect();
+        let mut app = app_with(
+            Config {
+                jobs,
+                ..Config::default()
+            },
+            PathBuf::new(),
+        );
+        app.selected = Some(ids[2]);
+        app.remove_job(ids[2]);
+        assert_eq!(app.selected, Some(ids[1]));
+        app.remove_job(ids[3]);
+        assert_eq!(app.selected, Some(ids[1]));
+        app.remove_job(ids[1]);
+        assert_eq!(app.selected, Some(ids[0]));
+        app.remove_job(ids[0]);
+        assert_eq!(app.selected, None);
+        let first = Job::default();
+        let second = Job::default();
+        app.selected = Some(first.id);
+        app.config.jobs = vec![first.clone(), second.clone()];
+        app.remove_job(first.id);
+        assert_eq!(app.selected, Some(second.id));
     }
 
     #[test]
@@ -937,6 +971,29 @@ mod tests {
             2
         );
         assert!(app.config.jobs[0].enabled);
+    }
+
+    #[test]
+    fn minimized_moonveil_window_still_runs_due_backups() {
+        let (_directory, mut app, _) = restore_fixture();
+        app.config.skin = "moonveil".into();
+        let job = app.config.jobs[0].clone();
+        std::fs::write(job.source.join("file"), "changed while minimized").unwrap();
+        let context = egui::Context::default();
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .minimized = Some(true);
+        let _ = context.run_ui(input, |_| {
+            assert!(!scenery::moonveil::decorations_visible(&context));
+            app.tick(&context);
+            assert_eq!(app.active, Some(job.id));
+        });
+        tick_until(&mut app, &context, |app| app.active.is_none());
+        assert!(app.active.is_none());
+        assert_eq!(engine::history::list(&job).unwrap().len(), 2);
     }
 
     #[test]

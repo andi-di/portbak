@@ -51,7 +51,7 @@ pub static LIQUID_GLASS: Skin = Skin {
         mascot: Sprite::Shield,
         tagline: "",
         welcome_title: "Back up with ease",
-        welcome_prompt: "Create your first backup job",
+        welcome_prompt: "Create a backup job",
         ready: "Up to date",
     },
 };

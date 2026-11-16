@@ -88,9 +88,9 @@ impl App {
             if let Some(history) = &mut self.backup_history {
                 history.selected = Some(name);
                 history.confirming_restore = true;
-                crate::app::scenery::catgirl::trigger(
+                crate::app::scenery::saya::trigger(
                     &ctx,
-                    crate::app::scenery::catgirl::Action::RestoreConfirmation,
+                    crate::app::scenery::saya::Action::RestoreConfirmation,
                 );
             }
         }
@@ -201,19 +201,29 @@ fn restore_dialog(
         .show(ui, |ui| {
             ui.heading("Restore backup?");
             restore_details(ui, history, app_error);
-            ui.horizontal(|ui| {
-                cancel = ui.add(PixelButton::new("Cancel")).clicked();
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let restore = PixelButton::new("Replace contents and restore")
-                        .sprite(Sprite::Rewind)
-                        .tone(Tone::Danger);
-                    confirm = ui
-                        .add_enabled(history.restorable_selection().is_some(), restore)
-                        .clicked();
-                });
-            });
+            let (restore, dismiss) = restore_buttons(ui, history.restorable_selection().is_some());
+            confirm = restore.clicked();
+            cancel = dismiss.clicked();
             (confirm, cancel)
         })
+}
+
+fn restore_buttons(ui: &mut egui::Ui, can_restore: bool) -> (egui::Response, egui::Response) {
+    let cancel = PixelButton::new("Cancel");
+    let restore = PixelButton::new("Restore")
+        .sprite(Sprite::Rewind)
+        .tone(Tone::Danger);
+    let height = cancel.size(ui).y.max(restore.size(ui).y);
+    ui.horizontal(|ui| {
+        let cancel = ui.add(cancel.min_size(egui::vec2(0.0, height)));
+        let restore = ui
+            .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_enabled(can_restore, restore.min_size(egui::vec2(0.0, height)))
+            })
+            .inner;
+        (restore, cancel)
+    })
+    .inner
 }
 
 fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
@@ -527,6 +537,31 @@ fn backup_controls(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn restore_and_cancel_buttons_have_matching_heights_in_every_theme() {
+        for skin in crate::app::theme::skins::ALL {
+            for theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let ctx = egui::Context::default();
+                style::install(&ctx, skin);
+                ctx.set_theme(theme);
+                for enabled in [true, false] {
+                    let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                        ui.set_width(760.0);
+                        let (restore, cancel) = restore_buttons(ui, enabled);
+                        assert_eq!(
+                            restore.rect.height(),
+                            cancel.rect.height(),
+                            "{} {theme:?}",
+                            skin.id
+                        );
+                        assert!(cancel.rect.right() < restore.rect.left());
+                        assert_eq!(restore.enabled(), enabled);
+                    });
+                }
+            }
+        }
+    }
+
     use super::*;
     use crate::model::Record;
     use chrono::Utc;

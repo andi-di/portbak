@@ -45,7 +45,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
         ui.add_space(6.0);
         pixel::display_label(ui, "SETTINGS", 16.0, palette.ink);
     });
-    ui.add_space(14.0);
+    ui.add_space(8.0);
     ui.horizontal_wrapped(|ui| {
         pixel::segmented(
             ui,
@@ -56,7 +56,7 @@ fn settings_page(ui: &mut egui::Ui, config: &mut Config, tab: &mut SettingsTab) 
             ],
         );
     });
-    ui.add_space(14.0);
+    ui.add_space(8.0);
     match tab {
         SettingsTab::Jobs => job_defaults(ui, &mut config.job_defaults),
         SettingsTab::Theme => {
@@ -88,14 +88,15 @@ fn job_defaults(ui: &mut egui::Ui, defaults: &mut JobDefaults) {
         switch_row(ui, &mut defaults.zip, "Compress as ZIP");
     });
     pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+        let mut job = defaults.new_job();
+        super::editor::schedule_controls(ui, &mut job);
+        defaults.update_schedule(&job);
+        ui.add_space(10.0);
         switch_row(
             ui,
             &mut defaults.check_on_enable,
             "Check immediately when enabled",
         );
-        let mut job = defaults.new_job();
-        super::editor::schedule_controls(ui, &mut job);
-        defaults.update_schedule(&job);
     });
     pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         switch_row(ui, &mut defaults.rolling, "Enable rolling retention");
@@ -151,6 +152,18 @@ fn skin_card(ui: &mut egui::Ui, candidate: &'static Skin, selected_id: &mut Stri
     let rect = frame.response.rect;
     let response =
         pixel::pointing_hand(ui.interact(rect, ui.id().with(candidate.id), egui::Sense::click()));
+    if response.has_focus() {
+        pixel::subtle_highlight(
+            ui,
+            &response,
+            rect.shrink(3.0),
+            if selected {
+                palette.accent_ink
+            } else {
+                palette.ink
+            },
+        );
+    }
     if response.clicked() && !selected {
         *selected_id = candidate.id.to_owned();
     }
