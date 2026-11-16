@@ -2,7 +2,7 @@ name: Validate and build
 description: Shared checks and release build for CI and published binaries
 inputs:
   version:
-    description: Release version override; empty uses Cargo.toml
+    description: Expected release version for Windows metadata verification
     default: ''
 runs:
   using: composite
@@ -43,13 +43,7 @@ runs:
       run: cargo clippy --locked --all-targets -- -D warnings
     - name: Build release executable
       shell: bash
-      env:
-        RELEASE_VERSION: ${{ inputs.version }}
-      run: |
-        if [ -n "$RELEASE_VERSION" ]; then
-          export PORTBAK_RELEASE_VERSION="$RELEASE_VERSION"
-        fi
-        cargo build --release --locked
+      run: cargo build --release --locked
     - name: Verify Windows release version
       if: runner.os == 'Windows' && inputs.version != ''
       shell: pwsh

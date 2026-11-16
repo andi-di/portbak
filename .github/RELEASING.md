@@ -3,21 +3,26 @@
 Every PR merged into `main` queues an automatic release. Open PRs and closed,
 unmerged PRs never publish. Release notes live in GitHub Releases only.
 
-The default bump is **minor** (`0.1.0` → `0.2.0`). Set one PR label to override it:
+## Release version
 
-| Label | Effect |
-| --- | --- |
-| `release:patch` | Increment patch only |
-| `release:minor` | Increment minor and reset patch; same as the default |
-| `release:major` | Increment major and reset minor and patch |
+Each PR sets the upcoming release version in `Cargo.toml` and updates the
+`portbak` entry in `Cargo.lock` to match. Use a stable `major.minor.patch` version
+with each component at most 65535, as required by Windows executable metadata.
+Choose the bump to match the change: patch for fixes, minor for features, and
+major for breaking changes.
 
-Conflicting or unknown `release:` labels fail validation in a separate required
-check; label changes do not restart platform builds. Release version selection
-reads labels from the merged PR when its main-branch push is processed.
-`Cargo.toml` supplies the baseline before the first tag and the
-version for local development builds. Release builds receive their allocated
-version through `PORTBAK_RELEASE_VERSION`; no bot commits are made to `main`.
+The required Validate release version check rejects versions that already have
+a tag or are not newer than every existing stable release tag. If another PR
+releases your chosen version first, update your PR to a newer version before
+merging. Release labels no longer select or increment versions.
+
+Local builds, CI builds, and published executables all use the version from
+`Cargo.toml`. Merging publishes that exact version; it does not increment the
+manifest or create an automated version-bump commit.
+
 Application versions do not change the settings or backup metadata format versions.
+
+## Publication and retries
 
 The workflow uses pushes to `main` and verifies the associated merged PR;
 direct pushes without a matching merged PR do not release. It does not use
@@ -34,7 +39,8 @@ the release workflow performs the checks and builds both platforms, avoiding
 a duplicate Build and test run on `main`.
 
 If a build or upload fails, rerun the failed workflow jobs in GitHub Actions.
-The reserved version stays associated with its merge commit, even if newer PRs
+A version tag can be reused only for the same merged commit. The reserved
+version stays associated with its merge commit, even if newer PRs
 release first. Incomplete draft uploads can be replaced on retry. Published
 assets and tags are never overwritten. Do not delete reserved tags to reuse
 their numbers; a failed release can leave a gap until it is retried.

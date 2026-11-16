@@ -1,0 +1,22 @@
+name: Validate release version
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  release-version:
+    name: Validate release version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate manifest version against release tags
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { cargoVersion, validateReleaseVersion } = require('./.github/scripts/release.cjs');
+            await validateReleaseVersion(github, context.repo, cargoVersion(fs.readFileSync('Cargo.toml', 'utf8')));

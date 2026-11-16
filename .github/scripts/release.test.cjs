@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { bumpVersion, cargoVersion, parseVersion, prepareRelease, releaseFiles,
+const { validateVersion, validateReleaseVersion, cargoVersion, parseVersion, prepareRelease, releaseFiles,
   publishRelease } = require('./release.cjs');
 
 const SHA = 'a'.repeat(40);
@@ -80,7 +80,7 @@ class FakeGitHub {
 const core = { setOutput() {} };
 async function prepared() {
   const github = new FakeGitHub();
-  await prepareRelease({ github, context: context(), core }, '0.1.0');
+  await prepareRelease({ github, context: context(), core }, '0.2.0');
   return github;
 }
 
@@ -92,20 +92,29 @@ function archives(t) {
   return directory;
 }
 
-test('minor is the default; explicit patch and major labels reset the right components', () => {
-  assert.equal(bumpVersion('0.1.0', []), '0.2.0');
-  assert.equal(bumpVersion('1.9.4', ['bug', 'release:minor']), '1.10.0');
-  assert.equal(bumpVersion('1.9.4', ['release:patch']), '1.9.5');
-  assert.equal(bumpVersion('1.9.4', ['release:major']), '2.0.0');
-  assert.throws(() => bumpVersion('1.9.4', ['release:major', 'release:patch']), /at most one/);
-  assert.throws(() => bumpVersion('1.9.4', ['release:rc']), /at most one/);
+test('manifest versions must be unused and newer than existing stable tags', () => {
+  const tags = ['v1.9.0', 'v1.10.0', 'v2.0.0-rc.1', 'unrelated'].map(name =>
+    ({ name, commit: { sha: SHA } }));
+  assert.equal(validateVersion('1.10.1', tags), 'v1.10.1');
+  assert.equal(validateVersion('0.1.0', []), 'v0.1.0');
+  assert.throws(() => validateVersion('1.10.0', tags), /already has a release tag/);
+  assert.throws(() => validateVersion('1.9.1', tags), /newer/);
+  assert.throws(() => validateVersion('1.10.0', tags, 'b'.repeat(40)), /already/);
+  assert.equal(validateVersion('1.10.0', tags, SHA), 'v1.10.0');
+});
+
+test('PR validation reads all tags and never writes', async () => {
+  const github = new FakeGitHub();
+  github.tags.push({ name: 'v0.2.0', commit: { sha: SHA } });
+  await assert.rejects(validateReleaseVersion(github, context().repo, '0.2.0'), /already/);
+  assert.equal(await validateReleaseVersion(github, context().repo, '0.2.1'), 'v0.2.1');
+  assert.deepEqual(github.writes, []);
 });
 
 test('only stable versions representable in Windows metadata are accepted', () => {
   for (const value of ['v1.0.0', '1.0', '1.0.0-rc.1', '01.0.0', '65536.0.0', '1.2.3\n']) {
     assert.throws(() => parseVersion(value), undefined, value);
   }
-  assert.throws(() => bumpVersion('0.65535.0', []), /Windows/);
   assert.equal(cargoVersion('[package]\nname = "portbak"\nversion = "0.1.0"\n[dependencies]\nx = "2"\n'), '0.1.0');
 });
 
@@ -115,15 +124,16 @@ test('nonmerged PRs and other branches cannot reserve releases', async () => {
     const github = new FakeGitHub();
     const input = context();
     mutate(input);
-    await assert.rejects(prepareRelease({ github, context: input, core }, '0.1.0'), /merged/);
+    await assert.rejects(prepareRelease({ github, context: input, core }, '0.2.0'), /merged/);
     assert.equal(github.writes.length, 0);
   }
 });
 
-test('conflicting labels fail before any repository mutation', async () => {
-  const github = new FakeGitHub();
+test('existing versions on another commit fail before any repository mutation', async () => {
+  const github = await prepared();
+  github.writes = [];
   await assert.rejects(prepareRelease({ github,
-    context: context(SHA, ['release:major', 'release:patch']), core }, '0.1.0'), /at most one/);
+    context: context('b'.repeat(40)), core }, '0.2.0'), /already/);
   assert.deepEqual(github.writes, []);
 });
 
@@ -133,16 +143,16 @@ test('API errors are not treated as missing releases', async () => {
   github.rest.repos.getReleaseByTag = async () => {
     throw Object.assign(new Error('Forbidden'), { status: 403 });
   };
-  await assert.rejects(prepareRelease({ github, context: context(), core }, '0.1.0'), /Forbidden/);
+  await assert.rejects(prepareRelease({ github, context: context(), core }, '0.2.0'), /Forbidden/);
   assert.deepEqual(github.writes, []);
 });
 
-test('reservation uses the highest numeric tag and binds a draft to the exact merge', async () => {
+test('reservation uses the manifest version and binds a draft to the exact merge', async () => {
   const github = new FakeGitHub();
   github.tags = ['v0.9.0', 'v0.10.0', 'v2.0.0-rc.1', 'unrelated'].map(name =>
     ({ name, commit: { sha: 'b'.repeat(40) } }));
-  const result = await prepareRelease({ github, context: context(), core }, '0.1.0');
-  assert.equal(result.version, '0.11.0');
+  const result = await prepareRelease({ github, context: context(), core }, '0.10.1');
+  assert.equal(result.version, '0.10.1');
   assert.equal(result.sha, SHA);
   assert.equal(result.published, 'false');
   assert.equal(github.releases[0].target_commitish, SHA);
@@ -153,8 +163,8 @@ test('reservation uses the highest numeric tag and binds a draft to the exact me
 
 test('failed builds keep their version while later PRs receive distinct versions', async () => {
   const github = await prepared();
-  await prepareRelease({ github, context: context('b'.repeat(40)), core }, '0.1.0');
-  const result = await prepareRelease({ github, context: context(), core }, '0.1.0');
+  await prepareRelease({ github, context: context('b'.repeat(40)), core }, '0.3.0');
+  const result = await prepareRelease({ github, context: context(), core }, '0.2.0');
   assert.equal(result.version, '0.2.0');
   assert.deepEqual(github.tags.map(tag => tag.name), ['v0.2.0', 'v0.3.0']);
   assert.equal(github.releases.length, 2);
@@ -163,7 +173,7 @@ test('failed builds keep their version while later PRs receive distinct versions
 test('a tag left by an interrupted reservation is reused', async () => {
   const github = new FakeGitHub();
   github.tags.push({ name: 'v0.2.0', commit: { sha: SHA } });
-  await prepareRelease({ github, context: context(), core }, '0.1.0');
+  await prepareRelease({ github, context: context(), core }, '0.2.0');
   assert.equal(github.tags.length, 1);
   assert.equal(github.releases.length, 1);
 });
@@ -172,7 +182,7 @@ test('published releases are skipped without touching their assets', async () =>
   const github = await prepared();
   github.releases[0].draft = false;
   github.writes = [];
-  const result = await prepareRelease({ github, context: context(), core }, '0.1.0');
+  const result = await prepareRelease({ github, context: context(), core }, '0.2.0');
   assert.equal(result.published, 'true');
   await publishRelease({ github, context: context() }, { version: '0.2.0', directory: 'missing' });
   assert.deepEqual(github.writes, []);
@@ -232,12 +242,12 @@ function pushContext(sha = SHA) {
     payload: { deleted: false } };
 }
 
-test('a main push releases the exact merged PR and its major override', async () => {
+test('a main push releases the manifest version regardless of legacy labels', async () => {
   const github = new FakeGitHub();
   github.pulls = [{ ...context(SHA, ['release:major']).payload.pull_request,
     merged_at: '2026-11-16T20:22:21Z' }];
-  const result = await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
-  assert.equal(result.version, '1.0.0');
+  const result = await prepareRelease({ github, context: pushContext(), core }, '0.2.0');
+  assert.equal(result.version, '0.2.0');
   assert.equal(result.sha, SHA);
 });
 
@@ -247,7 +257,7 @@ test('direct pushes, open PRs, other branches, and older merge commits do not re
     [{ ...pr, merge_commit_sha: 'b'.repeat(40) }]]) {
     const github = new FakeGitHub();
     github.pulls = pulls;
-    const result = await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
+    const result = await prepareRelease({ github, context: pushContext(), core }, '0.2.0');
     assert.equal(result.published, 'true');
     assert.deepEqual(github.writes, []);
   }
@@ -265,7 +275,7 @@ test('deleted or non-main push refs cannot reserve versions', async () => {
 test('push-based publication discovers the reserved draft and publishes both builds', async (t) => {
   const github = new FakeGitHub();
   github.pulls = [{ ...context().payload.pull_request, merged_at: '2026-11-16T20:22:21Z' }];
-  await prepareRelease({ github, context: pushContext(), core }, '0.1.0');
+  await prepareRelease({ github, context: pushContext(), core }, '0.2.0');
   await publishRelease({ github, context: pushContext() }, { version: '0.2.0', directory: archives(t) });
   assert.equal(github.releases[0].draft, false);
   assert.equal(github.assets.length, 3);
@@ -277,7 +287,7 @@ test('Actions prototype getters survive push context normalization through publi
   const { repo, ...properties } = pushContext();
   const actionsContext = Object.assign(Object.create({ get repo() { return repo; } }), properties);
   assert.equal(Object.hasOwn(actionsContext, 'repo'), false);
-  const reserved = await prepareRelease({ github, context: actionsContext, core }, '0.1.0');
+  const reserved = await prepareRelease({ github, context: actionsContext, core }, '0.2.0');
   assert.equal(reserved.sha, SHA);
   assert.equal(github.releases[0].owner, repo.owner);
   assert.equal(github.releases[0].repo, repo.repo);

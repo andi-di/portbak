@@ -1,8 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=assets/icon/portbak.ico");
-    println!("cargo:rerun-if-env-changed=PORTBAK_RELEASE_VERSION");
-    let version = std::env::var("PORTBAK_RELEASE_VERSION")
-        .unwrap_or_else(|_| std::env::var("CARGO_PKG_VERSION").unwrap());
+    let version = std::env::var("CARGO_PKG_VERSION").unwrap();
     let parts: Vec<u16> = version
         .split('.')
         .map(|part| {
