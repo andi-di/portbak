@@ -1,23 +1,21 @@
-use crate::model::ScheduleSettings;
+mod history;
 mod navigation;
 pub(crate) mod platform;
 mod rendering;
 mod scenery;
 mod theme;
 mod views;
+mod worker;
+use history::HistoryState;
 use navigation::Page;
+use worker::{Worker, WorkerEvent};
 
-use crate::engine::{self, history::Backup, Outcome};
-use crate::model::{Config, Job, Record};
+use crate::model::{Config, Job};
 use crate::persistence;
-use chrono::Utc;
 use eframe::egui;
 use std::{
-    collections::{HashMap, VecDeque},
     fs::File,
-    panic::{self, AssertUnwindSafe},
     path::PathBuf,
-    sync::mpsc,
     time::{Duration, Instant},
 };
 use uuid::Uuid;
@@ -25,115 +23,14 @@ use uuid::Uuid;
 const AUTOSAVE_DELAY: Duration = Duration::from_millis(600);
 const TICK_INTERVAL: Duration = Duration::from_millis(500);
 
-enum Event {
-    Deleted {
-        error: Option<String>,
-        request: Uuid,
-        result: Result<LoadedHistory, String>,
-    },
-    Progress(String),
-    Finished {
-        job: Uuid,
-        result: Result<Outcome, String>,
-    },
-    HistoryLoaded {
-        request: Uuid,
-        result: Result<LoadedHistory, String>,
-    },
-    ProtectionSaved {
-        request: Uuid,
-        name: String,
-        protected: bool,
-        result: Result<(), String>,
-    },
-    SummaryLoaded {
-        job: Uuid,
-        target: PathBuf,
-        request: Uuid,
-        records: Result<Vec<Record>, String>,
-    },
-}
-
-struct LoadedHistory {
-    backups: Vec<Backup>,
-    /// Canonical source path, shown so the user sees exactly which folder gets replaced.
-    source: Option<PathBuf>,
-}
-
-/// Backup records of one job, valid only while the job keeps this destination.
-struct CachedHistory {
-    target: PathBuf,
-    records: Result<Vec<Record>, String>,
-}
-
-struct PendingSummary {
-    target: PathBuf,
-    request: Uuid,
-}
-
-struct BackupHistory {
-    /// Ignore asynchronous results from a previous history view.
-    request: Uuid,
-    job: Job,
-    backups: Option<Result<Vec<Backup>, String>>,
-    selected: Option<String>,
-    source_display: Option<PathBuf>,
-    saving: bool,
-    confirming_restore: bool,
-    error: String,
-}
-
-impl BackupHistory {
-    fn new(job: Job) -> Self {
-        Self {
-            request: Uuid::new_v4(),
-            job,
-            backups: None,
-            selected: None,
-            source_display: None,
-            saving: false,
-            confirming_restore: false,
-            error: String::new(),
-        }
-    }
-
-    /// The selected backup, if it can be restored right now.
-    fn restorable_selection(&self) -> Option<String> {
-        if self.saving || self.source_display.is_none() {
-            return None;
-        }
-        let name = self.selected.as_ref()?;
-        let backups = self.backups.as_ref()?.as_ref().ok()?;
-        backups
-            .iter()
-            .any(|backup| backup.available && backup.record.name == *name)
-            .then(|| name.clone())
-    }
-}
-
-enum Operation {
-    Backup,
-    Restore(String),
-}
-
 pub struct App {
     config: Config,
     path: PathBuf,
     page: Page,
-    queue: VecDeque<Uuid>,
-    active: Option<Uuid>,
-    restoring: bool,
-    activity_until: Option<Instant>,
-    /// The job and label of the operation that just finished, held with the footer activity.
-    recent_activity: Option<(Uuid, &'static str)>,
-    backup_history: Option<BackupHistory>,
+    worker: Worker,
+    history: HistoryState,
     settings_tab: views::settings_view::SettingsTab,
-    history_cache: HashMap<Uuid, CachedHistory>,
-    history_requests: HashMap<Uuid, PendingSummary>,
-    tx: mpsc::Sender<Event>,
-    rx: mpsc::Receiver<Event>,
     error: String,
-    progress: String,
     dirty: bool,
     last_save: Instant,
     /// Held for the app's lifetime so a second instance cannot share the configuration.
@@ -145,24 +42,14 @@ impl App {
         if let Some(app_dir) = path.parent() {
             config.resolve_destinations(app_dir);
         }
-        let (tx, rx) = mpsc::channel();
         Self {
             page: Page::default(),
             config,
             path,
-            queue: VecDeque::new(),
-            active: None,
-            restoring: false,
-            activity_until: None,
-            recent_activity: None,
-            backup_history: None,
+            worker: Worker::default(),
+            history: HistoryState::default(),
             settings_tab: views::settings_view::SettingsTab::default(),
-            history_cache: HashMap::new(),
-            history_requests: HashMap::new(),
-            tx,
-            rx,
             error: String::new(),
-            progress: String::new(),
             dirty: false,
             last_save: Instant::now(),
             _lock: lock,
@@ -177,51 +64,29 @@ impl App {
         self.config.jobs.iter_mut().find(|job| job.id == id)
     }
 
-    /// No worker runs and nothing waits; required before history can be opened or restored.
-    fn is_idle(&self) -> bool {
-        self.active.is_none() && self.queue.is_empty()
-    }
-
     /// Keep destructive actions and protection changes separate from backup execution.
     fn scheduling_paused(&self) -> bool {
-        self.restoring
+        self.worker.restoring
             || self
-                .backup_history
+                .history
+                .view
                 .as_ref()
                 .is_some_and(|history| history.saving || history.confirming_restore)
     }
 
     fn can_add_job(&self) -> bool {
-        !self.restoring
+        !self.worker.restoring
             && !self
-                .backup_history
+                .history
+                .view
                 .as_ref()
                 .is_some_and(|history| history.saving)
     }
 
-    /// Running, restoring, or queued work for a job. Finished work stays labelled as long as
-    /// the footer activity, so quick checks do not flash the label.
-    fn activity_label(&self, id: Uuid) -> Option<&'static str> {
-        if self.active == Some(id) {
-            return Some(if self.restoring {
-                "Restoring"
-            } else {
-                "Running"
-            });
-        }
-        if self.queue.contains(&id) {
-            return Some("Queued");
-        }
-        let recent = self
-            .activity_until
-            .is_some_and(|until| until > Instant::now());
-        self.recent_activity
-            .filter(|(job, _)| recent && *job == id)
-            .map(|(_, label)| label)
-    }
-
     fn is_busy(&self, id: Uuid) -> bool {
-        self.active == Some(id) || self.queue.contains(&id) || self.scheduling_paused()
+        self.worker.active == Some(id)
+            || self.worker.queue.contains(&id)
+            || self.scheduling_paused()
     }
 
     /// Returns whether the configuration is now saved; failures stay dirty and are retried.
@@ -247,13 +112,13 @@ impl App {
         }
         let job = self.config.job_defaults.new_job();
         self.page = Page::JobSettings(job.id);
-        self.backup_history = None;
+        self.history.view = None;
         self.config.jobs.push(job);
     }
 
     fn remove_job(&mut self, id: Uuid) {
-        self.history_cache.remove(&id);
-        self.history_requests.remove(&id);
+        self.history.cache.remove(&id);
+        self.history.requests.remove(&id);
         let index = self.config.jobs.iter().position(|job| job.id == id);
         self.config.jobs.retain(|job| job.id != id);
         if self.page.selected_job() == Some(id) {
@@ -262,12 +127,6 @@ impl App {
                     .and_then(|index| self.config.jobs.get(index.saturating_sub(1)))
                     .map(|job| job.id),
             );
-        }
-    }
-
-    fn enqueue(&mut self, id: Uuid) {
-        if !self.scheduling_paused() && self.active != Some(id) && !self.queue.contains(&id) {
-            self.queue.push_back(id);
         }
     }
 
@@ -284,199 +143,8 @@ impl App {
         }
     }
 
-    fn remove_pending(&mut self, id: Uuid) {
-        self.queue.retain(|queued| *queued != id);
-    }
-
-    /// Runs `task` on a background thread and delivers its event to the UI thread.
-    fn spawn_task(&self, ctx: &egui::Context, task: impl FnOnce() -> Event + Send + 'static) {
-        let tx = self.tx.clone();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            // Sending only fails once the app has shut down.
-            let _ = tx.send(task());
-            ctx.request_repaint();
-        });
-    }
-
-    fn start_worker(&mut self, job: Job, operation: Operation, ctx: &egui::Context) {
-        self.active = Some(job.id);
-        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
-        self.restoring = matches!(operation, Operation::Restore(_));
-        self.progress = if self.restoring {
-            "Preparing restore …"
-        } else {
-            "Preparing backup …"
-        }
-        .into();
-        let progress_tx = self.tx.clone();
-        let progress_ctx = ctx.clone();
-        self.spawn_task(ctx, move || {
-            let (sender, receiver) = mpsc::channel();
-            let relay = std::thread::spawn(move || {
-                for message in receiver {
-                    let _ = progress_tx.send(Event::Progress(message));
-                    progress_ctx.request_repaint();
-                }
-            });
-            let result = run_operation(&job, operation, &sender);
-            // Flush all progress before reporting completion.
-            drop(sender);
-            let _ = relay.join();
-            Event::Finished {
-                job: job.id,
-                result,
-            }
-        });
-    }
-
-    fn open_history(&mut self, id: Uuid, ctx: &egui::Context) {
-        if !self.is_idle() || self.backup_history.is_some() {
-            return;
-        }
-        let Some(job) = self.job(id).cloned() else {
-            return;
-        };
-        if job.target.as_os_str().is_empty() {
-            return;
-        }
-        let dialog = BackupHistory::new(job.clone());
-        let request = dialog.request;
-        self.backup_history = Some(dialog);
-        self.spawn_task(ctx, move || Event::HistoryLoaded {
-            request,
-            result: load_history(&job).map_err(describe),
-        });
-    }
-
-    /// Disables the job and saves that before touching the source, so a crash cannot re-enable it.
-    fn confirm_restore(&mut self, ctx: &egui::Context) {
-        if !self.is_idle() {
-            return;
-        }
-        let Some(dialog) = &self.backup_history else {
-            return;
-        };
-        let Some(name) = dialog.restorable_selection() else {
-            return;
-        };
-        let id = dialog.job.id;
-        let Some(job) = self.job_mut(id) else {
-            return;
-        };
-        job.enabled = false;
-        job.reschedule(Utc::now());
-        let job = job.clone();
-        if !self.persist() {
-            return;
-        }
-        self.backup_history = None;
-        self.start_worker(job, Operation::Restore(name), ctx);
-    }
-
-    fn delete_backup(&mut self, name: String, ctx: &egui::Context) {
-        if !self.is_idle() {
-            return;
-        }
-        let Some(history) = &mut self.backup_history else {
-            return;
-        };
-        if history.saving {
-            return;
-        }
-        history.saving = true;
-        history.error.clear();
-        let request = history.request;
-        let job = history.job.clone();
-        self.spawn_task(ctx, move || {
-            let deletion = engine::history::delete(&job, &name);
-            let result = load_history(&job).map_err(describe);
-            Event::Deleted {
-                request,
-                error: deletion.err().map(describe),
-                result,
-            }
-        });
-    }
-
-    fn save_protection(&mut self, name: String, protected: bool, ctx: &egui::Context) {
-        let Some(dialog) = &mut self.backup_history else {
-            return;
-        };
-        if dialog.saving {
-            return;
-        }
-        dialog.saving = true;
-        dialog.error.clear();
-        let request = dialog.request;
-        let job = dialog.job.clone();
-        self.spawn_task(ctx, move || {
-            let result = engine::history::set_protected(&job, &name, protected).map_err(describe);
-            Event::ProtectionSaved {
-                request,
-                name,
-                protected,
-                result,
-            }
-        });
-    }
-
-    /// Loads the retention summary unless one for the current destination exists or is pending.
-    fn ensure_summary(&mut self, id: Uuid, ctx: &egui::Context) {
-        let cached = self.job(id).is_some_and(|job| {
-            self.history_cache
-                .get(&id)
-                .is_some_and(|cache| cache.target == job.target)
-        });
-        if !cached {
-            self.reload_summary(id, ctx);
-        }
-    }
-
-    fn reload_summary(&mut self, id: Uuid, ctx: &egui::Context) {
-        let Some(job) = self.job(id).cloned() else {
-            return;
-        };
-        let pending = self
-            .history_requests
-            .get(&id)
-            .is_some_and(|pending| pending.target == job.target);
-        if job.target.as_os_str().is_empty() || pending {
-            return;
-        }
-        let request = Uuid::new_v4();
-        let target = job.target.clone();
-        self.history_requests.insert(
-            id,
-            PendingSummary {
-                target: target.clone(),
-                request,
-            },
-        );
-        self.spawn_task(ctx, move || Event::SummaryLoaded {
-            job: id,
-            target,
-            request,
-            records: engine::history::list(&job)
-                .map(|backups| records_of(&backups))
-                .map_err(describe),
-        });
-    }
-
-    /// Fresh records supersede any summary still being loaded.
-    fn store_summary(&mut self, id: Uuid, target: PathBuf, records: Vec<Record>) {
-        self.history_requests.remove(&id);
-        self.history_cache.insert(
-            id,
-            CachedHistory {
-                target,
-                records: Ok(records),
-            },
-        );
-    }
-
     fn tick(&mut self, ctx: &egui::Context) {
-        while let Ok(event) = self.rx.try_recv() {
+        while let Ok(event) = self.worker.rx.try_recv() {
             self.handle(event, ctx);
         }
         self.queue_due_jobs();
@@ -487,9 +155,9 @@ impl App {
         ctx.request_repaint_after(TICK_INTERVAL);
     }
 
-    fn handle(&mut self, event: Event, ctx: &egui::Context) {
+    fn handle(&mut self, event: WorkerEvent, ctx: &egui::Context) {
         match event {
-            Event::Deleted {
+            WorkerEvent::Deleted {
                 request,
                 result,
                 error,
@@ -501,10 +169,10 @@ impl App {
                 self.history_loaded(request, result);
             }
 
-            Event::Progress(message) => self.progress = message,
-            Event::Finished { job, result } => self.finish_operation(job, result, ctx),
-            Event::HistoryLoaded { request, result } => self.history_loaded(request, result),
-            Event::ProtectionSaved {
+            WorkerEvent::Progress(message) => self.worker.progress = message,
+            WorkerEvent::Finished { job, result } => self.finish_operation(job, result, ctx),
+            WorkerEvent::HistoryLoaded { request, result } => self.history_loaded(request, result),
+            WorkerEvent::ProtectionSaved {
                 request,
                 name,
                 protected,
@@ -513,7 +181,8 @@ impl App {
                 if protected
                     && result.is_ok()
                     && self
-                        .backup_history
+                        .history
+                        .view
                         .as_ref()
                         .is_some_and(|history| history.request == request)
                 {
@@ -521,7 +190,7 @@ impl App {
                 }
                 self.protection_saved(request, &name, protected, result);
             }
-            Event::SummaryLoaded {
+            WorkerEvent::SummaryLoaded {
                 job,
                 target,
                 request,
@@ -529,166 +198,6 @@ impl App {
             } => self.summary_loaded(job, target, request, records),
         }
     }
-
-    fn finish_operation(&mut self, id: Uuid, result: Result<Outcome, String>, ctx: &egui::Context) {
-        use scenery::saya::{self, Action};
-        match &result {
-            Err(_) => saya::trigger(ctx, Action::Failed),
-            Ok(_) if self.restoring => saya::trigger(ctx, Action::RestoreCompleted),
-            Ok(_) => {}
-        }
-        if let Some(job) = self.job_mut(id) {
-            match result {
-                Ok(outcome) => {
-                    if outcome.created {
-                        job.last_success = Some(Utc::now());
-                    }
-                    job.status = outcome.message;
-                }
-                Err(error) => job.status = format!("Error: {error}"),
-            }
-        }
-        self.recent_activity = self.activity_label(id).map(|label| (id, label));
-        self.active = None;
-        self.restoring = false;
-        self.activity_until = Some(Instant::now() + Duration::from_millis(750));
-        self.progress.clear();
-        self.persist();
-        self.reload_summary(id, ctx);
-    }
-
-    fn pending_history(&mut self, request: Uuid) -> Option<&mut BackupHistory> {
-        self.backup_history
-            .as_mut()
-            .filter(|dialog| dialog.request == request)
-    }
-
-    fn history_loaded(&mut self, request: Uuid, result: Result<LoadedHistory, String>) {
-        let Some(dialog) = self.pending_history(request) else {
-            return;
-        };
-        let loaded = match result {
-            Ok(loaded) => loaded,
-            Err(error) => {
-                dialog.backups = Some(Err(error));
-                return;
-            }
-        };
-        let records = records_of(&loaded.backups);
-        dialog.source_display = loaded.source;
-        dialog.backups = Some(Ok(loaded.backups));
-        let (id, target) = (dialog.job.id, dialog.job.target.clone());
-        self.store_summary(id, target, records);
-    }
-
-    fn protection_saved(
-        &mut self,
-        request: Uuid,
-        name: &str,
-        protected: bool,
-        result: Result<(), String>,
-    ) {
-        let Some(dialog) = self.pending_history(request) else {
-            return;
-        };
-        dialog.saving = false;
-        if let Err(error) = result {
-            dialog.error = error;
-            return;
-        }
-        let Some(Ok(backups)) = &mut dialog.backups else {
-            return;
-        };
-        if let Some(backup) = backups.iter_mut().find(|backup| backup.record.name == name) {
-            backup.record.protected = protected;
-        }
-        let records = records_of(backups);
-        let (id, target) = (dialog.job.id, dialog.job.target.clone());
-        self.store_summary(id, target, records);
-    }
-
-    fn summary_loaded(
-        &mut self,
-        id: Uuid,
-        target: PathBuf,
-        request: Uuid,
-        records: Result<Vec<Record>, String>,
-    ) {
-        let current = self
-            .history_requests
-            .get(&id)
-            .is_some_and(|pending| pending.request == request);
-        if !current {
-            return;
-        }
-        self.history_requests.remove(&id);
-        if self.job(id).is_some_and(|job| job.target == target) {
-            self.history_cache
-                .insert(id, CachedHistory { target, records });
-        }
-    }
-
-    fn queue_due_jobs(&mut self) {
-        if self.scheduling_paused() {
-            return;
-        }
-        let now = Utc::now();
-        let mut due = Vec::new();
-        for job in &mut self.config.jobs {
-            let previous = job.next_run;
-            if job.take_due(now) {
-                due.push(job.id);
-            }
-            self.dirty |= previous != job.next_run;
-        }
-        for id in due {
-            self.enqueue(id);
-        }
-    }
-
-    fn start_next_queued(&mut self, ctx: &egui::Context) {
-        if self.active.is_some() || self.scheduling_paused() {
-            return;
-        }
-        let Some(id) = self.queue.pop_front() else {
-            return;
-        };
-        if let Some(job) = self.job(id).cloned() {
-            // Reload the visible history after the worker finishes, including retention changes.
-            self.backup_history = None;
-            self.start_worker(job, Operation::Backup, ctx);
-        }
-    }
-}
-
-fn run_operation(
-    job: &Job,
-    operation: Operation,
-    progress: &mpsc::Sender<String>,
-) -> Result<Outcome, String> {
-    let outcome = panic::catch_unwind(AssertUnwindSafe(|| match operation {
-        Operation::Backup => engine::run(job, progress),
-        Operation::Restore(name) => engine::restore::run(job, &name, progress),
-    }));
-    match outcome {
-        Ok(result) => result.map_err(describe),
-        Err(_) => Err(
-            "Unexpected error in worker; check for restore recovery folders beside the source"
-                .into(),
-        ),
-    }
-}
-
-fn load_history(job: &Job) -> anyhow::Result<LoadedHistory> {
-    let backups = engine::history::list(job)?;
-    let source = std::fs::canonicalize(&job.source)
-        .ok()
-        .filter(|source| source.is_dir());
-    Ok(LoadedHistory { backups, source })
-}
-
-fn records_of(backups: &[Backup]) -> Vec<Record> {
-    backups.iter().map(|backup| backup.record.clone()).collect()
 }
 
 fn describe(error: anyhow::Error) -> String {
@@ -697,10 +206,14 @@ fn describe(error: anyhow::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::history::HistoryViewState;
     use super::*;
     use crate::model::Schedule;
+    use crate::{engine, model::ScheduleSettings};
+    use chrono::Utc;
     use fs2::FileExt;
     use std::fs::OpenOptions;
+    use std::{collections::VecDeque, sync::mpsc};
 
     fn app_with(config: Config, path: PathBuf) -> App {
         App::new(config, path, tempfile::tempfile().unwrap())
@@ -776,12 +289,12 @@ mod tests {
         job.enabled = true;
         job.reschedule(Utc::now());
         app.job_activation_changed(id, false);
-        assert_eq!(app.queue, VecDeque::from([id]));
-        app.queue.clear();
+        assert_eq!(app.worker.queue, VecDeque::from([id]));
+        app.worker.queue.clear();
         app.job_mut(id).unwrap().check_on_enable = false;
         app.config.job_defaults.check_on_enable = true;
         app.job_activation_changed(id, false);
-        assert!(app.queue.is_empty());
+        assert!(app.worker.queue.is_empty());
     }
 
     #[test]
@@ -799,22 +312,22 @@ mod tests {
         let next = job.next_run;
         app.job_activation_changed(id, false);
         app.job_activation_changed(id, false);
-        assert_eq!(app.queue, VecDeque::from([id]));
+        assert_eq!(app.worker.queue, VecDeque::from([id]));
         assert_eq!(app.job(id).unwrap().next_run, next);
-        app.queue.clear();
+        app.worker.queue.clear();
         app.job_activation_changed(id, true);
-        assert!(app.queue.is_empty());
-        app.active = Some(id);
+        assert!(app.worker.queue.is_empty());
+        app.worker.active = Some(id);
         app.job_activation_changed(id, false);
-        assert!(app.queue.is_empty());
-        app.active = None;
+        assert!(app.worker.queue.is_empty());
+        app.worker.active = None;
         app.job_mut(id).unwrap().check_on_enable = false;
         app.job_activation_changed(id, false);
-        assert!(app.queue.is_empty());
-        app.queue.push_back(id);
+        assert!(app.worker.queue.is_empty());
+        app.worker.queue.push_back(id);
         app.job_mut(id).unwrap().enabled = false;
         app.job_activation_changed(id, true);
-        assert!(app.queue.is_empty());
+        assert!(app.worker.queue.is_empty());
     }
 
     #[test]
@@ -890,8 +403,8 @@ mod tests {
         }
     }
 
-    fn dialog(app: &App) -> &BackupHistory {
-        app.backup_history.as_ref().unwrap()
+    fn dialog(app: &App) -> &HistoryViewState {
+        app.history.view.as_ref().unwrap()
     }
 
     fn restore_fixture() -> (tempfile::TempDir, App, String) {
@@ -921,11 +434,11 @@ mod tests {
 
     fn select_restore(app: &mut App, name: &str) {
         let job = app.config.jobs[0].clone();
-        let mut dialog = BackupHistory::new(job.clone());
+        let mut dialog = HistoryViewState::new(job.clone());
         dialog.source_display = Some(job.source.clone());
         dialog.backups = Some(Ok(engine::history::list(&job).unwrap()));
         dialog.selected = Some(name.to_owned());
-        app.backup_history = Some(dialog);
+        app.history.view = Some(dialog);
     }
 
     #[test]
@@ -934,13 +447,13 @@ mod tests {
         let active = Uuid::new_v4();
         let queued = Uuid::new_v4();
         let other = Uuid::new_v4();
-        app.active = Some(active);
+        app.worker.active = Some(active);
         app.enqueue(queued);
         app.enqueue(other);
         app.remove_pending(queued);
         app.remove_pending(active);
-        assert_eq!(app.active, Some(active));
-        assert_eq!(app.queue, VecDeque::from([other]));
+        assert_eq!(app.worker.active, Some(active));
+        assert_eq!(app.worker.queue, VecDeque::from([other]));
     }
 
     #[test]
@@ -952,11 +465,11 @@ mod tests {
         std::fs::write(job.source.join("file"), "changed").unwrap();
         let context = egui::Context::default();
         app.tick(&context);
-        assert_eq!(app.active, Some(job.id));
-        assert!(app.backup_history.is_none());
+        assert_eq!(app.worker.active, Some(job.id));
+        assert!(app.history.view.is_none());
         assert!(app.config.jobs[0].next_run > job.next_run);
-        tick_until(&mut app, &context, |app| app.active.is_none());
-        assert!(app.active.is_none());
+        tick_until(&mut app, &context, |app| app.worker.active.is_none());
+        assert!(app.worker.active.is_none());
         app.open_history(job.id, &context);
         tick_until(&mut app, &context, |app| dialog(app).backups.is_some());
         assert_eq!(
@@ -988,10 +501,10 @@ mod tests {
         let _ = context.run_ui(input, |_| {
             assert!(!scenery::moonveil::decorations_visible(&context));
             app.tick(&context);
-            assert_eq!(app.active, Some(job.id));
+            assert_eq!(app.worker.active, Some(job.id));
         });
-        tick_until(&mut app, &context, |app| app.active.is_none());
-        assert!(app.active.is_none());
+        tick_until(&mut app, &context, |app| app.worker.active.is_none());
+        assert!(app.worker.active.is_none());
         assert_eq!(engine::history::list(&job).unwrap().len(), 2);
     }
 
@@ -1000,18 +513,18 @@ mod tests {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
         let context = egui::Context::default();
-        app.backup_history.as_mut().unwrap().saving = true;
+        app.history.view.as_mut().unwrap().saving = true;
         app.tick(&context);
-        assert!(app.active.is_none());
-        app.backup_history.as_mut().unwrap().saving = false;
-        app.backup_history.as_mut().unwrap().confirming_restore = true;
+        assert!(app.worker.active.is_none());
+        app.history.view.as_mut().unwrap().saving = false;
+        app.history.view.as_mut().unwrap().confirming_restore = true;
         app.tick(&context);
-        assert!(app.active.is_none());
-        app.backup_history.as_mut().unwrap().confirming_restore = false;
+        assert!(app.worker.active.is_none());
+        app.history.view.as_mut().unwrap().confirming_restore = false;
         app.tick(&context);
-        assert!(app.active.is_some());
-        tick_until(&mut app, &context, |app| app.active.is_none());
-        assert!(app.active.is_none());
+        assert!(app.worker.active.is_some());
+        tick_until(&mut app, &context, |app| app.worker.active.is_none());
+        assert!(app.worker.active.is_none());
     }
 
     #[test]
@@ -1026,7 +539,7 @@ mod tests {
         assert!(app.config.jobs[0] == original);
         assert_eq!(app.page.selected_job(), Some(app.config.jobs[1].id));
         assert!(!app.page.is_backups());
-        assert!(app.backup_history.is_none());
+        assert!(app.history.view.is_none());
         assert!(!app.scheduling_paused());
     }
 
@@ -1036,8 +549,8 @@ mod tests {
         app.config.jobs[0].target.clear();
         let context = egui::Context::default();
         app.open_history(app.config.jobs[0].id, &context);
-        assert!(app.backup_history.is_none());
-        assert!(app.rx.try_recv().is_err());
+        assert!(app.history.view.is_none());
+        assert!(app.worker.rx.try_recv().is_err());
         assert!(app.error.is_empty());
         assert!(!app.scheduling_paused());
     }
@@ -1046,12 +559,12 @@ mod tests {
     fn new_job_waits_for_restore_and_protection_save() {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
-        app.backup_history.as_mut().unwrap().saving = true;
+        app.history.view.as_mut().unwrap().saving = true;
         assert!(!app.can_add_job());
         app.add_job();
         assert_eq!(app.config.jobs.len(), 1);
-        app.backup_history.as_mut().unwrap().saving = false;
-        app.restoring = true;
+        app.history.view.as_mut().unwrap().saving = false;
+        app.worker.restoring = true;
         assert!(!app.can_add_job());
         app.add_job();
         assert_eq!(app.config.jobs.len(), 1);
@@ -1062,15 +575,15 @@ mod tests {
         let (_directory, mut app, name) = restore_fixture();
         select_restore(&mut app, &name);
         let request = dialog(&app).request;
-        app.backup_history.as_mut().unwrap().saving = true;
+        app.history.view.as_mut().unwrap().saving = true;
         app.page = Page::Home;
         app.close_inactive_history();
-        assert!(app.backup_history.is_some());
+        assert!(app.history.view.is_some());
         app.protection_saved(request, &name, true, Ok(()));
         app.close_inactive_history();
-        assert!(app.backup_history.is_none());
+        assert!(app.history.view.is_none());
         app.history_loaded(request, Err("Stale response".into()));
-        assert!(app.backup_history.is_none());
+        assert!(app.history.view.is_none());
         assert!(app.config.jobs[0].enabled);
     }
 
@@ -1083,14 +596,14 @@ mod tests {
         select_restore(&mut app, &name);
         let context = egui::Context::default();
         app.confirm_restore(&context);
-        assert!(app.restoring);
+        assert!(app.worker.restoring);
         assert!(!app.config.jobs[0].enabled);
         assert!(app.config.jobs[0].next_run.is_none());
         app.enqueue(Uuid::new_v4());
-        assert!(app.queue.is_empty());
-        tick_until(&mut app, &context, |app| app.active.is_none());
-        assert!(app.active.is_none());
-        assert!(!app.restoring);
+        assert!(app.worker.queue.is_empty());
+        tick_until(&mut app, &context, |app| app.worker.active.is_none());
+        assert!(app.worker.active.is_none());
+        assert!(!app.worker.restoring);
         assert!(app.config.jobs[0].status.starts_with("Restore complete"));
         assert!(!app.config.jobs[0].enabled);
         assert_eq!(app.config.jobs[0].last_success, timestamp);
@@ -1102,18 +615,18 @@ mod tests {
         let (_directory, mut app, name) = restore_fixture();
         let context = egui::Context::default();
         select_restore(&mut app, &name);
-        app.backup_history.as_mut().unwrap().selected = None;
+        app.history.view.as_mut().unwrap().selected = None;
         app.confirm_restore(&context);
-        assert!(app.active.is_none());
-        app.backup_history.as_mut().unwrap().selected = Some(name);
-        app.active = Some(Uuid::new_v4());
+        assert!(app.worker.active.is_none());
+        app.history.view.as_mut().unwrap().selected = Some(name);
+        app.worker.active = Some(Uuid::new_v4());
         app.confirm_restore(&context);
         assert!(app.config.jobs[0].enabled);
-        app.active = None;
+        app.worker.active = None;
         app.path = app.path.join("missing/config.json");
         app.confirm_restore(&context);
-        assert!(app.active.is_none());
-        assert!(app.backup_history.is_some());
+        assert!(app.worker.active.is_none());
+        assert!(app.history.view.is_some());
         assert!(!app.error.is_empty());
     }
 
@@ -1132,7 +645,7 @@ mod tests {
                 .protected
         );
         let id = app.config.jobs[0].id;
-        assert!(app.history_cache[&id].records.as_ref().unwrap()[0].protected);
+        assert!(app.history.cache[&id].records.as_ref().unwrap()[0].protected);
         let lock = OpenOptions::new()
             .read(true)
             .write(true)
@@ -1150,7 +663,7 @@ mod tests {
                 .protected
         );
         assert!(app.config.jobs[0].enabled);
-        assert!(app.active.is_none());
+        assert!(app.worker.active.is_none());
     }
 
     #[test]
@@ -1162,7 +675,7 @@ mod tests {
         app.open_history(app.config.jobs[0].id, &context);
         tick_until(&mut app, &context, |app| dialog(app).backups.is_some());
         assert!(dialog(&app).backups.as_ref().unwrap().is_ok());
-        assert!(app.active.is_none());
+        assert!(app.worker.active.is_none());
         assert!(app.config.jobs[0].enabled);
     }
 
@@ -1177,7 +690,7 @@ mod tests {
         let mut app = app_with(config, PathBuf::new());
         app.enqueue(id);
         app.enqueue(id);
-        assert_eq!(app.queue, VecDeque::from([id]));
+        assert_eq!(app.worker.queue, VecDeque::from([id]));
         assert!(!app.config.jobs[0].enabled);
     }
 
@@ -1206,7 +719,7 @@ mod tests {
         });
         assert!(!app.config.jobs[0].enabled);
         assert!(app.config.jobs[0].next_run.is_none());
-        assert!(app.queue.is_empty());
+        assert!(app.worker.queue.is_empty());
     }
 
     #[test]
@@ -1217,8 +730,8 @@ mod tests {
         let context = egui::Context::default();
         app.reload_summary(id, &context);
         app.config.jobs[0].target.push("elsewhere");
-        tick_until(&mut app, &context, |app| app.history_requests.is_empty());
-        assert!(app.history_requests.is_empty());
-        assert!(!app.history_cache.contains_key(&id));
+        tick_until(&mut app, &context, |app| app.history.requests.is_empty());
+        assert!(app.history.requests.is_empty());
+        assert!(!app.history.cache.contains_key(&id));
     }
 }

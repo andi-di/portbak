@@ -7,7 +7,10 @@ use crate::app::views::widgets::{
     alert, caption, display_path, format_bytes, local_time, page_frame, page_scroll_area,
     retention_warnings, DATE, PAGE_PADDING, TIME,
 };
-use crate::app::{records_of, App, BackupHistory};
+use crate::app::{
+    history::{records_of, HistoryViewState},
+    App,
+};
 use crate::engine::history::Backup;
 use chrono::{Local, TimeZone};
 use eframe::egui;
@@ -41,7 +44,8 @@ impl App {
                     .show(ui, |ui| {
                         ui.add_enabled_ui(
                             !self
-                                .backup_history
+                                .history
+                                .view
                                 .as_ref()
                                 .is_some_and(|history| history.saving),
                             |ui| {
@@ -50,12 +54,12 @@ impl App {
                         );
                         // Restores start here, so their progress and result show here too.
                         if let Some(job) = self.job(id) {
-                            super::editor::job_status(ui, job, self.activity_label(id));
+                            super::editor::job_status(ui, job, self.worker.activity_label(id));
                             ui.add_space(8.0);
                         }
                     });
                 page_scroll_area(ui, |ui| {
-                    if let Some(history) = &mut self.backup_history {
+                    if let Some(history) = &mut self.history.view {
                         if history.job.id == id {
                             response = history_contents(ui, history);
                         } else {
@@ -77,7 +81,7 @@ impl App {
             self.save_protection(name, protected, &ctx);
         }
         if let Some(name) = response.reveal {
-            if let Some(history) = &mut self.backup_history {
+            if let Some(history) = &mut self.history.view {
                 if let Err(error) =
                     crate::app::platform::open_in_file_manager(&history.job.target.join(name))
                 {
@@ -86,7 +90,7 @@ impl App {
             }
         }
         if let Some(name) = response.restore {
-            if let Some(history) = &mut self.backup_history {
+            if let Some(history) = &mut self.history.view {
                 history.selected = Some(name);
                 history.confirming_restore = true;
                 crate::app::scenery::saya::trigger(
@@ -99,7 +103,7 @@ impl App {
     }
 
     fn show_restore_confirmation(&mut self, ctx: &egui::Context) {
-        let Some(history) = &mut self.backup_history else {
+        let Some(history) = &mut self.history.view else {
             return;
         };
         if !history.confirming_restore {
@@ -112,18 +116,9 @@ impl App {
             self.confirm_restore(ctx);
         }
     }
-
-    pub(in crate::app) fn close_inactive_history(&mut self) {
-        let visible = self.page.is_backups() && !self.page.is_settings();
-        if self.backup_history.as_ref().is_some_and(|history| {
-            !history.saving && (!visible || self.page.selected_job() != Some(history.job.id))
-        }) {
-            self.backup_history = None;
-        }
-    }
 }
 
-fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryResponse {
+fn history_contents(ui: &mut egui::Ui, dialog: &mut HistoryViewState) -> HistoryResponse {
     let palette = Palette::of(ui);
     let mut response = HistoryResponse::default();
     ui.heading(dialog.job.display_name());
@@ -152,7 +147,7 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
 /// Returns confirmation and cancellation separately so dismissal never starts a restore.
 fn restore_confirmation(
     ctx: &egui::Context,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> (bool, bool) {
     let response = restore_modal(ctx, history, app_error);
@@ -166,7 +161,7 @@ const ALERT_RADIUS: f32 = 30.0;
 
 fn restore_modal(
     ctx: &egui::Context,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> egui::ModalResponse<egui::scroll_area::ScrollAreaOutput<(bool, bool)>> {
     let liquid = Skin::of(ctx).finish == Finish::Liquid;
@@ -190,7 +185,7 @@ fn restore_modal(
 /// The dialog's scrolling body: details and the cancel and restore buttons.
 fn restore_dialog(
     ui: &mut egui::Ui,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> egui::scroll_area::ScrollAreaOutput<(bool, bool)> {
     let ctx = ui.ctx().clone();
@@ -227,7 +222,7 @@ fn restore_buttons(ui: &mut egui::Ui, can_restore: bool) -> (egui::Response, egu
     .inner
 }
 
-fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
+fn restore_details(ui: &mut egui::Ui, dialog: &HistoryViewState, app_error: &str) {
     let palette = Palette::of(ui);
     let source = dialog.source_display.as_ref().unwrap_or(&dialog.job.source);
     caption(ui, "Source folder to replace");
@@ -585,7 +580,7 @@ mod tests {
                 let ctx = egui::Context::default();
                 crate::app::theme::style::install(&ctx, skin);
                 ctx.set_theme(theme);
-                let mut history = BackupHistory::new(crate::model::Job {
+                let mut history = HistoryViewState::new(crate::model::Job {
                     source: r"C:\Users\Someone\Documents\Projects\Important documents".into(),
                     ..Default::default()
                 });
@@ -648,7 +643,7 @@ mod tests {
                 let ctx = egui::Context::default();
                 crate::app::theme::style::install(&ctx, skin);
                 ctx.set_theme(theme);
-                let mut history = BackupHistory::new(crate::model::Job::default());
+                let mut history = HistoryViewState::new(crate::model::Job::default());
                 let name = "2026-11-08_18-30-00_Important documents and project files";
                 history.backups = Some(Ok(vec![Backup {
                     record: Record {

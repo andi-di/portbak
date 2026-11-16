@@ -7,7 +7,7 @@ use crate::app::views::widgets::{
     alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
     retention_warnings, switch_row, switch_row_with, DATE_TIME,
 };
-use crate::app::{App, CachedHistory};
+use crate::app::{history::HistorySummary, App};
 use crate::model::ScheduleSettings;
 use crate::model::{Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
@@ -40,7 +40,7 @@ struct Permissions {
 
 impl App {
     pub(in crate::app) fn show_job_editor(&mut self, ui: &mut egui::Ui) {
-        if self.page.is_backups() && self.page.selected_job().is_some() {
+        if self.page.is_backups() {
             self.show_backups_tab(ui);
             return;
         }
@@ -48,11 +48,14 @@ impl App {
         let permissions = self.page.selected_job().map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
-            activity: self.activity_label(id).filter(|&label| label != "Running"),
+            activity: self
+                .worker
+                .activity_label(id)
+                .filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
         let selected = self.page.selected_job();
-        let summaries = &self.history_cache;
+        let summaries = &self.history.cache;
         let app_dir = self
             .path
             .parent()
@@ -188,7 +191,7 @@ fn job_editor(
     ui: &mut egui::Ui,
     job: &mut Job,
     permissions: &Permissions,
-    summary: Option<&CachedHistory>,
+    summary: Option<&HistorySummary>,
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
@@ -552,7 +555,7 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
     }
 }
 
-fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
+fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&HistorySummary>) {
     let palette = Palette::of(ui);
     switch_row(
         ui,

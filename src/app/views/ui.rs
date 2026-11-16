@@ -9,6 +9,7 @@ use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
 use crate::app::views::widgets::alert;
 use crate::app::App;
+#[cfg(test)]
 use crate::model::ScheduleSettings;
 use crate::model::{Job, Theme};
 use chrono::Utc;
@@ -50,7 +51,8 @@ impl eframe::App for App {
         crate::app::scenery::layers::paint_underlay(&ctx);
         let before = self.config.clone();
         if !self
-            .backup_history
+            .history
+            .view
             .as_ref()
             .is_some_and(|history| history.confirming_restore)
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
@@ -298,9 +300,10 @@ impl App {
                         };
                         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
                         let recent = self
+                            .worker
                             .activity_until
                             .is_some_and(|until| until > std::time::Instant::now());
-                        let active = self.active.is_some() || recent;
+                        let active = self.worker.active.is_some() || recent;
                         ui.scope_builder(
                             egui::UiBuilder::new()
                                 .id_salt("activity")
@@ -323,8 +326,8 @@ impl App {
                             },
                         );
                         if active {
-                            response.hint(if self.active.is_some() {
-                                self.progress.as_str()
+                            response.hint(if self.worker.active.is_some() {
+                                self.worker.progress.as_str()
                             } else {
                                 "Recent backup activity"
                             });
@@ -477,7 +480,7 @@ impl App {
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         // Running and queued work replaces the countdown in the card's readout.
-        let badge = match self.activity_label(job.id) {
+        let badge = match self.worker.activity_label(job.id) {
             Some(label) => Some((label.to_uppercase(), palette.gold)),
             None => job
                 .countdown(Utc::now())
@@ -956,8 +959,8 @@ mod tests {
                 );
                 let mut footer_label = None;
                 for frame in 0..8 {
-                    app.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
-                    app.progress = "Checking source files ...".into();
+                    app.worker.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
+                    app.worker.progress = "Checking source files ...".into();
                     app.config.jobs[0].status = if frame < 2 {
                         "Not checked yet"
                     } else {

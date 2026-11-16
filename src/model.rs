@@ -4,12 +4,15 @@ use chrono::{Datelike, Duration, Local, TimeZone};
 
 mod schedule;
 use crate::destinations;
-pub use schedule::{IntervalUnit, Schedule, ScheduleSettings};
+#[cfg(test)]
+use schedule::IntervalUnit;
+pub use schedule::{Schedule, ScheduleSettings};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
 
 pub const MAX_JOB_NAME_LENGTH: usize = 50;
+pub const CONFIG_VERSION: u32 = 2;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -197,7 +200,7 @@ fn deserialize_skin<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result
 impl Default for Config {
     fn default() -> Self {
         Self {
-            version: 2,
+            version: CONFIG_VERSION,
             theme: Theme::System,
             skin: "modern".into(),
             job_defaults: JobDefaults::default(),

@@ -8,13 +8,12 @@ mod persistence;
 use anyhow::Context;
 use eframe::egui;
 use fs2::FileExt;
-use model::Config;
+use model::{Config, CONFIG_VERSION};
 use std::{
     fs::{File, OpenOptions},
     path::{Path, PathBuf},
 };
 
-const CONFIG_VERSION: u32 = 2;
 const MIN_WINDOW_SIZE: egui::Vec2 = egui::vec2(1024.0, 940.0);
 
 fn main() {
