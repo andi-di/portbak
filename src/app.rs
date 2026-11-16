@@ -6,6 +6,7 @@ mod views;
 
 use crate::engine::{self, history::Backup, Outcome};
 use crate::model::{Config, Job, Record};
+use crate::persistence;
 use chrono::Utc;
 use eframe::egui;
 use std::{
@@ -227,7 +228,7 @@ impl App {
     /// Returns whether the configuration is now saved; failures stay dirty and are retried.
     fn persist(&mut self) -> bool {
         self.last_save = Instant::now();
-        match engine::save(&self.path, &self.config.for_storage()) {
+        match persistence::save(&self.path, &self.config.for_storage()) {
             Ok(()) => {
                 self.dirty = false;
                 self.error.clear();
@@ -844,7 +845,7 @@ mod tests {
         };
         let mut app = app_with(config, original.join("portbak.json"));
         assert!(app.persist());
-        let saved: Config = engine::load(&app.path).unwrap();
+        let saved: Config = persistence::load(&app.path).unwrap();
         assert_eq!(
             saved.jobs[0].target,
             PathBuf::from("backups").join(job.target.file_name().unwrap())
@@ -853,7 +854,7 @@ mod tests {
         drop(app);
         std::fs::rename(&original, &moved).unwrap();
         let path = moved.join("portbak.json");
-        let config = engine::load(&path).unwrap();
+        let config = persistence::load(&path).unwrap();
         let app = app_with(config, path);
         let job = &app.config.jobs[0];
         assert!(job

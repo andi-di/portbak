@@ -1,66 +1,37 @@
 pub mod history;
 pub mod restore;
 
-use crate::model::{Job, Manifest, Record};
-use anyhow::{bail, Context, Result};
+mod filesystem;
+mod inventory;
+pub mod retention;
+mod storage;
+
+use self::{
+    filesystem::{
+        copy_file, destination, disk_size, ensure_disjoint, metadata_if_exists, TempPath,
+    },
+    inventory::{digest, hash_reader, inventory, Entry},
+    retention::prune,
+    storage::{lock_destination, manifest_path, read_manifest},
+};
+use crate::{
+    model::{Job, Manifest, Record},
+    persistence::save,
+};
+use anyhow::{Context, Result};
 use chrono::{Local, Utc};
-use fs2::FileExt;
-use serde::{de::DeserializeOwned, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, File, Metadata, OpenOptions},
-    io::{self, Read, Write},
+    fs::{self, File},
+    io,
     path::{Path, PathBuf},
     sync::mpsc::Sender,
 };
 use uuid::Uuid;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-const MANIFEST_VERSION: u32 = 1;
-
 pub struct Outcome {
     pub message: String,
     pub created: bool,
-}
-
-/// One file or folder of a backup; its serialized form defines the backup fingerprint.
-#[derive(Clone, Debug, PartialEq, Serialize)]
-struct Entry {
-    path: String,
-    hash: String,
-    size: u64,
-    directory: bool,
-}
-
-/// Removes a partially written file or folder when dropped.
-struct TempPath(PathBuf);
-
-impl Drop for TempPath {
-    fn drop(&mut self) {
-        let _ = if self.0.is_dir() {
-            fs::remove_dir_all(&self.0)
-        } else {
-            fs::remove_file(&self.0)
-        };
-    }
-}
-
-pub fn save<T: Serialize>(path: &Path, value: &T) -> Result<()> {
-    let data = serde_json::to_vec_pretty(value)?;
-    atomicwrites::AtomicFile::new(path, atomicwrites::AllowOverwrite)
-        .write(|file| {
-            file.write_all(&data)?;
-            file.sync_all()
-        })
-        .map_err(|error| anyhow::anyhow!("Failed to save: {error}"))
-}
-
-pub fn load<T: DeserializeOwned>(path: &Path) -> Result<T> {
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
-}
-
-pub fn manifest_path(root: &Path, id: Uuid) -> PathBuf {
-    root.join(format!("manifest-{id}.json"))
 }
 
 pub fn run(job: &Job, progress: &Sender<String>) -> Result<Outcome> {
@@ -128,25 +99,9 @@ fn backup_folders(job: &Job) -> Result<(PathBuf, PathBuf)> {
     Ok((source, target))
 }
 
-fn destination(job: &Job) -> Result<PathBuf> {
-    fs::canonicalize(&job.target).context("Destination folder is unavailable")
-}
-
-fn ensure_disjoint(source: &Path, target: &Path) -> Result<()> {
-    anyhow::ensure!(
-        !source.starts_with(target) && !target.starts_with(source),
-        "Source and destination folders must not overlap"
-    );
-    Ok(())
-}
-
 /// Progress is best effort: the receiver may already be gone.
 fn report(progress: &Sender<String>, message: impl Into<String>) {
     let _ = progress.send(message.into());
-}
-
-fn is_zip_backup(name: &str) -> bool {
-    name.ends_with(".zip")
 }
 
 fn latest_matches(root: &Path, manifest: &Manifest, hash: &str) -> bool {
@@ -239,16 +194,6 @@ fn write_folder(
     Ok(())
 }
 
-/// Copies into a fresh file only; an existing output means the workspace was tampered with.
-fn copy_file(from: &Path, to: &Path) -> Result<()> {
-    let mut output = OpenOptions::new().write(true).create_new(true).open(to)?;
-    io::copy(&mut File::open(from)?, &mut output)?;
-    output.sync_all()?;
-    #[cfg(unix)]
-    fs::set_permissions(to, fs::metadata(from)?.permissions())?;
-    Ok(())
-}
-
 /// `count` followed by its noun in singular or plural form, e.g. `1 file` or `3 files`.
 pub(crate) fn counted(count: usize, singular: &str, plural: &str) -> String {
     format!("{count} {}", if count == 1 { singular } else { plural })
@@ -277,207 +222,8 @@ fn completion_message(
     if let Some(error) = cleanup_error {
         parts.push(format!("Cleanup failed: {error:#}"));
     }
-    parts.extend(history::warnings(job, &manifest.records));
+    parts.extend(retention::warnings(job, &manifest.records));
     parts.join(" · ")
-}
-
-/// Deletes the oldest unprotected backups until the limits hold; the newest is always kept.
-fn prune(root: &Path, manifest_path: &Path, manifest: &mut Manifest, job: &Job) -> Result<()> {
-    if !job.rolling {
-        return Ok(());
-    }
-    while manifest.records.len() > 1 && exceeds_limits(job, &manifest.records) {
-        let newest = manifest.records.len() - 1;
-        let Some(index) = manifest.records[..newest]
-            .iter()
-            .position(|record| !record.protected)
-        else {
-            break;
-        };
-        remove_backup(&root.join(&manifest.records[index].name))?;
-        manifest.records.remove(index);
-        save(manifest_path, manifest)?;
-    }
-    Ok(())
-}
-
-fn exceeds_limits(job: &Job, records: &[Record]) -> bool {
-    let counted = records
-        .iter()
-        .filter(|record| job.count_protected || !record.protected);
-    let (count, total) = counted.fold((0usize, 0u128), |(count, total), record| {
-        (count + 1, total + u128::from(record.bytes))
-    });
-    job.max_count.is_some_and(|limit| count > limit.max(1))
-        || job.max_bytes.is_some_and(|limit| total > u128::from(limit))
-}
-
-fn remove_backup(path: &Path) -> Result<()> {
-    let Some(metadata) = metadata_if_exists(path)? else {
-        return Ok(());
-    };
-    anyhow::ensure!(!is_link(&metadata), "Cleanup refused to remove a link");
-    if metadata.is_dir() {
-        fs::remove_dir_all(path)?;
-    } else {
-        fs::remove_file(path)?;
-    }
-    Ok(())
-}
-
-fn metadata_if_exists(path: &Path) -> Result<Option<Metadata>> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) => Ok(Some(metadata)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
-    }
-}
-
-fn is_link(metadata: &Metadata) -> bool {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-        metadata.file_type().is_symlink()
-            || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    }
-    #[cfg(not(windows))]
-    {
-        metadata.file_type().is_symlink()
-    }
-}
-
-fn hash_reader(mut reader: impl Read) -> Result<String> {
-    let mut hasher = Sha256::new();
-    io::copy(&mut reader, &mut hasher)?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn inventory(root: &Path) -> Result<(Vec<Entry>, usize)> {
-    let mut entries = Vec::new();
-    let mut skipped = 0;
-    collect_entries(root, root, &mut entries, &mut skipped)?;
-    entries.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok((entries, skipped))
-}
-
-/// Links and special files are counted but never followed or saved.
-fn collect_entries(
-    root: &Path,
-    directory: &Path,
-    entries: &mut Vec<Entry>,
-    skipped: &mut usize,
-) -> Result<()> {
-    for item in fs::read_dir(directory)? {
-        let path = item?.path();
-        let metadata = fs::symlink_metadata(&path)?;
-        if is_link(&metadata) || !(metadata.is_dir() || metadata.is_file()) {
-            *skipped += 1;
-            continue;
-        }
-        let is_directory = metadata.is_dir();
-        entries.push(Entry {
-            path: portable_path(path.strip_prefix(root)?)?,
-            hash: if is_directory {
-                String::new()
-            } else {
-                hash_reader(File::open(&path)?)?
-            },
-            size: if is_directory { 0 } else { metadata.len() },
-            directory: is_directory,
-        });
-        if is_directory {
-            collect_entries(root, &path, entries, skipped)?;
-        }
-    }
-    Ok(())
-}
-
-/// Joins with `/` so fingerprints and ZIP names match across platforms.
-fn portable_path(relative: &Path) -> Result<String> {
-    let mut components = Vec::new();
-    for component in relative.components() {
-        let name = component
-            .as_os_str()
-            .to_str()
-            .context("File name is not valid UTF-8")?;
-        anyhow::ensure!(
-            !name.contains('\\'),
-            "File names containing backslashes are not supported"
-        );
-        components.push(name);
-    }
-    Ok(components.join("/"))
-}
-
-fn digest(entries: &[Entry]) -> Result<String> {
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(entries)?)
-    ))
-}
-
-fn disk_size(path: &Path) -> Result<u64> {
-    let metadata = fs::symlink_metadata(path)?;
-    anyhow::ensure!(!is_link(&metadata), "Link found in backup destination");
-    if metadata.is_file() {
-        return Ok(metadata.len());
-    }
-    let mut total = 0;
-    for entry in fs::read_dir(path)? {
-        total += disk_size(&entry?.path())?;
-    }
-    Ok(total)
-}
-
-fn reject_metadata_link(path: &Path) -> Result<()> {
-    if let Some(metadata) = metadata_if_exists(path)? {
-        anyhow::ensure!(!is_link(&metadata), "Backup metadata must not be a link");
-    }
-    Ok(())
-}
-
-fn lock_destination(root: &Path) -> Result<File> {
-    let lock_path = root.join(".lock");
-    reject_metadata_link(&lock_path)?;
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(&lock_path)?;
-    lock.try_lock_exclusive()
-        .context("This destination is already in use")?;
-    Ok(lock)
-}
-
-fn read_manifest(root: &Path, id: Uuid) -> Result<Manifest> {
-    let path = manifest_path(root, id);
-    reject_metadata_link(&path)?;
-    let manifest = if path.exists() {
-        load(&path)?
-    } else {
-        Manifest {
-            version: MANIFEST_VERSION,
-            job_id: Some(id),
-            records: vec![],
-        }
-    };
-    if manifest.version != MANIFEST_VERSION || manifest.job_id != Some(id) {
-        bail!("Unknown backup manifest")
-    }
-    // Names are joined onto the destination, so they must stay single path components.
-    let valid_name = |name: &str| {
-        Path::new(name).components().count() == 1 && name.starts_with(|c: char| c.is_ascii_digit())
-    };
-    anyhow::ensure!(
-        manifest
-            .records
-            .iter()
-            .all(|record| valid_name(&record.name)),
-        "Invalid backup name in manifest"
-    );
-    Ok(manifest)
 }
 
 #[cfg(test)]
@@ -488,6 +234,10 @@ fn discard_progress() -> Sender<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::persistence::load;
+    use anyhow::bail;
+    use fs2::FileExt;
+    use std::io::Read;
 
     #[test]
     fn counts_use_singular_only_for_one() {

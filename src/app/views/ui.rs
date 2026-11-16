@@ -1235,7 +1235,7 @@ mod tests {
             } else {
                 Theme::Light
             };
-            let saved: Config = crate::engine::load(&path).unwrap();
+            let saved: Config = crate::persistence::load(&path).unwrap();
             assert_eq!(saved.theme, expected);
             let mut restarted = App::new(saved, path.clone(), tempfile::tempfile().unwrap());
             let _ = context.run_ui(
@@ -1388,7 +1388,7 @@ mod tests {
                 assert!((width - 390.0).abs() < 1.0, "width: {width}");
             }
             assert!(app.persist());
-            let config: Config = crate::engine::load(&path).unwrap();
+            let config: Config = crate::persistence::load(&path).unwrap();
             let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
             let new_ctx = egui::Context::default();
             restarted.ensure_skin(&new_ctx);

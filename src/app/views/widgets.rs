@@ -226,7 +226,7 @@ pub fn alert(ui: &mut egui::Ui, color: egui::Color32, text: &str) {
 
 pub fn retention_warnings(ui: &mut egui::Ui, job: &Job, records: &[Record]) {
     let gold = Palette::of(ui).gold;
-    for warning in engine::history::warnings(job, records) {
+    for warning in engine::retention::warnings(job, records) {
         alert(ui, gold, &warning);
     }
 }

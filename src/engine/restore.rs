@@ -1,6 +1,12 @@
 use super::{
-    copy_file, destination, digest, ensure_disjoint, inventory, is_link, is_zip_backup,
-    lock_destination, metadata_if_exists, read_manifest, report, Outcome, TempPath,
+    filesystem::{
+        copy_file, destination, ensure_disjoint, is_link, is_zip_backup, metadata_if_exists,
+        TempPath,
+    },
+    inventory::{digest, inventory},
+    report,
+    storage::{lock_destination, read_manifest},
+    Outcome,
 };
 use crate::model::Job;
 use anyhow::{bail, Context, Result};

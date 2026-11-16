@@ -2,6 +2,7 @@
 mod app;
 mod engine;
 mod model;
+mod persistence;
 
 use anyhow::Context;
 use eframe::egui;
@@ -87,7 +88,7 @@ fn lock_config(path: &Path) -> anyhow::Result<File> {
 /// Loads and immediately re-saves, so an unwritable location fails at startup, not later.
 fn load_config(path: &Path) -> anyhow::Result<Config> {
     let config: Config = if path.exists() {
-        engine::load(path)?
+        persistence::load(path)?
     } else {
         Config::default()
     };
@@ -95,6 +96,6 @@ fn load_config(path: &Path) -> anyhow::Result<Config> {
         config.version == CONFIG_VERSION,
         "Unknown configuration version"
     );
-    engine::save(path, &config.for_storage())?;
+    persistence::save(path, &config.for_storage())?;
     Ok(config)
 }
