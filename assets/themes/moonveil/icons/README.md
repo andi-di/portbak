@@ -53,9 +53,6 @@ Keep character colors in the Saya heads and surrounding controls. Functional
 icons use high-contrast silver shading, bold silhouettes and crisp pixel clusters.
 No text, backdrop, glow or cast shadow.
 
-The close cross uses smooth vector geometry in `sources/close.svg`, with rounded
-14-pixel source strokes. Regenerate its PNG pair on Windows with
-`powershell.exe -NoProfile -File tools/render_moonveil_vectors.ps1`.
 The restore arrow is generated from the other functional icons as style references,
 using the same coarse pixel grid and silhouette weight. The warning icon uses a
 filled triangle and exclamation cutout. Preserve the standard canvas, padding and
