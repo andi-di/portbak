@@ -4,7 +4,7 @@
 
 use crate::app::rendering::glass;
 use crate::app::rendering::ornaments::noise;
-use crate::app::rendering::pixel::mix;
+use crate::app::rendering::primitives::mix;
 use crate::app::scenery::bubbles::{self, Prey};
 use crate::app::scenery::fishes::{self, FishPose};
 use crate::app::theme::style::Palette;

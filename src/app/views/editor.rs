@@ -1,12 +1,15 @@
-use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
+use crate::app::navigation::Page;
+use crate::app::rendering::controls::{self, Button, Hint, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, Palette, Skin};
 use crate::app::views::widgets::{
     alert, caption, centered_row, gib_field, local_time, page_frame, page_scroll_area, path_picker,
     retention_warnings, switch_row, switch_row_with, DATE_TIME,
 };
-use crate::app::{App, CachedHistory};
-use crate::model::{IntervalUnit, Job, Schedule, MAX_JOB_NAME_LENGTH};
+use crate::app::{history::HistorySummary, App};
+use crate::model::ScheduleSettings;
+use crate::model::{Job, Schedule, MAX_JOB_NAME_LENGTH};
 use chrono::Utc;
 use eframe::egui;
 use uuid::Uuid;
@@ -17,7 +20,7 @@ const DEFAULT_MAX_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 const WEEKDAY_LABELS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /// Everything that decides when a job runs; a change restarts its schedule.
-type ScheduleKey = (bool, Schedule, u32, u32, [bool; 7], u32, IntervalUnit);
+type ScheduleKey = (bool, ScheduleSettings);
 
 #[derive(Clone, Copy)]
 enum JobAction {
@@ -37,19 +40,22 @@ struct Permissions {
 
 impl App {
     pub(in crate::app) fn show_job_editor(&mut self, ui: &mut egui::Ui) {
-        if self.backups_tab && self.selected.is_some() {
+        if self.page.is_backups() {
             self.show_backups_tab(ui);
             return;
         }
         let ctx = ui.ctx().clone();
-        let permissions = self.selected.map(|id| Permissions {
+        let permissions = self.page.selected_job().map(|id| Permissions {
             busy: self.is_busy(id),
             locked: self.scheduling_paused(),
-            activity: self.activity_label(id).filter(|&label| label != "Running"),
+            activity: self
+                .worker
+                .activity_label(id)
+                .filter(|&label| label != "Running"),
         });
         let can_add = self.can_add_job();
-        let selected = self.selected;
-        let summaries = &self.history_cache;
+        let selected = self.page.selected_job();
+        let summaries = &self.history.cache;
         let app_dir = self
             .path
             .parent()
@@ -61,7 +67,7 @@ impl App {
         egui::CentralPanel::default()
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
-                pixel::paint_scenery(ui);
+                crate::app::scenery::layers::paint_scenery(ui);
                 ui.push_id(("job_page", selected), |ui| {
                     page_scroll_area(ui, |ui| {
                         let job = jobs.iter_mut().find(|job| Some(job.id) == selected);
@@ -69,7 +75,7 @@ impl App {
                             add = welcome(ui, can_add);
                             return;
                         };
-                        job_tabs(ui, &mut self.backups_tab);
+                        job_tabs(ui, &mut self.page);
                         let was_enabled = job.enabled;
                         let previous = job.clone();
                         let summary = summaries
@@ -80,7 +86,8 @@ impl App {
                             .inner
                             .map(|action| (job.id, action));
                         if !permissions.busy {
-                            if let Err(error) = job.update_auto_destination(&previous, app_dir) {
+                            if let Err(error) = crate::destinations::update(job, &previous, app_dir)
+                            {
                                 self.error =
                                     format!("Could not update automatic destination: {error:#}");
                             }
@@ -131,7 +138,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
     let liquid = Skin::of(ui.ctx()).finish == style::Finish::Liquid;
     ui.vertical_centered(|ui| {
         ui.add_space(50.0);
-        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || pixel::blink(ui, 0.6) {
+        let bob = if Skin::of(ui.ctx()).effects.hearts || liquid || controls::blink(ui, 0.6) {
             0.0
         } else {
             6.0
@@ -146,7 +153,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
         ui.add_space(24.0 - bob);
         let wording = &Skin::of(ui.ctx()).wording;
         let title = if liquid { palette.ink } else { palette.gold };
-        pixel::display_label(ui, wording.welcome_title, 24.0, title);
+        controls::display_label(ui, wording.welcome_title, 24.0, title);
         ui.add_space(8.0);
         let tagline = "Your folders. Safely backed up.";
         if liquid {
@@ -160,7 +167,7 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
                 .color(palette.dim),
         );
         ui.add_space(22.0);
-        let start = PixelButton::new("New job")
+        let start = Button::new("New job")
             .sprite(Sprite::Plus)
             .tone(Tone::Accent)
             .min_size(egui::vec2(240.0, 52.0));
@@ -169,12 +176,12 @@ fn welcome(ui: &mut egui::Ui, can_add: bool) -> bool {
             return clicked;
         }
         ui.add_space(8.0);
-        let prompt = if pixel::blink(ui, 0.5) {
+        let prompt = if controls::blink(ui, 0.5) {
             wording.welcome_prompt
         } else {
             " "
         };
-        pixel::display_label(ui, prompt, 10.0, palette.hot);
+        controls::display_label(ui, prompt, 10.0, palette.hot);
         clicked
     })
     .inner
@@ -184,7 +191,7 @@ fn job_editor(
     ui: &mut egui::Ui,
     job: &mut Job,
     permissions: &Permissions,
-    summary: Option<&CachedHistory>,
+    summary: Option<&HistorySummary>,
 ) -> Option<JobAction> {
     let palette = Palette::of(ui);
     let action = job_banner(ui, job, permissions);
@@ -192,19 +199,19 @@ fn job_editor(
     ui.add_space(8.0);
     // Busy jobs stay read-only without greying out, so quick checks do not flash the form.
     let unchanged = permissions.busy.then(|| job.clone());
-    pixel::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
+    controls::section(ui, "Folders", Sprite::Folder, palette.accent, |ui| {
         folder_settings(ui, job, permissions.busy)
     });
-    pixel::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
+    controls::section(ui, "Scheduling", Sprite::Clock, palette.hot, |ui| {
         schedule_settings(ui, job)
     });
-    pixel::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
+    controls::section(ui, "Retention", Sprite::Shield, palette.good, |ui| {
         retention_settings(ui, job, summary)
     });
     if let Some(unchanged) = unchanged {
         *job = unchanged;
         // Edits are discarded, but a job without a runnable schedule must still stop.
-        if job.enabled && !job.has_runnable_schedule() {
+        if job.enabled && !job.timing.has_runnable_schedule() {
             job.enabled = false;
             job.reschedule(Utc::now());
         }
@@ -242,7 +249,7 @@ fn job_banner(ui: &mut egui::Ui, job: &mut Job, permissions: &Permissions) -> Op
             activation_button(ui, job, permissions.locked);
             let can_check = !job.source.as_os_str().is_empty()
                 && !job.target.as_os_str().is_empty()
-                && job.has_runnable_schedule();
+                && job.timing.has_runnable_schedule();
             if ui
                 .add_enabled_ui(can_check, |ui| {
                     job_action_button(
@@ -289,7 +296,7 @@ fn job_action_button(
     tone: Tone,
     busy: bool,
 ) -> bool {
-    let button = PixelButton::new(label)
+    let button = Button::new(label)
         .icon_only()
         .sprite(sprite)
         .tone(tone)
@@ -345,18 +352,19 @@ fn activation_button(ui: &mut egui::Ui, job: &mut Job, locked: bool) {
     } else {
         ("Enable automatic backups", Tone::Good)
     };
-    let button = PixelButton::new(label)
+    let button = Button::new(label)
         .icon_only()
         .sprite(Sprite::Power)
         .tone(tone)
         .min_size(egui::vec2(52.0, 52.0));
     let folders_chosen = !job.source.as_os_str().is_empty() && !job.target.as_os_str().is_empty();
-    let can_toggle = (job.enabled || (folders_chosen && job.has_runnable_schedule())) && !locked;
+    let can_toggle =
+        (job.enabled || (folders_chosen && job.timing.has_runnable_schedule())) && !locked;
     let tooltip = if locked {
         "Automatic backups cannot be changed during restore or while the Backups tab is open"
     } else if !job.enabled && !folders_chosen {
         "Choose source and destination folders to enable automatic backups"
-    } else if !job.enabled && !job.has_runnable_schedule() {
+    } else if !job.enabled && !job.timing.has_runnable_schedule() {
         "Select at least one weekday to enable automatic backups"
     } else {
         label
@@ -395,15 +403,7 @@ fn folder_settings(ui: &mut egui::Ui, job: &mut Job, read_only: bool) {
 }
 
 fn schedule_key(job: &Job) -> ScheduleKey {
-    (
-        job.enabled,
-        job.schedule,
-        job.hour,
-        job.minute,
-        job.weekdays,
-        job.interval_value,
-        job.interval_unit,
-    )
+    (job.enabled, job.timing.clone())
 }
 
 fn schedule_settings(ui: &mut egui::Ui, job: &mut Job) {
@@ -426,9 +426,9 @@ pub(super) fn schedule_controls(ui: &mut egui::Ui, job: &mut Job) {
 
 fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
     centered_row(ui, |ui| {
-        pixel::segmented(
+        controls::segmented(
             ui,
-            &mut job.schedule,
+            &mut job.timing.mode,
             &[
                 (Schedule::Interval, "Interval", Sprite::Interval),
                 (Schedule::Daily, "Daily", Sprite::Daily),
@@ -437,7 +437,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         );
     });
     ui.add_space(8.0);
-    match job.schedule {
+    match job.timing.mode {
         Schedule::Interval => interval_row(ui, job),
         Schedule::Daily => time_row(ui, job, show_next_check),
         Schedule::Weekdays => {
@@ -448,7 +448,7 @@ fn scheduling_fields(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
 }
 
 fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
-    let total = job.interval_seconds();
+    let total = job.timing.interval_seconds();
     let mut hours = total / 3600;
     let mut minutes = total / 60 % 60;
     let mut seconds = total % 60;
@@ -461,7 +461,8 @@ fn interval_row(ui: &mut egui::Ui, job: &mut Job) {
         changed |= duration_field(ui, &mut seconds, 59, "Seconds");
         ui.label("(hh:mm:ss)");
         if changed {
-            job.set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
+            job.timing
+                .set_interval_seconds(hours * 3600 + minutes * 60 + seconds);
         }
     });
 }
@@ -491,7 +492,7 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         .size()
         .y
         + next_check_frame(ui.ctx()).total_margin().sum().y;
-    let row_height = pixel::button_height(ui)
+    let row_height = controls::button_height(ui)
         .max(ui.text_style_height(&egui::TextStyle::Heading) + ui.spacing().button_padding.y * 2.0)
         .max(if show_next_check { readout_height } else { 0.0 });
     ui.allocate_ui_with_layout(
@@ -500,21 +501,21 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
         |ui| {
             ui.label("Local time");
             ui.add(
-                egui::DragValue::new(&mut job.hour)
+                egui::DragValue::new(&mut job.timing.hour)
                     .range(0..=23)
                     .min_decimals(0),
             );
             ui.label(":");
             ui.add(
-                egui::DragValue::new(&mut job.minute)
+                egui::DragValue::new(&mut job.timing.minute)
                     .range(0..=59)
                     .min_decimals(0)
                     .custom_formatter(|value, _| format!("{:02}", value as u32)),
             );
             if show_next_check {
                 ui.add_space(12.0);
-                let next = if job.has_runnable_schedule() {
-                    local_time(job.next_after(Utc::now()), "%d.%m.%Y %H:%M")
+                let next = if job.timing.has_runnable_schedule() {
+                    local_time(job.timing.next_after(Utc::now()), "%d.%m.%Y %H:%M")
                 } else {
                     "Select at least one weekday".into()
                 };
@@ -539,8 +540,8 @@ fn time_row(ui: &mut egui::Ui, job: &mut Job, show_next_check: bool) {
 
 fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
     centered_row(ui, |ui| {
-        for (selected, label) in job.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
-            let day = PixelButton::new(label)
+        for (selected, label) in job.timing.weekdays.iter_mut().zip(WEEKDAY_LABELS) {
+            let day = Button::new(label)
                 .selected(*selected)
                 .min_size(egui::vec2(58.0, 0.0));
             if ui.add(day).clicked() {
@@ -548,13 +549,13 @@ fn weekday_row(ui: &mut egui::Ui, job: &mut Job) {
             }
         }
     });
-    if !job.has_runnable_schedule() {
+    if !job.timing.has_runnable_schedule() {
         alert(ui, Palette::of(ui).bad, "Select at least one weekday");
         job.enabled = false;
     }
 }
 
-fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&CachedHistory>) {
+fn retention_settings(ui: &mut egui::Ui, job: &mut Job, summary: Option<&HistorySummary>) {
     let palette = Palette::of(ui);
     switch_row(
         ui,
@@ -675,18 +676,21 @@ pub(super) fn job_status(ui: &mut egui::Ui, job: &Job, activity: Option<&str>) {
     }
 }
 
-pub(super) fn job_tabs(ui: &mut egui::Ui, backups: &mut bool) {
+pub(super) fn job_tabs(ui: &mut egui::Ui, page: &mut Page) {
+    let Some(id) = page.selected_job() else {
+        return;
+    };
     // The tabs open the page's scroll view, which would clip their shadow and swell.
     if Skin::of(ui.ctx()).finish == style::Finish::Liquid {
         ui.add_space(crate::app::rendering::liquid::HEADROOM);
     }
     ui.horizontal_wrapped(|ui| {
-        pixel::segmented(
+        controls::segmented(
             ui,
-            backups,
+            page,
             &[
-                (false, "Job settings", Sprite::JobSettings),
-                (true, "Backups", Sprite::Chest),
+                (Page::JobSettings(id), "Job settings", Sprite::JobSettings),
+                (Page::Backups(id), "Backups", Sprite::Chest),
             ],
         );
     });
@@ -705,8 +709,11 @@ mod tests {
                 style::install(&ctx, skin);
                 ctx.set_theme(theme);
                 let mut job = Job {
-                    schedule: Schedule::Daily,
-                    minute: 5,
+                    timing: ScheduleSettings {
+                        mode: Schedule::Daily,
+                        minute: 5,
+                        ..ScheduleSettings::default()
+                    },
                     ..Job::default()
                 };
                 for _ in 0..3 {

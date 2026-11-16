@@ -1,12 +1,16 @@
+use crate::app::rendering::controls::{self, Button, Checkbox, Hint, Tone};
 use crate::app::rendering::liquid::{self, Frost};
-use crate::app::rendering::pixel::{self, Hint, PixelButton, PixelCheckbox, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Finish, Palette, Skin};
 use crate::app::views::widgets::{
     alert, caption, display_path, format_bytes, local_time, page_frame, page_scroll_area,
     retention_warnings, DATE, PAGE_PADDING, TIME,
 };
-use crate::app::{records_of, App, BackupHistory};
+use crate::app::{
+    history::{records_of, HistoryViewState},
+    App,
+};
 use crate::engine::history::Backup;
 use chrono::{Local, TimeZone};
 use eframe::egui;
@@ -23,7 +27,7 @@ struct HistoryResponse {
 impl App {
     pub(in crate::app) fn show_backups_tab(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        let Some(id) = self.selected else {
+        let Some(id) = self.page.selected_job() else {
             return;
         };
         let destination_missing = self
@@ -34,27 +38,28 @@ impl App {
         egui::CentralPanel::default()
             .frame(page_frame(ui))
             .show_inside(ui, |ui| {
-                pixel::paint_scenery(ui);
+                crate::app::scenery::layers::paint_scenery(ui);
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(PAGE_PADDING, 0))
                     .show(ui, |ui| {
                         ui.add_enabled_ui(
                             !self
-                                .backup_history
+                                .history
+                                .view
                                 .as_ref()
                                 .is_some_and(|history| history.saving),
                             |ui| {
-                                super::editor::job_tabs(ui, &mut self.backups_tab);
+                                super::editor::job_tabs(ui, &mut self.page);
                             },
                         );
                         // Restores start here, so their progress and result show here too.
                         if let Some(job) = self.job(id) {
-                            super::editor::job_status(ui, job, self.activity_label(id));
+                            super::editor::job_status(ui, job, self.worker.activity_label(id));
                             ui.add_space(8.0);
                         }
                     });
                 page_scroll_area(ui, |ui| {
-                    if let Some(history) = &mut self.backup_history {
+                    if let Some(history) = &mut self.history.view {
                         if history.job.id == id {
                             response = history_contents(ui, history);
                         } else {
@@ -76,7 +81,7 @@ impl App {
             self.save_protection(name, protected, &ctx);
         }
         if let Some(name) = response.reveal {
-            if let Some(history) = &mut self.backup_history {
+            if let Some(history) = &mut self.history.view {
                 if let Err(error) =
                     crate::app::platform::open_in_file_manager(&history.job.target.join(name))
                 {
@@ -85,7 +90,7 @@ impl App {
             }
         }
         if let Some(name) = response.restore {
-            if let Some(history) = &mut self.backup_history {
+            if let Some(history) = &mut self.history.view {
                 history.selected = Some(name);
                 history.confirming_restore = true;
                 crate::app::scenery::saya::trigger(
@@ -98,7 +103,7 @@ impl App {
     }
 
     fn show_restore_confirmation(&mut self, ctx: &egui::Context) {
-        let Some(history) = &mut self.backup_history else {
+        let Some(history) = &mut self.history.view else {
             return;
         };
         if !history.confirming_restore {
@@ -111,18 +116,9 @@ impl App {
             self.confirm_restore(ctx);
         }
     }
-
-    pub(in crate::app) fn close_inactive_history(&mut self) {
-        let visible = self.backups_tab && !self.settings_open;
-        if self.backup_history.as_ref().is_some_and(|history| {
-            !history.saving && (!visible || self.selected != Some(history.job.id))
-        }) {
-            self.backup_history = None;
-        }
-    }
 }
 
-fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryResponse {
+fn history_contents(ui: &mut egui::Ui, dialog: &mut HistoryViewState) -> HistoryResponse {
     let palette = Palette::of(ui);
     let mut response = HistoryResponse::default();
     ui.heading(dialog.job.display_name());
@@ -151,7 +147,7 @@ fn history_contents(ui: &mut egui::Ui, dialog: &mut BackupHistory) -> HistoryRes
 /// Returns confirmation and cancellation separately so dismissal never starts a restore.
 fn restore_confirmation(
     ctx: &egui::Context,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> (bool, bool) {
     let response = restore_modal(ctx, history, app_error);
@@ -165,7 +161,7 @@ const ALERT_RADIUS: f32 = 30.0;
 
 fn restore_modal(
     ctx: &egui::Context,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> egui::ModalResponse<egui::scroll_area::ScrollAreaOutput<(bool, bool)>> {
     let liquid = Skin::of(ctx).finish == Finish::Liquid;
@@ -189,7 +185,7 @@ fn restore_modal(
 /// The dialog's scrolling body: details and the cancel and restore buttons.
 fn restore_dialog(
     ui: &mut egui::Ui,
-    history: &BackupHistory,
+    history: &HistoryViewState,
     app_error: &str,
 ) -> egui::scroll_area::ScrollAreaOutput<(bool, bool)> {
     let ctx = ui.ctx().clone();
@@ -209,8 +205,8 @@ fn restore_dialog(
 }
 
 fn restore_buttons(ui: &mut egui::Ui, can_restore: bool) -> (egui::Response, egui::Response) {
-    let cancel = PixelButton::new("Cancel");
-    let restore = PixelButton::new("Restore")
+    let cancel = Button::new("Cancel");
+    let restore = Button::new("Restore")
         .sprite(Sprite::Rewind)
         .tone(Tone::Danger);
     let height = cancel.size(ui).y.max(restore.size(ui).y);
@@ -226,7 +222,7 @@ fn restore_buttons(ui: &mut egui::Ui, can_restore: bool) -> (egui::Response, egu
     .inner
 }
 
-fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
+fn restore_details(ui: &mut egui::Ui, dialog: &HistoryViewState, app_error: &str) {
     let palette = Palette::of(ui);
     let source = dialog.source_display.as_ref().unwrap_or(&dialog.job.source);
     caption(ui, "Source folder to replace");
@@ -240,7 +236,11 @@ fn restore_details(ui: &mut egui::Ui, dialog: &BackupHistory, app_error: &str) {
         ui.add(egui::Label::new(format!("Selected backup: {name}")).wrap());
     }
     egui::Frame::new()
-        .fill(pixel::mix(palette.bad, palette.surface, 0.8))
+        .fill(crate::app::rendering::primitives::mix(
+            palette.bad,
+            palette.surface,
+            0.8,
+        ))
         .stroke(egui::Stroke::new(2.0_f32, palette.bad))
         .corner_radius(style::control_radius(ui.ctx()))
         .inner_margin(egui::Margin::same(10))
@@ -433,7 +433,7 @@ fn backup_row<R>(
             .inner
         });
     let id = ui.id().with(&backup.record.name);
-    pixel::tooltip(
+    controls::tooltip(
         ui,
         size,
         id.with("size"),
@@ -464,10 +464,10 @@ fn backup_text(ui: &mut egui::Ui, backup: &Backup) -> egui::Rect {
                 )
                 .rect;
             if !backup.available {
-                pixel::badge(ui, "Unavailable", palette.bad);
+                controls::badge(ui, "Unavailable", palette.bad);
             }
             if record.protected {
-                pixel::badge(ui, "Protected", palette.good);
+                controls::badge(ui, "Protected", palette.good);
             }
         });
         ui.add(egui::Label::new(egui::RichText::new(&record.name).small().color(dim)).wrap());
@@ -485,7 +485,7 @@ fn backup_controls(
     let mut restore = None;
     let mut reveal = None;
     let change = backup_row(ui, backup, |ui| {
-        let trash = PixelButton::new("Delete backup")
+        let trash = Button::new("Delete backup")
             .icon_only()
             .sprite(Sprite::Trash)
             .tone(Tone::Danger);
@@ -497,7 +497,7 @@ fn backup_controls(
         {
             delete = Some(backup.record.name.clone());
         }
-        let button = PixelButton::new("Restore backup")
+        let button = Button::new("Restore backup")
             .icon_only()
             .sprite(Sprite::Rewind)
             .tone(Tone::Danger);
@@ -507,7 +507,7 @@ fn backup_controls(
             .clicked() {
                 restore = Some(backup.record.name.clone());
             }
-        let open = PixelButton::new("Open backup location")
+        let open = Button::new("Open backup location")
             .icon_only()
             .sprite(Sprite::Monitor)
             .tone(Tone::Plain);
@@ -521,7 +521,7 @@ fn backup_controls(
         }
         let mut protected = backup.record.protected;
         let enabled = !saving && (backup.available || protected);
-        let checkbox = PixelCheckbox::new(&mut protected, "Locked");
+        let checkbox = Checkbox::new(&mut protected, "Locked");
         ui.add_enabled(enabled, checkbox)
             .hint("Protect from retention deletion")
             .changed()
@@ -580,7 +580,7 @@ mod tests {
                 let ctx = egui::Context::default();
                 crate::app::theme::style::install(&ctx, skin);
                 ctx.set_theme(theme);
-                let mut history = BackupHistory::new(crate::model::Job {
+                let mut history = HistoryViewState::new(crate::model::Job {
                     source: r"C:\Users\Someone\Documents\Projects\Important documents".into(),
                     ..Default::default()
                 });
@@ -643,7 +643,7 @@ mod tests {
                 let ctx = egui::Context::default();
                 crate::app::theme::style::install(&ctx, skin);
                 ctx.set_theme(theme);
-                let mut history = BackupHistory::new(crate::model::Job::default());
+                let mut history = HistoryViewState::new(crate::model::Job::default());
                 let name = "2026-11-08_18-30-00_Important documents and project files";
                 history.backups = Some(Ok(vec![Backup {
                     record: Record {

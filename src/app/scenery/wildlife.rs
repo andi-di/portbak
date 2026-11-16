@@ -3,7 +3,7 @@
 
 use crate::app::rendering::glass;
 use crate::app::rendering::ornaments::noise;
-use crate::app::rendering::pixel::{mix, shaded_polygon};
+use crate::app::rendering::primitives::{mix, shaded_polygon};
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Rect, Shape, Stroke, Vec2};
 use std::f32::consts::{PI, TAU};

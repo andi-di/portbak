@@ -91,9 +91,9 @@ try:
         target.mkdir()
         (source / "Example.txt").write_text("UI smoke test\n")
         job_id = str(uuid.uuid4())
-        config = {"version": 1, "theme": theme, "jobs": [{
+        config = {"version": 2, "theme": theme, "jobs": [{
             "id": job_id, "name": "My documents", "source": fixture_path(source), "target": fixture_path(target),
-            "enabled": True, "zip": theme == "Dark", "schedule": "Interval", "interval_value": 5, "interval_unit": "Seconds", "next_run": "2020-01-01T00:00:00Z",
+            "enabled": True, "zip": theme == "Dark", "timing": {"mode": "Interval", "interval_value": 5, "interval_unit": "Seconds"}, "next_run": "2020-01-01T00:00:00Z",
             "rolling": True, "max_count": 10, "max_bytes": 10737418240
         }]}
         (case / "portbak.json").write_text(json.dumps(config))
@@ -126,7 +126,7 @@ try:
                     memory = next(line.strip() for line in status if line.startswith("VmRSS:"))
                 saved = json.loads((case / "portbak.json").read_text())
                 assert saved["jobs"][0]["last_success"], "Backup completion not persisted"
-                assert saved["jobs"][0]["interval_unit"] == "Seconds"
+                assert saved["jobs"][0]["timing"]["interval_unit"] == "Seconds"
                 deadline = time.monotonic() + 10
                 while time.monotonic() < deadline:
                     saved = json.loads((case / "portbak.json").read_text())

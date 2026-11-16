@@ -2,9 +2,9 @@
 //! the light behind them, lightly blurred and saturated, with a specular edge that follows the
 //! pointer and a swell when pressed. Without OpenGL 3 the glass falls back to tinted panes.
 
+use crate::app::rendering::controls::FaceLook;
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::modern;
-use crate::app::rendering::pixel::FaceLook;
 use crate::app::rendering::shaders::{Effect, Recipe};
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::style::{self, label_font, Palette};
@@ -337,7 +337,7 @@ pub fn segmented(
         .map(|(text, _, icon)| icon.x + GAP + text.size().x)
         .fold(0.0, f32::max)
         + PADDING * 2.0;
-    let height = crate::app::rendering::pixel::button_height(ui);
+    let height = crate::app::rendering::controls::button_height(ui);
     let count = segments.len() as f32;
     let (track, _) = ui.allocate_exact_size(
         Vec2::new(width * count + INSET * 2.0, height),
@@ -410,7 +410,7 @@ pub fn segmented(
             rect.center().y - text.size().y / 2.0,
         );
         painter.galley(text_origin.round(), text, ink);
-        if crate::app::rendering::pixel::pointing_hand(response).clicked() && !selected {
+        if crate::app::rendering::controls::pointing_hand(response).clicked() && !selected {
             clicked = Some(index);
         }
     }

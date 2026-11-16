@@ -360,10 +360,10 @@ def run(binary, output, report):
                      "manifest": target / f"manifest-{job_id}.json"})
         config_jobs.append({"id": job_id, "name": name, "source": str(source),
             "target": str(target), "enabled": True, "zip": zipped,
-            "schedule": "Interval", "interval_value": 2, "interval_unit": "Seconds",
+            "timing": {"mode": "Interval", "interval_value": 2, "interval_unit": "Seconds"},
             "next_run": "2020-01-01T00:00:00Z", "rolling": False})
     config_path = output / "portbak.json"
-    write_json(config_path, {"version": 1, "theme": "Light", "jobs": config_jobs})
+    write_json(config_path, {"version": 2, "theme": "Light", "jobs": config_jobs})
     app = output / ("portbak.exe" if sys.platform == "win32" else "portbak")
     shutil.copy2(binary, app)
     env = os.environ.copy()

@@ -3,7 +3,7 @@
 //! bubbles. Painted above everything, so input passes through.
 
 use crate::app::rendering::ornaments::noise;
-use crate::app::rendering::pixel::mix;
+use crate::app::rendering::primitives::mix;
 use crate::app::rendering::refraction;
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Pos2, Stroke, Vec2};

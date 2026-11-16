@@ -2,7 +2,7 @@
 //! iOS 26 wallpapers. The ribbons' crisp edges give the glass something to visibly bend.
 
 use crate::app::rendering::glass;
-use crate::app::rendering::pixel::shaded_polygon;
+use crate::app::rendering::primitives::shaded_polygon;
 use crate::app::rendering::shaders::{Effect, Recipe};
 use eframe::egui::{self, Color32, Pos2, Rect};
 use std::time::Duration;

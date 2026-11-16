@@ -4,7 +4,7 @@
 
 use crate::app::rendering::glass;
 use crate::app::rendering::ornaments::noise;
-use crate::app::rendering::pixel::mix;
+use crate::app::rendering::primitives::mix;
 use crate::app::scenery::aquarium;
 use crate::app::theme::style::Palette;
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, Shape, Stroke, Vec2};

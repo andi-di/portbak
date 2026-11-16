@@ -8,7 +8,7 @@ mod reactions;
 
 use expressions::Expression;
 
-use crate::app::rendering::pixel::pointing_hand;
+use crate::app::rendering::controls::pointing_hand;
 use crate::app::theme::style::Palette;
 
 use eframe::egui::{self, Color32, Pos2, Rect};
@@ -504,7 +504,7 @@ fn show_toggle(ui: &mut egui::Ui, collapsed: bool) {
         ],
         egui::Stroke::new(1.6_f32, palette.metal),
     ));
-    crate::app::rendering::pixel::subtle_highlight(ui, &response, rect, palette.metal);
+    crate::app::rendering::controls::subtle_highlight(ui, &response, rect, palette.metal);
     if response.clone().on_hover_text(label).clicked() {
         let time = ui.input(|input| input.time);
         ui.ctx().data_mut(|data| {
@@ -556,7 +556,7 @@ fn show_portrait(ui: &mut egui::Ui, rect: Rect, letter: Rect) {
         ui.ctx().request_repaint_after(Duration::from_millis(50));
     }
     show_letter(ui, letter, galley);
-    crate::app::rendering::pixel::subtle_outline(ui, &response, rect, Palette::of(ui).metal);
+    crate::app::rendering::controls::subtle_outline(ui, &response, rect, Palette::of(ui).metal);
 
     if !state.hovered && time < state.until {
         ui.ctx()

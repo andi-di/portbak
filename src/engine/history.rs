@@ -1,15 +1,11 @@
 use super::{
-    counted, destination, exceeds_limits, is_link, is_zip_backup, lock_destination, manifest_path,
-    metadata_if_exists, read_manifest, save,
+    filesystem::{destination, is_link, is_zip_backup, metadata_if_exists, remove_backup},
+    storage::{lock_destination, manifest_path, read_manifest},
 };
 use crate::model::{Job, Record};
+use crate::persistence::save;
 use anyhow::{Context, Result};
 use std::cmp::Reverse;
-
-/// Warn once three or fewer unprotected places remain.
-const LOW_FREE_PLACES: usize = 3;
-/// Warn once 20 % or less of the size budget remains unprotected.
-const LOW_FREE_PERCENT: u128 = 20;
 
 #[derive(Clone)]
 pub struct Backup {
@@ -56,7 +52,7 @@ pub fn delete(job: &Job, name: &str) -> Result<()> {
         !manifest.records[index].protected,
         "Unlock this backup before deleting it"
     );
-    super::remove_backup(&target.join(name))?;
+    remove_backup(&target.join(name))?;
     manifest.records.remove(index);
     save(&manifest_path(&target, job.id), &manifest)
 }
@@ -74,58 +70,14 @@ pub fn set_protected(job: &Job, name: &str, protected: bool) -> Result<()> {
     save(&manifest_path(&target, job.id), &manifest)
 }
 
-/// Explains how much room protected backups leave for rolling retention.
-pub fn warnings(job: &Job, records: &[Record]) -> Vec<String> {
-    let protected: Vec<&Record> = records.iter().filter(|record| record.protected).collect();
-    if !job.rolling || !job.count_protected || protected.is_empty() {
-        return Vec::new();
-    }
-    let mut warnings = Vec::new();
-    if let Some(limit) = job.max_count {
-        let free = limit.saturating_sub(protected.len());
-        if free <= LOW_FREE_PLACES {
-            let verb = if free == 1 { "remains" } else { "remain" };
-            warnings.push(format!(
-                "Low retention capacity: {} {verb} ({} protected, limit {limit}).",
-                counted(free, "place", "places"),
-                protected.len()
-            ));
-        }
-    }
-    if let Some(limit) = job.max_bytes {
-        let limit = u128::from(limit);
-        let protected_bytes: u128 = protected
-            .iter()
-            .map(|record| u128::from(record.bytes))
-            .sum();
-        let free = limit.saturating_sub(protected_bytes);
-        if free * 100 <= limit * LOW_FREE_PERCENT {
-            let percent = if limit == 0 {
-                0.0
-            } else {
-                free as f64 * 100.0 / limit as f64
-            };
-            warnings.push(format!(
-                "Low retention size budget: {free} bytes ({percent:.1}%) remain \
-                 after protected backups; limit {limit} bytes."
-            ));
-        }
-    }
-    if exceeds_limits(job, records) {
-        warnings.push(
-            "Current history exceeds retention limits; \
-             protected backups and the newest version are kept."
-                .into(),
-        );
-    }
-    warnings
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{load, prune};
     use crate::model::Manifest;
+    use crate::{
+        engine::retention::{prune, warnings},
+        persistence::load,
+    };
     use chrono::Utc;
     use std::{fs, path::PathBuf};
 

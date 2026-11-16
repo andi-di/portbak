@@ -1,12 +1,16 @@
+use crate::app::navigation::Page;
+use crate::app::rendering::controls::{self, Button, Hint, Tone};
 use crate::app::rendering::glass::{self, Tint};
 use crate::app::rendering::liquid;
 use crate::app::rendering::ornaments;
-use crate::app::rendering::pixel::{self, Hint, PixelButton, Tone};
+
 use crate::app::rendering::sprites::{self, Sprite};
 use crate::app::theme::skins;
 use crate::app::theme::style::{self, Finish, Palette, Skin};
 use crate::app::views::widgets::alert;
 use crate::app::App;
+#[cfg(test)]
+use crate::model::ScheduleSettings;
 use crate::model::{Job, Theme};
 use chrono::Utc;
 use eframe::egui;
@@ -30,7 +34,7 @@ impl eframe::App for App {
         }
         self.ensure_skin(ctx);
         self.tick(ctx);
-        if let Some(id) = self.selected {
+        if let Some(id) = self.page.selected_job() {
             self.ensure_summary(id, ctx);
         }
         ctx.set_theme(theme_preference(self.config.theme));
@@ -44,18 +48,17 @@ impl eframe::App for App {
             }
             crate::app::scenery::saya::preload(&ctx);
         }
-        pixel::paint_underlay(&ctx);
+        crate::app::scenery::layers::paint_underlay(&ctx);
         let before = self.config.clone();
         if !self
-            .backup_history
+            .history
+            .view
             .as_ref()
             .is_some_and(|history| history.confirming_restore)
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
         {
             crate::app::scenery::saya::close_gallery(&ctx);
-            self.selected = None;
-            self.settings_open = false;
-            self.backups_tab = false;
+            self.page = Page::Home;
         }
         self.show_header(ui);
         self.show_footer(ui);
@@ -66,11 +69,9 @@ impl eframe::App for App {
         if crate::app::scenery::saya::gallery_open(&ctx) {
             crate::app::scenery::saya::show_gallery(ui);
             if !crate::app::scenery::saya::gallery_open(&ctx) {
-                self.selected = None;
-                self.settings_open = false;
-                self.backups_tab = false;
+                self.page = Page::Home;
             }
-        } else if self.settings_open {
+        } else if self.page.is_settings() {
             self.show_settings(ui);
         } else {
             self.show_job_editor(ui);
@@ -82,20 +83,20 @@ impl eframe::App for App {
         if !crate::app::scenery::saya::gallery_open(&ctx) {
             crate::app::scenery::saya::enter_page(&ctx, self.saya_page());
         }
-        pixel::paint_overlays(&ctx);
+        crate::app::scenery::layers::paint_overlays(&ctx);
     }
 }
 
 impl App {
     fn saya_page(&self) -> crate::app::scenery::saya::Page {
         use crate::app::scenery::saya::Page;
-        if self.settings_open {
+        if self.page.is_settings() {
             match self.settings_tab {
                 super::settings_view::SettingsTab::Jobs => Page::SettingsJobs,
                 super::settings_view::SettingsTab::Theme => Page::SettingsTheme,
             }
-        } else if let Some(id) = self.selected {
-            if self.backups_tab {
+        } else if let Some(id) = self.page.selected_job() {
+            if self.page.is_backups() {
                 Page::Backups(id)
             } else {
                 Page::JobSettings(id)
@@ -125,18 +126,6 @@ impl App {
         }
     }
 
-    fn toggle_settings(&mut self) {
-        self.settings_open = !self.settings_open;
-        self.selected = None;
-        self.backups_tab = false;
-    }
-
-    fn toggle_job(&mut self, id: uuid::Uuid) {
-        self.selected = (self.selected != Some(id)).then_some(id);
-        self.settings_open = false;
-        self.backups_tab = false;
-    }
-
     fn show_header(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let palette = palette_of(&ctx);
@@ -151,7 +140,7 @@ impl App {
                 bottom: 0,
             }
         };
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(margin);
+        let frame = controls::panel_frame(&ctx, palette.surface).inner_margin(margin);
         egui::Panel::top("header")
             .frame(frame)
             .show_separator_line(false)
@@ -159,7 +148,7 @@ impl App {
                 // Liquid glass keeps the top bar clear: only its buttons are glass.
                 let liquid = Skin::of(ui.ctx()).finish == Finish::Liquid;
                 if !liquid {
-                    pixel::panel_decoration(ui, 1.9);
+                    controls::panel_decoration(ui, 1.9);
                 }
                 ui.horizontal(|ui| {
                     let brand = ui.horizontal(|ui| {
@@ -174,7 +163,7 @@ impl App {
                         )
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .on_hover_text("Start screen");
-                    pixel::subtle_highlight(
+                    controls::subtle_highlight(
                         ui,
                         &home,
                         brand.response.rect.expand(if gothic { 2.0 } else { 3.0 }),
@@ -182,9 +171,7 @@ impl App {
                     );
                     if home.clicked() && !crate::app::scenery::saya::suppress_home_click(&ctx) {
                         crate::app::scenery::saya::close_gallery(&ctx);
-                        self.selected = None;
-                        self.settings_open = false;
-                        self.backups_tab = false;
+                        self.page = Page::Home;
                     }
                     let dark = self.config.theme == Theme::Dark;
                     let (label, sprite) = if dark {
@@ -192,8 +179,8 @@ impl App {
                     } else {
                         ("Dark", Sprite::Moon)
                     };
-                    let mode_size = PixelButton::new(label).sprite(sprite).icon_only().size(ui);
-                    let settings_size = PixelButton::new("Settings")
+                    let mode_size = Button::new(label).sprite(sprite).icon_only().size(ui);
+                    let settings_size = Button::new("Settings")
                         .sprite(Sprite::Gear)
                         .icon_only()
                         .size(ui);
@@ -207,7 +194,7 @@ impl App {
                             egui::Layout::left_to_right(egui::Align::Center),
                             |ui| {
                                 if ui
-                                    .add(PixelButton::new(label).sprite(sprite).icon_only())
+                                    .add(Button::new(label).sprite(sprite).icon_only())
                                     .hint(format!("Switch to {label} mode"))
                                     .clicked()
                                 {
@@ -223,10 +210,10 @@ impl App {
                                         },
                                     );
                                 }
-                                let settings = PixelButton::new("Settings")
+                                let settings = Button::new("Settings")
                                     .icon_only()
                                     .sprite(Sprite::Gear)
-                                    .selected(self.settings_open);
+                                    .selected(self.page.is_settings());
                                 if ui.add(settings).hint("Settings").clicked() {
                                     crate::app::scenery::saya::close_gallery(&ctx);
                                     self.toggle_settings();
@@ -263,7 +250,7 @@ impl App {
                     egui::pos2(clip.right(), top + 16.0),
                 );
                 ui.allocate_rect(band, egui::Sense::hover());
-                pixel::stripes(ui.painter(), band, palette);
+                controls::stripes(ui.painter(), band, palette);
                 let rule = egui::Rect::from_min_max(
                     egui::pos2(clip.left(), band.bottom()),
                     egui::pos2(clip.right(), band.bottom() + 3.0),
@@ -281,13 +268,13 @@ impl App {
         } else {
             18
         };
-        let frame = pixel::panel_frame(&ctx, palette.sunken)
+        let frame = controls::panel_frame(&ctx, palette.sunken)
             .inner_margin(egui::Margin::symmetric(side, 10));
         egui::Panel::bottom("footer")
             .frame(frame)
             .show_separator_line(false)
             .show_inside(ui, |ui| {
-                pixel::panel_decoration(ui, 1.0);
+                controls::panel_decoration(ui, 1.0);
                 if !matches!(Skin::of(ui.ctx()).finish, Finish::Glass | Finish::Liquid) {
                     let clip = ui.clip_rect();
                     let rule =
@@ -295,7 +282,12 @@ impl App {
                     ui.painter().rect_filled(rule, 0.0, palette.outline);
                 }
                 ui.horizontal(|ui| {
-                    pixel::display_label(ui, Skin::of(ui.ctx()).wording.ready, 10.0, palette.good);
+                    controls::display_label(
+                        ui,
+                        Skin::of(ui.ctx()).wording.ready,
+                        10.0,
+                        palette.good,
+                    );
                     ui.label(
                         egui::RichText::new("Scheduling runs while the app is open")
                             .color(palette.dim),
@@ -308,9 +300,10 @@ impl App {
                         };
                         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
                         let recent = self
+                            .worker
                             .activity_until
                             .is_some_and(|until| until > std::time::Instant::now());
-                        let active = self.active.is_some() || recent;
+                        let active = self.worker.active.is_some() || recent;
                         ui.scope_builder(
                             egui::UiBuilder::new()
                                 .id_salt("activity")
@@ -325,7 +318,7 @@ impl App {
                                     );
                                     return;
                                 }
-                                pixel::led(
+                                controls::led(
                                     ui,
                                     if active { palette.gold } else { palette.dim },
                                     active,
@@ -333,8 +326,8 @@ impl App {
                             },
                         );
                         if active {
-                            response.hint(if self.active.is_some() {
-                                self.progress.as_str()
+                            response.hint(if self.worker.active.is_some() {
+                                self.worker.progress.as_str()
                             } else {
                                 "Recent backup activity"
                             });
@@ -358,7 +351,7 @@ impl App {
         } else {
             0
         };
-        let frame = pixel::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
+        let frame = controls::panel_frame(&ctx, palette.surface).inner_margin(egui::Margin {
             left: 16 + inset,
             right: 14 + inset,
             top: 16 + inset / 2,
@@ -378,10 +371,10 @@ impl App {
             .exact_size(clamp_sidebar_width(self.config.sidebar_width) - frame.stroke.width * 2.0)
             .frame(frame)
             .show_inside(ui, |ui| {
-                pixel::sidebar_decoration(ui);
+                controls::sidebar_decoration(ui);
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    pixel::display_label(
+                    controls::display_label(
                         ui,
                         "JOBS",
                         16.0,
@@ -393,11 +386,11 @@ impl App {
                         ui.label(egui::RichText::new(count).color(palette.dim));
                     } else {
                         let color = style::decorative_color(ui.ctx(), palette.gold);
-                        pixel::badge(ui, &count, color);
+                        controls::badge(ui, &count, color);
                     }
                 });
                 ui.add_space(10.0);
-                let new_job = PixelButton::new("New job")
+                let new_job = Button::new("New job")
                     .sprite(Sprite::Plus)
                     .tone(Tone::Accent)
                     .min_size(egui::vec2(ui.available_width() - 4.0, 0.0));
@@ -475,7 +468,7 @@ impl App {
 
     fn job_card_contents(&self, ui: &mut egui::Ui, job: &Job) -> bool {
         let palette = Palette::of(ui);
-        let selected = self.selected == Some(job.id);
+        let selected = self.page.selected_job() == Some(job.id);
         let background = ui.painter().add(egui::Shape::Noop);
         let card_id = ui.id().with(job.id);
         // The card's hover is only known after its contents, so wake the icon from last frame's.
@@ -487,7 +480,7 @@ impl App {
             .ctx()
             .animate_bool_with_time(card_id.with("wake"), hovered, 0.2);
         // Running and queued work replaces the countdown in the card's readout.
-        let badge = match self.activity_label(job.id) {
+        let badge = match self.worker.activity_label(job.id) {
             Some(label) => Some((label.to_uppercase(), palette.gold)),
             None => job
                 .countdown(Utc::now())
@@ -583,7 +576,7 @@ impl App {
                     .galley(origin, galley, palette.ink);
             });
         let rect = frame.response.rect;
-        let response = pixel::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
+        let response = controls::pointing_hand(ui.interact(rect, card_id, egui::Sense::click()));
         let glass_hover = ui.ctx().animate_bool_with_time(
             card_id.with("glass_hover"),
             response.hovered(),
@@ -593,7 +586,7 @@ impl App {
             background,
             card_shapes(ui.ctx(), rect, selected, response.hovered(), glass_hover),
         );
-        pixel::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
+        controls::focus_tint(ui, &response, rect.shrink(3.0), palette.ink);
         ui.add_space(CARD_SHADOW);
         response.clicked()
     }
@@ -653,7 +646,7 @@ fn logo(ui: &mut egui::Ui) {
         Finish::Liquid => sprites::show(ui, skin.wording.mascot, 4.0, palette.accent),
         _ => sprites::show(ui, skin.wording.mascot, 4.0, palette.hot),
     };
-    if skin.finish == Finish::Pixel && pixel::blink(ui, 0.8) {
+    if skin.finish == Finish::Pixel && controls::blink(ui, 0.8) {
         let glint = mascot.rect.right_top() + egui::vec2(-2.0, 2.0);
         for (offset, size) in [
             (egui::vec2(-2.0, -6.0), egui::vec2(4.0, 12.0)),
@@ -680,7 +673,7 @@ fn logo(ui: &mut egui::Ui) {
     }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
-        pixel::display_label(
+        controls::display_label(
             ui,
             "PORTBAK",
             if skin.finish == Finish::Modern {
@@ -723,7 +716,9 @@ fn card_shapes(
     let shadow = style::drop_shadow(style::metrics(ctx), palette, CARD_SHADOW as i8);
     let fill = match (selected, hovered) {
         (true, _) => palette.raised,
-        (false, true) => pixel::mix(palette.surface, palette.raised, 0.6),
+        (false, true) => {
+            crate::app::rendering::primitives::mix(palette.surface, palette.raised, 0.6)
+        }
         (false, false) => palette.surface,
     };
     let border = if selected {
@@ -881,12 +876,12 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    pixel::paint_underlay(&ctx);
+                    crate::app::scenery::layers::paint_underlay(&ctx);
                     app.show_header(ui);
                     app.show_footer(ui);
                     app.show_job_list(ui);
                     app.show_job_editor(ui);
-                    pixel::paint_overlays(&ctx);
+                    crate::app::scenery::layers::paint_overlays(&ctx);
                 },
             );
             upload_bytes += output
@@ -926,22 +921,22 @@ mod tests {
             std::path::PathBuf::new(),
             tempfile::tempfile().unwrap(),
         );
-        app.selected = Some(app.config.jobs[0].id);
-        app.backups_tab = true;
+        app.page = Page::JobSettings(app.config.jobs[0].id);
+        app.page = Page::Backups(app.config.jobs[0].id);
         app.toggle_settings();
-        assert!(app.settings_open);
-        assert!(app.selected.is_none());
-        assert!(!app.backups_tab);
+        assert!(app.page.is_settings());
+        assert!(app.page.selected_job().is_none());
+        assert!(!app.page.is_backups());
         app.toggle_settings();
-        assert!(!app.settings_open);
-        assert!(app.selected.is_none());
+        assert!(!app.page.is_settings());
+        assert!(app.page.selected_job().is_none());
         app.toggle_settings();
         let id = app.config.jobs[0].id;
         app.toggle_job(id);
-        assert_eq!(app.selected, Some(id));
-        assert!(!app.settings_open);
+        assert_eq!(app.page.selected_job(), Some(id));
+        assert!(!app.page.is_settings());
         app.toggle_job(id);
-        assert!(app.selected.is_none());
+        assert!(app.page.selected_job().is_none());
     }
 
     #[test]
@@ -964,8 +959,8 @@ mod tests {
                 );
                 let mut footer_label = None;
                 for frame in 0..8 {
-                    app.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
-                    app.progress = "Checking source files ...".into();
+                    app.worker.active = (frame % 2 == 1).then_some(app.config.jobs[0].id);
+                    app.worker.progress = "Checking source files ...".into();
                     app.config.jobs[0].status = if frame < 2 {
                         "Not checked yet"
                     } else {
@@ -1100,7 +1095,7 @@ mod tests {
                 tempfile::tempfile().unwrap(),
             );
             for selection in [None, Some(0), Some(0), Some(1), None, Some(1)] {
-                app.selected = selection.map(|index| app.config.jobs[index].id);
+                app.page = Page::for_job(selection.map(|index| app.config.jobs[index].id));
                 let output = ctx.run_ui(
                     egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(
@@ -1235,7 +1230,7 @@ mod tests {
             } else {
                 Theme::Light
             };
-            let saved: Config = crate::engine::load(&path).unwrap();
+            let saved: Config = crate::persistence::load(&path).unwrap();
             assert_eq!(saved.theme, expected);
             let mut restarted = App::new(saved, path.clone(), tempfile::tempfile().unwrap());
             let _ = context.run_ui(
@@ -1388,7 +1383,7 @@ mod tests {
                 assert!((width - 390.0).abs() < 1.0, "width: {width}");
             }
             assert!(app.persist());
-            let config: Config = crate::engine::load(&path).unwrap();
+            let config: Config = crate::persistence::load(&path).unwrap();
             let mut restarted = App::new(config, path, tempfile::tempfile().unwrap());
             let new_ctx = egui::Context::default();
             restarted.ensure_skin(&new_ctx);
@@ -1521,7 +1516,10 @@ mod tests {
                                 name: "A job with a fairly long name".into(),
                                 source: "C:/Users/someone/Documents/Projects".into(),
                                 target: "C:/Backups/target".into(),
-                                schedule: crate::model::Schedule::Weekdays,
+                                timing: ScheduleSettings {
+                                    mode: crate::model::Schedule::Weekdays,
+                                    ..ScheduleSettings::default()
+                                },
                                 enabled: true,
                                 next_run: Some(Utc::now()),
                                 ..Job::default()
@@ -1537,8 +1535,10 @@ mod tests {
                             app.settings_tab = SettingsTab::Theme;
                         }
                     } else {
-                        app.selected = Some(app.config.jobs[0].id);
-                        app.backups_tab = view == "backups";
+                        app.page = Page::JobSettings(app.config.jobs[0].id);
+                        if view == "backups" {
+                            app.page = Page::Backups(app.config.jobs[0].id);
+                        }
                     }
                     let mut overflow = Vec::new();
                     // Later frames settle sizes measured in earlier ones.
@@ -1551,7 +1551,7 @@ mod tests {
                             app.show_header(ui);
                             app.show_footer(ui);
                             app.show_job_list(ui);
-                            if app.settings_open {
+                            if app.page.is_settings() {
                                 app.show_settings(ui);
                             } else {
                                 app.show_job_editor(ui);
