@@ -54,6 +54,10 @@ sudo apt install build-essential pkg-config libx11-dev libxi-dev libxrandr-dev l
 
 On Windows, use the MSVC Rust toolchain and Visual Studio C++ Build Tools with the Windows SDK.
 
+Each release PR must update the version in `Cargo.toml` and `Cargo.lock` to an
+unused version newer than existing releases. See [.github/RELEASING.md](.github/RELEASING.md)
+for the release process.
+
 Before submitting changes, run:
 
 ```sh

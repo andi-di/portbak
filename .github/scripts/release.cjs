@@ -22,19 +22,24 @@ function compareVersions(left, right) {
   return 0;
 }
 
-function bumpVersion(version, labels) {
-  const choices = labels.filter(name => name.startsWith('release:'));
-  if (choices.length > 1 || choices.some(name => !/^release:(major|minor|patch)$/.test(name))) {
-    throw new Error('Use at most one release:major, release:minor, or release:patch label');
+function validateVersion(version, tags, mergeSha) {
+  parseVersion(version);
+  const tag = `v${version}`;
+  const existing = tags.find(candidate => candidate.name === tag);
+  if (existing) {
+    if (mergeSha && existing.commit.sha === mergeSha) return tag;
+    throw new Error(`Version ${version} already has a release tag; bump Cargo.toml and Cargo.lock`);
   }
-  const kind = choices[0]?.slice('release:'.length) ?? 'minor';
-  const parts = parseVersion(version);
-  const index = { major: 0, minor: 1, patch: 2 }[kind];
-  parts[index]++;
-  parts.fill(0, index + 1);
-  const result = parts.join('.');
-  parseVersion(result);
-  return result;
+  const versions = tags.filter(candidate => /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(candidate.name));
+  if (versions.some(candidate => compareVersions(version, candidate.name.slice(1)) <= 0)) {
+    throw new Error('Cargo.toml version must be newer than every existing release tag');
+  }
+  return tag;
+}
+
+async function validateReleaseVersion(github, repo, version, mergeSha) {
+  const tags = await github.paginate(github.rest.repos.listTags, { ...repo, per_page: 100 });
+  return validateVersion(version, tags, mergeSha);
 }
 
 function cargoVersion(manifest) {
@@ -85,7 +90,7 @@ async function releaseByTag(github, repo, tag) {
   }
 }
 
-async function prepareRelease({ github, context, core }, baseline) {
+async function prepareRelease({ github, context, core }, version) {
   context = await releaseContext(github, context);
   if (!context) {
     core.setOutput('published', 'true');
@@ -94,22 +99,11 @@ async function prepareRelease({ github, context, core }, baseline) {
   }
   const pr = mergedPullRequest(context);
   const repo = context.repo;
-  const labels = pr.labels.map(label => label.name);
-  // Validate even on retries, before performing any repository writes.
-  bumpVersion(baseline, labels);
-  const tags = (await github.paginate(github.rest.repos.listTags, { ...repo, per_page: 100 }))
-    .filter(tag => /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag.name));
-  const reserved = tags.filter(tag => tag.commit.sha === pr.merge_commit_sha);
-  if (reserved.length > 1) throw new Error('Multiple version tags refer to this merge commit');
-  let tag = reserved[0]?.name;
-  if (!tag) {
-    const latest = tags.map(tag => tag.name.slice(1))
-      .reduce((latest, version) => compareVersions(version, latest) > 0 ? version : latest, baseline);
-    tag = `v${bumpVersion(latest, labels)}`;
+  const tags = await github.paginate(github.rest.repos.listTags, { ...repo, per_page: 100 });
+  const tag = validateVersion(version, tags, pr.merge_commit_sha);
+  if (!tags.some(candidate => candidate.name === tag)) {
     await github.rest.git.createRef({ ...repo, ref: `refs/tags/${tag}`, sha: pr.merge_commit_sha });
   }
-  const version = tag.slice(1);
-  parseVersion(version);
   let release = await releaseByTag(github, repo, tag);
   if (!release) {
     release = (await github.rest.repos.createRelease({
@@ -178,5 +172,5 @@ async function publishRelease({ github, context }, { version, directory }) {
   });
 }
 
-module.exports = { parseVersion, bumpVersion, cargoVersion, mergedPullRequest, prepareRelease,
+module.exports = { parseVersion, validateVersion, validateReleaseVersion, cargoVersion, mergedPullRequest, prepareRelease,
   releaseFiles, publishRelease };
