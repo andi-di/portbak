@@ -67,7 +67,7 @@ async function releaseContext(github, context) {
     && pr.merge_commit_sha === context.sha);
   if (matches.length > 1) throw new Error('Multiple merged PRs match the pushed commit');
   if (!matches.length) return null;
-  return { ...context, payload: {
+  return { ...context, repo: context.repo, payload: {
     action: 'closed', pull_request: { ...matches[0], merged: true },
   } };
 }
