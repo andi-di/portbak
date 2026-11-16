@@ -66,7 +66,9 @@ class FakeGitHub {
       } }),
     },
   };
-  paginate = async (method) => {
+  paginate = async (method, parameters) => {
+    assert.equal(parameters.owner, 'owner');
+    assert.equal(parameters.repo, 'portbak');
     if (method === this.rest.repos.listTags) return this.tags;
     if (method === this.rest.repos.listReleases) return this.releases;
     if (method === this.rest.repos.listPullRequestsAssociatedWithCommit) return this.pulls;
@@ -267,4 +269,18 @@ test('push-based publication discovers the reserved draft and publishes both bui
   await publishRelease({ github, context: pushContext() }, { version: '0.2.0', directory: archives(t) });
   assert.equal(github.releases[0].draft, false);
   assert.equal(github.assets.length, 3);
+});
+
+test('Actions prototype getters survive push context normalization through publication', async (t) => {
+  const github = new FakeGitHub();
+  github.pulls = [{ ...context().payload.pull_request, merged_at: '2026-11-16T20:22:21Z' }];
+  const { repo, ...properties } = pushContext();
+  const actionsContext = Object.assign(Object.create({ get repo() { return repo; } }), properties);
+  assert.equal(Object.hasOwn(actionsContext, 'repo'), false);
+  const reserved = await prepareRelease({ github, context: actionsContext, core }, '0.1.0');
+  assert.equal(reserved.sha, SHA);
+  assert.equal(github.releases[0].owner, repo.owner);
+  assert.equal(github.releases[0].repo, repo.repo);
+  await publishRelease({ github, context: actionsContext }, { version: reserved.version, directory: archives(t) });
+  assert.equal(github.releases[0].draft, false);
 });
